@@ -202,9 +202,9 @@ A regressão passou em SQLite e PostgreSQL (453 testes em cada banco, 2.542 asse
 
 ### Área útil da prévia — implementada em 30/10/2026
 
-O painel destina 62% da largura ao dashboard no computador, sem limite máximo artificial. Modos e escolha de dashboard ficam na mesma barra; acompanhamento, atualização da lista e geração de imagem ficam em Opções. **Ampliar** usa toda a área de trabalho e **Ver conversa** restaura a disposição lado a lado. A expansão preserva o mesmo iframe e a sessão BI. A prévia interativa não tem rolagem externa concorrendo com a do próprio BI; o histórico de imagens conserva sua rolagem.
+No computador, conversa e prévia usam 50% da largura cada. O espaço vertical livre é ocupado pelo dashboard, sem limite máximo artificial de altura. Modos e escolha de dashboard ficam na mesma barra; acompanhamento, atualização da lista e geração de imagem ficam em Opções. **Ampliar** usa toda a área de trabalho e **Ver conversa** restaura a disposição lado a lado. A expansão preserva o mesmo iframe e a sessão BI. A prévia interativa não tem rolagem externa concorrendo com a do próprio BI; o histórico de imagens conserva sua rolagem.
 
-Na conferência a 1.440 × 1.000, com menu fixo aberto, a área visível passou de aproximadamente 519 × 518 para 736 × 712 pixels. A expansão chegou a 1.187 pixels de largura útil. No celular (390 × 844), o painel ocupa a área de trabalho, com **Conversa** para retornar ao chat; a área útil medida foi de 390 × 521 pixels. A sessão temporária e o acesso ao BI permanecem disponíveis. Os menus internos do provedor continuam nativos; nenhuma ocultação por API não confirmada foi introduzida.
+Na conferência a 1.440 × 1.000, com menu fixo aberto, a área visível passou de aproximadamente 519 × 518 para 593 × 712 pixels, preservando a divisão 50/50. Com o menu recolhido, a área útil medida é de 683 × 712 pixels. A expansão chegou a 1.187 pixels de largura útil. No celular (390 × 844), o painel ocupa a área de trabalho, com **Conversa** para retornar ao chat; a área útil medida foi de 390 × 521 pixels. A sessão temporária e o acesso ao BI permanecem disponíveis. Os menus internos do provedor continuam nativos; nenhuma ocultação por API não confirmada foi introduzida.
 
 ### Menu recolhível — implementado em 30/10/2026
 

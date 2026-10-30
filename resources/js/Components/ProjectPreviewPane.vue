@@ -75,7 +75,7 @@ onUnmounted(()=>{disposed=true;version++;contextVersion++;clear();});
 </template>
 
 <style scoped>
-.project-preview-pane{width:62%;min-width:450px;max-width:none;min-height:0;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid #dce6f3;background:#fff}
+.project-preview-pane{width:50%;min-width:0;max-width:none;min-height:0;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid #dce6f3;background:#fff}
 .project-preview-pane.is-expanded{width:100%;min-width:0;flex:1}
 .project-preview-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:10px;min-height:48px;padding:8px 14px;border-bottom:1px solid #e5edf6;background:#fff}
 .project-preview-header>div{display:flex;align-items:center;gap:8px;color:#5275a1;min-width:0}.project-preview-header strong{font-size:12px;font-weight:650;white-space:nowrap;color:#345479}
