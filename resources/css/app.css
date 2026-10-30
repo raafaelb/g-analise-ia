@@ -86,3 +86,9 @@
         }
     }
 }
+
+/* Keep connection cards usable within the workspace at tablet widths. */
+.connections-view .connection-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.connections-view .connection-card{min-width:0}
+.connections-view .connected-account strong{overflow-wrap:anywhere}
+@media(max-width:1000px){.connections-view .connection-grid{grid-template-columns:minmax(0,1fr)}}

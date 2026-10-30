@@ -17,6 +17,7 @@ use App\Services\BiCloneNames;
 use App\Services\BiCredentials;
 use App\Services\BiDesks;
 use App\Services\BiFlowExecution;
+use App\Services\BiMcpClient;
 use App\Services\BiPublications;
 use App\Services\BiResourceValidation;
 use App\Services\BiValidationFailure;
@@ -106,6 +107,7 @@ class ActionBroker
     public function tools(): array
     {
         return [
+            ['name' => 'bi_data', 'description' => 'Consulta dados reais, indicadores, estrutura e valores da aplicação vinculada ao projeto pelo MCP individual do usuário. Somente leitura, sem SQL e sem criar/alterar recursos. Antes de query, use get_app/search_catalog para obter refs e indicadores; use search_values para localizar valores sem inventá-los. O MCP exige autorização própria do ambiente na página Conexões. As permissões são as da conta autorizada no MCP. Nunca peça tokens ou senhas no chat. Para descobrir bancos de origem ou executar ETL use horus_action.', 'inputSchema' => ['type' => 'object', 'properties' => ['operation' => ['type' => 'string', 'enum' => BiMcpClient::TOOLS], 'arguments' => ['type' => 'object', 'description' => 'get_app: {}. search_catalog: {terms:[palavras]}. search_values: {ref:coluna,contains:trecho,mode:distinct ou sample}; ref ou contains é necessário. query: {fields:[{ref:coluna ou expressão,agg:sum/avg/min/max/count/count_distinct,bucket:day/month/year}],filters:[{ref,op,value}],orderBy:[{ref,dir:asc ou desc}],limit:1 a 500}. agg e bucket são opcionais, use no máximo um por campo. Filtros aceitam =, !=, >, <, >=, <=, between, not between, in, not in, like, not like, is null e is not null. Intervalos usam dois valores; in usa lista. Nunca inclua appId, tenant, resource ou SQL.']], 'required' => ['operation', 'arguments'], 'additionalProperties' => false]],
             ['name' => 'tenant_variables', 'description' => 'Lista nomes e referências das variáveis do tenant do projeto. Os valores são protegidos: nunca devolve senhas, chaves ou outros valores. Use a referência no recurso BI.', 'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'additionalProperties' => false]],
             ['name' => 'refresh_coverage', 'description' => 'Confere todas as fontes de uma aplicação no tenant do projeto, agendas diárias ou mais frequentes, resultados reais e a execução de teste correlacionada. Somente leitura remota; não cria agendas ou executa cargas.', 'inputSchema' => ['type' => 'object', 'properties' => ['resource' => ['type' => 'string', 'pattern' => '^app:[1-9][0-9]*$']], 'required' => ['resource'], 'additionalProperties' => false]],
             ['name' => 'project_image', 'description' => 'Devolve a imagem PNG de um dashboard exportado para análise visual somente após autorização explícita do usuário no portal para esse arquivo e esta conversa. Não gera nova imagem. Use o artifact_id retornado pelo export.', 'inputSchema' => ['type' => 'object', 'properties' => ['artifact_id' => ['type' => 'string']], 'required' => ['artifact_id'], 'additionalProperties' => false]],
@@ -134,6 +136,13 @@ class ActionBroker
         $connection = Connection::where('user_id', $user->id)->where('provider', 'horus')->where('status', 'connected')->first();
         if (! $connection) {
             throw new RuntimeException('A conexão G-Analise foi removida ou expirou.');
+        }
+        if ($tool === 'bi_data') {
+            if (array_diff(array_keys($arguments), ['operation', 'arguments']) !== [] || ! is_string($arguments['operation'] ?? null) || ! is_array($arguments['arguments'] ?? null) || ! preg_match('/^app:([1-9][0-9]*)$/D', (string) $project->source_ref, $match)) {
+                throw new RuntimeException('Vincule uma aplicação ao projeto e informe uma consulta MCP válida.');
+            }
+
+            return app(BiMcpClient::class)->invoke($user, (string) $project->tenant_id, (int) $match[1], $arguments['operation'], $arguments['arguments'], $project->id);
         }
         if ($tool === 'tenant_variables') {
             $rows = app(BiCatalog::class)->rows($connection, $project, 'variables');

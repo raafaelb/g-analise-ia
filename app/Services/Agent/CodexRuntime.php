@@ -16,6 +16,7 @@ use App\Services\ProcessEnvironment;
 use App\Services\WorkspaceFiles;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\Process\InputStream;
 use Symfony\Component\Process\Process;
@@ -157,6 +158,8 @@ class CodexRuntime
                             if ($toolName === 'project_image' && isset($result['image_artifact_id'])) {
                                 $reply['contentItems'][] = app(ArtifactImages::class)->content($run, $result['image_artifact_id']);
                             }
+                        } catch (ValidationException $e) {
+                            $reply = ['success' => false, 'contentItems' => [['type' => 'inputText', 'text' => json_encode(['status' => 'invalid_arguments', 'message' => 'Corrija os argumentos da ferramenta conforme os campos abaixo e tente novamente.', 'errors' => $e->errors()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]]];
                         } catch (RuntimeException $e) {
                             $reply = ['success' => false, 'contentItems' => [['type' => 'inputText', 'text' => $e->getMessage()]]];
                         }

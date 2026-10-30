@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiCredentialController;
 use App\Http\Controllers\BiDeskController;
+use App\Http\Controllers\BiMcpController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ConnectionController;
 use App\Http\Controllers\SuiteAuthController;
@@ -21,10 +22,16 @@ Route::middleware('guest')->group(function () {
 Route::get('/auth/openai', [ConnectionController::class, 'redirect'])->middleware('throttle:openai-login')->name('openai.redirect');
 Route::get('/auth/openai/callback', [ConnectionController::class, 'callback'])->name('openai.callback');
 Route::middleware('auth')->group(function () {
+    Route::get('/auth/bi-mcp/callback', [BiMcpController::class, 'callback'])->middleware('throttle:bi-mcp-auth')->name('bi-mcp.callback');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/app/{section?}', [WorkspaceController::class, 'page'])->where('section', '.*')->name('workspace');
     Route::prefix('api')->middleware('throttle:workspace')->group(function () {
+        Route::get('/connections/bi-mcp/{tenant}/applications', [BiMcpController::class, 'applications'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
+        Route::post('/connections/bi-mcp/{tenant}/authorize', [BiMcpController::class, 'authorize'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
+        Route::post('/connections/bi-mcp/{tenant}/verify', [BiMcpController::class, 'verify'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
+        Route::delete('/connections/bi-mcp/{tenant}', [BiMcpController::class, 'disconnect'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
+        Route::post('/catalog/{tenant}/apps/{id}/mcp', [BiMcpController::class, 'query'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-mcp-query');
         Route::get('/users', [UserAccessController::class, 'index'])->name('users.index');
         Route::post('/users', [UserAccessController::class, 'store'])->middleware('throttle:bi-actions')->name('users.store');
         Route::patch('/users/{user}', [UserAccessController::class, 'update'])->whereNumber('user')->middleware('throttle:bi-actions')->name('users.update');

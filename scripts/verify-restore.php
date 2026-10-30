@@ -20,7 +20,7 @@ try {
     if (empty($values['APP_KEY'])) {
         throw new RuntimeException('APP_KEY não foi incluída no backup.');
     }
-    $overrides = ['APP_KEY' => $values['APP_KEY'], 'APP_ENV' => 'testing', 'APP_CONFIG_CACHE' => '/tmp/ganalise-restore-no-cache.php', 'DB_DATABASE' => $database, 'DB_CONNECTION' => 'pgsql', 'CACHE_STORE' => 'array', 'QUEUE_CONNECTION' => 'sync', 'SESSION_DRIVER' => 'array', 'BROADCAST_CONNECTION' => 'null', 'LOCAL_PREVIEW' => 'false', 'OPENAI_SIGN_IN_ENABLED' => 'false', 'LUMO_LOGIN_ENABLED' => 'false'];
+    $overrides = ['APP_KEY' => $values['APP_KEY'], 'APP_ENV' => 'testing', 'APP_CONFIG_CACHE' => '/tmp/ganalise-restore-no-cache.php', 'DB_DATABASE' => $database, 'DB_CONNECTION' => 'pgsql', 'CACHE_STORE' => 'array', 'QUEUE_CONNECTION' => 'sync', 'SESSION_DRIVER' => 'array', 'BROADCAST_CONNECTION' => 'null', 'LOCAL_PREVIEW' => 'false', 'OPENAI_SIGN_IN_ENABLED' => 'false', 'LUMO_LOGIN_ENABLED' => 'false', 'BI_MCP_ENABLED' => 'false', 'BI_VIEWER_ENABLED' => 'false', 'SUITE_AUTH_ENABLED' => 'false'];
     foreach ($overrides as $key => $value) {
         putenv($key.'='.$value);
         $_ENV[$key] = $value;
@@ -30,6 +30,9 @@ try {
     $app = require __DIR__.'/../bootstrap/app.php';
     $app->make(Kernel::class)->bootstrap();
     Http::preventStrayRequests();
+    if (config('horus.openai.enabled') || config('horus.lumo.login_enabled') || config('horus.mcp.enabled') || config('horus.viewer.enabled') || config('suite.enabled')) {
+        throw new RuntimeException('Integrações externas precisam permanecer desativadas na restauração isolada.');
+    }
     if (config('database.connections.pgsql.database') !== $database) {
         throw new RuntimeException('A conexão não aponta para o banco isolado.');
     }

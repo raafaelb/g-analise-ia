@@ -17,6 +17,7 @@ use App\Models\RefreshSchedule;
 use App\Services\ArtifactImages;
 use App\Services\Audit;
 use App\Services\BiCredentials;
+use App\Services\BiMcpIdentity;
 use App\Services\LocalPreview;
 use App\Services\OpenAiIdentity;
 use App\Services\ProjectPreviews;
@@ -53,8 +54,14 @@ class WorkspaceController extends Controller
         $uid = $request->user()->id;
         $projects = Project::where('user_id', $uid)->where('status', '!=', 'archived')->withCount('conversations')->latest('updated_at')->get();
         $connections = Connection::where('user_id', $uid)->get();
+        $lumoGeneration = $connections->firstWhere('provider', 'horus')?->metadata['session_generation'] ?? null;
+        foreach ($connections as $connection) {
+            if (str_starts_with($connection->provider, BiMcpIdentity::PREFIX)) {
+                $connection->setAttribute('requires_reauthorization', $connection->status !== 'connected' || $lumoGeneration === null || ($connection->metadata['lumo_generation'] ?? null) !== $lumoGeneration || ($connection->metadata['access_version'] ?? null) !== $request->user()->access_version);
+            }
+        }
 
-        $data = ['user' => [...$request->user()->only('id', 'name', 'email', 'role', 'active', 'local_login_enabled', 'must_change_password'), 'auth_provider' => $request->user()->suite_subject !== null ? 'suite' : 'local', 'can_manage_users' => $request->user()->canAdministerUsers()], 'projects' => $projects, 'conversations' => Conversation::where('user_id', $uid)->latest('updated_at')->get(), 'connections' => $connections, 'approvals' => Approval::where('user_id', $uid)->latest()->limit(100)->get(), 'schedules' => RefreshSchedule::where('user_id', $uid)->latest()->get(), 'activity' => AuditEvent::where('user_id', $uid)->latest()->limit(100)->get(), 'artifacts' => Artifact::where('user_id', $uid)->latest()->orderByDesc('id')->get(), 'runs' => AgentRun::where('user_id', $uid)->latest()->orderByDesc('id')->limit(30)->get(), 'preview' => app(LocalPreview::class)->enabled(), 'integration' => ['openai_configured' => app(OpenAiIdentity::class)->configured(), 'plan_usage_enabled' => config('horus.openai.plan_enabled'), 'auth_mode' => config('horus.openai.mode'), 'lumo_login_enabled' => config('horus.lumo.login_enabled'), 'timezone' => 'America/Sao_Paulo', 'suite_url' => app(SuiteIdentity::class)->configured() ? app(SuiteIdentity::class)->issuer() : null]];
+        $data = ['user' => [...$request->user()->only('id', 'name', 'email', 'role', 'active', 'local_login_enabled', 'must_change_password'), 'auth_provider' => $request->user()->suite_subject !== null ? 'suite' : 'local', 'can_manage_users' => $request->user()->canAdministerUsers()], 'projects' => $projects, 'conversations' => Conversation::where('user_id', $uid)->latest('updated_at')->get(), 'connections' => $connections, 'approvals' => Approval::where('user_id', $uid)->latest()->limit(100)->get(), 'schedules' => RefreshSchedule::where('user_id', $uid)->latest()->get(), 'activity' => AuditEvent::where('user_id', $uid)->latest()->limit(100)->get(), 'artifacts' => Artifact::where('user_id', $uid)->latest()->orderByDesc('id')->get(), 'runs' => AgentRun::where('user_id', $uid)->latest()->orderByDesc('id')->limit(30)->get(), 'preview' => app(LocalPreview::class)->enabled(), 'integration' => ['mcp_configured' => app(BiMcpIdentity::class)->configured(), 'openai_configured' => app(OpenAiIdentity::class)->configured(), 'plan_usage_enabled' => config('horus.openai.plan_enabled'), 'auth_mode' => config('horus.openai.mode'), 'lumo_login_enabled' => config('horus.lumo.login_enabled'), 'timezone' => 'America/Sao_Paulo', 'suite_url' => app(SuiteIdentity::class)->configured() ? app(SuiteIdentity::class)->issuer() : null]];
         if ($request->user()->must_change_password) {
             foreach (['projects', 'conversations', 'connections', 'approvals', 'schedules', 'activity', 'artifacts', 'runs'] as $key) {
                 $data[$key] = [];

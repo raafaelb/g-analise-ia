@@ -91,3 +91,8 @@ A Suíte confirma a identidade de colaboradores, e o portal emite sua própria s
 Uma versão de acesso invalida sessões antigas, e uma revisão de cadastro impede salvar alterações sobre um registro que mudou. Contas inativas ou com senha inicial pendente recusam novas operações do broker/Lumo e novas assinaturas privadas. A fronteira de sessão do portal continua distinta da autorização e das sessões emitidas por OpenAI e pelo BI.
 
 As revisões do agente também são entregues pela consulta da conversa, com o identificador da conversa e da mensagem de entrada. A seleção valida usuário, projeto e run. O cliente exibe o mesmo plano de revisão dentro do chat e envia a decisão ao endpoint existente com o fingerprint; não existe um segundo caminho de execução para a interface inline. As mensagens novas carregam seu run nos metadados para posicionar a proposta no histórico.
+
+
+### Consultas pessoais por MCP
+
+O adaptador MCP usa OAuth individual por usuário/tenant, PKCE e registro dinâmico no domínio HTTPS configurado. O banco reutiliza connections com provider horus_mcp:<tenant> e credenciais cifradas; o navegador recebe apenas estado e contexto. Tokens não entram no Codex: o broker bi_data executa as quatro ferramentas de leitura, vincula o app ao projeto, confere Lumo/grant/acesso antes e depois e devolve dados estruturados à IA. Há limites de payload/linhas, transporte JSON/SSE, renovação sob lock e recusa de callbacks/consultas antigos. A conta autorizada no MCP possui permissões próprias no provedor; não se presume igualdade de RLS entre identidades distintas. A desconexão garante bloqueio local e solicita revogação dos dois tokens; a homologação não confirmou invalidação remota imediata, conforme docs/gestao-completa.md.
