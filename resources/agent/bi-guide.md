@@ -17,6 +17,10 @@ Uma aplicação com `deskId: null` está em Minha Mesa. Publicar é uma decisão
 
 Crie arquivos a partir do recurso produzido por `new`/`clone_app`. Não substitua cabeçalhos canônicos e não edite `.lumo/`. `lint` valida a estrutura; não prova que métricas ou renderização estão corretas.
 
+## Atualizar a versão de autoria
+
+Se o BI foi alterado fora deste projeto ou após substituir uma aplicação, use `horus_action` com `action: refresh_resource` e o recurso autorizado. Essa operação lê a versão atual e atualiza somente arquivos sem edições locais pendentes. Se retornar `local_changes`, preserve o conteúdo e use `diff` para explicar o conflito e propor uma combinação. Não force sobrescrita e não edite `.lumo/`. Após atualizar, leia novamente os arquivos com `workspace_file` para obter o novo hash antes de editar.
+
 ## Referências de medidas e dimensões
 
 Widgets usam referências canônicas, não o texto do rótulo:

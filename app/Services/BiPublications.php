@@ -2,10 +2,18 @@
 
 namespace App\Services;
 
+use App\Events\WorkspaceChanged;
+use App\Models\Approval;
 use App\Models\Connection;
+use App\Models\ManagedBiResource;
 use App\Models\Project;
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 class BiPublications
 {
@@ -14,6 +22,7 @@ class BiPublications
     /** @return array<string, mixed> */
     public function plan(Connection $connection, Project $project, array $arguments): array
     {
+        $generation = $connection->metadata['session_generation'] ?? null;
         $ref = $arguments['resource'] ?? '';
         $mode = $arguments['publish_mode'] ?? 'new';
         $desk = $arguments['desk'] ?? null;
@@ -49,6 +58,7 @@ class BiPublications
             $target = ['resource' => 'app:'.$origin, 'name' => $this->name($original), 'sha256' => $this->digest($original)];
         }
         $this->assertSession($connection, $project);
+        $this->assertGeneration($connection, $generation);
 
         return [
             'mode' => $mode,
@@ -60,8 +70,9 @@ class BiPublications
     }
 
     /** @return array<string, mixed> */
-    public function verify(Connection $connection, Project $project, array $plan): array
+    public function verify(Connection $connection, Project $project, array $plan, bool $requireOriginalSession = true): array
     {
+        $generation = $connection->metadata['session_generation'] ?? null;
         [$context, $apps] = $this->context($connection, $project);
         $ref = $plan['target']['resource'] ?? '';
         if (! $this->listed($apps, $ref)) {
@@ -75,11 +86,75 @@ class BiPublications
             throw new RuntimeException('O destino ou o conteúdo resumido retornado pelo BI não corresponde à revisão autorizada.');
         }
         $this->assertSession($connection, $project);
-        if (($connection->metadata['session_generation'] ?? null) !== ($plan['connection_generation'] ?? null)) {
+        $this->assertGeneration($connection, $generation);
+        if ($requireOriginalSession && ($connection->metadata['session_generation'] ?? null) !== ($plan['connection_generation'] ?? null)) {
             throw new RuntimeException('A sessão mudou durante a confirmação da publicação.');
         }
 
         return ['verified' => true, 'mode' => $plan['mode'], 'resource' => $ref, 'name' => $this->name($body), 'dashboard_count' => count($body['dashboards']), 'destination' => $plan['destination'], 'checked_at' => now()->toIso8601String()];
+    }
+
+    /** @return array{project: Project, approval: Approval} */
+    public function reconcile(User $user, string $id): array
+    {
+        abort_if($user->role === 'viewer', 403, 'Seu perfil permite somente leitura.');
+        $approval = Approval::where('user_id', $user->id)->whereIn('type', ['manual', 'publish'])->findOrFail($id);
+        try {
+            $result = Cache::lock('project:'.$approval->project_id, 630)->block(3, function () use ($user, $approval): array {
+                $approval->refresh();
+                $project = Project::where('user_id', $user->id)->findOrFail($approval->project_id);
+                $arguments = $approval->payload['action'] ?? [];
+                $revision = $approval->payload['revision'] ?? [];
+                $plan = $revision['publication'] ?? null;
+                abort_unless(($arguments['action'] ?? '') === 'publish_app' && is_array($plan) && $approval->decided_at !== null, 422, 'Esta revisão não contém uma publicação autorizada para conferir.');
+                abort_unless(in_array($approval->status, ['failed', 'completed'], true), 409, 'Aguarde a execução terminar antes de conferir o resultado.');
+                $fingerprint = hash('sha256', json_encode([$user->id, $project->id, $project->tenant_id, $arguments, $revision], JSON_THROW_ON_ERROR));
+                abort_unless(hash_equals($approval->fingerprint, $fingerprint), 409, 'A revisão ou o contexto mudou. A conferência não pode usar estes dados.');
+                $attempt = $approval->payload['publication_attempt'] ?? [];
+                abort_unless(hash_equals(hash('sha256', json_encode($plan, JSON_THROW_ON_ERROR)), (string) ($attempt['plan_sha256'] ?? '')) && ! empty($attempt['started_at']), 422, 'Não há registro de envio desta publicação. Confira a mensagem da operação antes de preparar outra revisão.');
+                if ($approval->status === 'completed' && ($approval->payload['execution']['result']['publication']['verified'] ?? false) === true) {
+                    return ['project' => $project, 'approval' => $approval];
+                }
+                [$connection] = $this->catalog->access($user, (string) $project->tenant_id);
+                $confirmation = $this->verify($connection, $project, $plan, requireOriginalSession: false);
+                DB::transaction(function () use ($approval, $project, $confirmation, $arguments, $fingerprint): void {
+                    $currentProject = Project::where('user_id', $approval->user_id)->lockForUpdate()->findOrFail($project->id);
+                    $current = Approval::where('user_id', $approval->user_id)->lockForUpdate()->findOrFail($approval->id);
+                    abort_unless($currentProject->tenant_id === $project->tenant_id && $current->status === $approval->status && hash_equals($fingerprint, $current->fingerprint) && $current->payload === $approval->payload, 409, 'O contexto mudou durante a conferência. Atualize a operação e confira novamente.');
+                    $this->recordVerified($currentProject, $arguments['resource'], $confirmation);
+                    $previous = $current->payload['execution'] ?? [];
+                    $current->update(['status' => 'completed', 'payload' => [...$current->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => ['publication' => $confirmation, 'published_resource' => $confirmation['resource'], 'confirmed_name' => $confirmation['name']]], 'reconciliation' => ['checked_at' => $confirmation['checked_at'], 'previous_status' => $approval->status, 'previous_message' => $previous['message'] ?? null, 'remote_read_only' => true]]]);
+                    Audit::record($approval->user_id, 'bi.publication.reconciled', 'Publicação confirmada por nova consulta, sem reenviar a operação.', $project->id, ['approval_id' => $approval->id, 'resource' => $confirmation['resource'], 'tenant_id' => $project->tenant_id]);
+                });
+                Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+
+                return ['project' => $project->refresh(), 'approval' => $approval->refresh()];
+            });
+        } catch (LockTimeoutException) {
+            throw ValidationException::withMessages(['publication' => 'Outra tarefa deste projeto está em andamento. Aguarde para conferir a publicação.']);
+        }
+        try {
+            event(new WorkspaceChanged($user->id));
+        } catch (Throwable) {
+        }
+
+        return $result;
+    }
+
+    public function recordVerified(Project $project, string $source, array $confirmation): void
+    {
+        DB::transaction(function () use ($project, $source, $confirmation): void {
+            $current = Project::where('user_id', $project->user_id)->lockForUpdate()->findOrFail($project->id);
+            abort_unless($current->tenant_id === $project->tenant_id, 409, 'O tenant do projeto mudou durante a confirmação.');
+            $managed = ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $source)->lockForUpdate()->first();
+            if ($managed) {
+                $managed->update(['status' => 'published', 'receipt' => [...($managed->receipt ?? []), 'publication' => $confirmation]]);
+            }
+            if ($current->source_ref === $source) {
+                $current->update(['source_ref' => $confirmation['resource']]);
+                $project->source_ref = $confirmation['resource'];
+            }
+        });
     }
 
     /** @return array{Project, array, array} */
@@ -105,6 +180,13 @@ class BiPublications
         }
 
         return $user;
+    }
+
+    private function assertGeneration(Connection $connection, ?string $generation): void
+    {
+        if (($connection->fresh()?->metadata['session_generation'] ?? null) !== $generation) {
+            throw new RuntimeException('A sessão mudou durante a consulta de publicação. Confira seus acessos e tente a conferência novamente.');
+        }
     }
 
     private function listed(array $rows, string $ref): bool

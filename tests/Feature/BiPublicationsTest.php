@@ -54,6 +54,14 @@ class BiPublicationsTest extends TestCase
                 return ['data' => ['results' => $rows, 'matched' => count($rows)]];
             }
             if ($args[0] === 'fetch') {
+                if ($state->switch_session_during_read ?? false) {
+                    $connection->update(['metadata' => [...$connection->metadata, 'session_generation' => 'session-b']]);
+                    $state->switch_session_during_read = false;
+                }
+                if ($state->publishes > 0 && ($state->readback_unavailable ?? false)) {
+                    throw new RuntimeException('Consulta temporariamente indisponível.');
+                }
+
                 return ['data' => []];
             }
             if ($args[0] === 'info') {
@@ -78,7 +86,11 @@ class BiPublicationsTest extends TestCase
                     }
                 }
 
-                return ['exit_code' => 0, 'data' => ['accepted' => true]];
+                if ($state->throw_after_publish ?? false) {
+                    throw new RuntimeException('A resposta nativa foi interrompida.');
+                }
+
+                return ['exit_code' => 0, 'data' => ['accepted' => true, 'detail' => str_repeat('x', $state->large_result ?? 0)]];
             }
             throw new RuntimeException('Comando inesperado no teste de publicação: '.json_encode($args));
         });
@@ -252,5 +264,162 @@ class BiPublicationsTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('permissão ou a sessão');
         app(BiPublications::class)->plan($connection, $project, ['resource' => 'app:2', 'desk' => 10, 'publish_mode' => 'new']);
+    }
+
+    public function test_read_only_reconciliation_confirms_a_delayed_publication_without_sending_it_again(): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->apply = false;
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $this->execute($user, $approval);
+        $endpoint = '/api/approvals/'.$approval->id.'/publication/verify';
+        $this->postJson($endpoint)->assertUnprocessable()->assertJsonPath('errors.publication.0', 'O destino ou o conteúdo resumido retornado pelo BI não corresponde à revisão autorizada.');
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
+        $state->bodies[2]['_state']['deskId'] = 10;
+        $this->postJson($endpoint)->assertOk()->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.execution.result.publication.verified', true)->assertJsonPath('approval.payload.reconciliation.remote_read_only', true);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'published']);
+        $this->assertDatabaseHas('audit_events', ['action' => 'bi.publication.reconciled', 'resource_id' => $approval->project_id]);
+        $commands = count($state->commands);
+        $this->postJson($endpoint)->assertOk()->assertJsonPath('approval.status', 'completed');
+        $this->assertSame($commands, count($state->commands), 'Conferir uma operação já confirmada é idempotente.');
+        $this->assertSame(1, $state->publishes);
+        $this->assertDatabaseCount('agent_runs', 0);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_reconciliation_after_reconnecting_uses_current_access_and_updates_the_surviving_replacement(): void
+    {
+        Queue::fake();
+        [$user, $project, $connection, $state] = $this->context();
+        $state->readback_unavailable = true;
+        $this->native($state);
+        $approval = $this->prepare($user, 'replace');
+        $this->execute($user, $approval);
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertArrayNotHasKey(2, $state->bodies);
+        $connection->update(['metadata' => [...$connection->metadata, 'session_generation' => 'session-b']]);
+        $state->readback_unavailable = false;
+        $this->postJson('/api/approvals/'.$approval->id.'/publication/verify')->assertOk()->assertJsonPath('project.source_ref', 'app:1')->assertJsonPath('approval.payload.execution.result.published_resource', 'app:1');
+        $this->assertSame('app:1', $project->fresh()->source_ref);
+        $this->assertSame('app:1', ManagedBiResource::first()->receipt['publication']['resource']);
+        $this->assertSame(1, $state->publishes);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_reconciliation_can_confirm_a_write_whose_native_response_was_lost(): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->throw_after_publish = true;
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $this->execute($user, $approval);
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertArrayNotHasKey('native_accepted_at', $approval->fresh()->payload['publication_attempt']);
+        $this->postJson('/api/approvals/'.$approval->id.'/publication/verify')->assertOk()->assertJsonPath('approval.payload.execution.result.publication.verified', true);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'published']);
+        $this->assertSame(1, $state->publishes);
+        $this->assertDatabaseCount('agent_runs', 0);
+    }
+
+    public function test_reconciliation_requires_authentication(): void
+    {
+        $this->mock(LumoClient::class)->shouldNotReceive('run');
+        $this->postJson('/api/approvals/'.Str::uuid().'/publication/verify')->assertUnauthorized();
+    }
+
+    public function test_another_user_cannot_learn_or_reconcile_a_publication(): void
+    {
+        [$owner, , , $state] = $this->context();
+        $this->native($state);
+        $approval = $this->prepare($owner);
+        $this->actingAs(User::factory()->create())->postJson('/api/approvals/'.$approval->id.'/publication/verify')->assertNotFound();
+        $this->assertSame('pending', $approval->fresh()->status);
+        $this->assertSame(0, $state->publishes);
+    }
+
+    public function test_a_viewer_cannot_reconcile_a_publication(): void
+    {
+        [$user, , , $state] = $this->context();
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $user->forceFill(['role' => 'viewer'])->save();
+        $this->actingAs($user->fresh())->postJson('/api/approvals/'.$approval->id.'/publication/verify')->assertForbidden()->assertJsonPath('message', 'Seu perfil permite somente leitura.');
+        $this->assertSame(0, $state->publishes);
+    }
+
+    /** @return array<string, array{string, int}> */
+    public static function invalidReconciliations(): array
+    {
+        return [
+            'changed signed plan' => ['plan', 409],
+            'changed project tenant' => ['tenant', 409],
+            'changed attempt receipt' => ['receipt', 422],
+            'no native attempt' => ['no_attempt', 422],
+            'still executing' => ['executing', 409],
+            'tenant access revoked' => ['access', 403],
+        ];
+    }
+
+    #[DataProvider('invalidReconciliations')]
+    public function test_reconciliation_refuses_invalid_context_without_native_calls(string $case, int $status): void
+    {
+        Queue::fake();
+        [$user, $project, $connection, $state] = $this->context();
+        $state->apply = false;
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $this->execute($user, $approval);
+        $payload = $approval->fresh()->payload;
+        if ($case === 'plan') {
+            $payload['revision']['publication']['destination']['id'] = 999;
+        } elseif ($case === 'tenant') {
+            $project->update(['tenant_id' => '999']);
+        } elseif ($case === 'receipt') {
+            $payload['publication_attempt']['plan_sha256'] = str_repeat('0', 64);
+        } elseif ($case === 'no_attempt') {
+            unset($payload['publication_attempt']);
+        } elseif ($case === 'executing') {
+            $approval->update(['status' => 'executing']);
+        } elseif ($case === 'access') {
+            $connection->update(['metadata' => [...$connection->metadata, 'tenants' => []]]);
+        }
+        $approval->update(['payload' => $payload]);
+        $commands = count($state->commands);
+        $this->postJson('/api/approvals/'.$approval->id.'/publication/verify')->assertStatus($status);
+        $this->assertSame($commands, count($state->commands));
+        $this->assertSame(1, $state->publishes);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
+    }
+
+    public function test_a_large_native_result_preserves_the_publication_confirmation_in_the_interface(): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->large_result = 65000;
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $this->execute($user, $approval);
+        $this->getJson('/api/bi-actions/'.$approval->id)->assertOk()->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.execution.result.publication.verified', true)->assertJsonPath('approval.payload.execution.result.published_resource', 'app:2');
+        $this->assertSame(1, $state->publishes);
+    }
+
+    public function test_a_session_change_during_reconciliation_cannot_confirm_an_earlier_read(): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->readback_unavailable = true;
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $this->execute($user, $approval);
+        $state->readback_unavailable = false;
+        $state->switch_session_during_read = true;
+        $this->postJson('/api/approvals/'.$approval->id.'/publication/verify')->assertUnprocessable()->assertJsonPath('errors.publication.0', 'A sessão mudou durante a consulta de publicação. Confira seus acessos e tente a conferência novamente.');
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
+        $this->assertSame(1, $state->publishes);
     }
 }

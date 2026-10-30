@@ -60,12 +60,18 @@ class BiCatalog
             $project = $this->context($connection, $item);
             $this->lumo->initialize($connection, $project, true);
             $warnings = [];
+            $metadata = [];
+            $metadataFresh = false;
             try {
-                $this->lumo->run($connection, ['pull'], $project, 150);
+                $this->refreshSnapshotFiles($connection, $project);
+                $metadata = $this->workingMetadata($project);
+                $metadataFresh = true;
             } catch (RuntimeException $e) {
+                if ($connection->fresh()->status !== 'connected') {
+                    throw $e;
+                }
                 $warnings[] = 'Os metadados locais não foram atualizados; alguns detalhes serão carregados ao abrir o recurso.';
             }
-            $metadata = $this->workingMetadata($project);
             $resources = [];
             $capabilities = [];
             foreach (self::KINDS as $kind) {
@@ -83,7 +89,7 @@ class BiCatalog
             }
             $resources = app(BiResourceRelations::class)->deskCounters($resources, $capabilities);
             $tags = collect($resources)->flatten(1)->flatMap(fn ($row) => $row['tags'] ?? [])->unique()->sort()->values()->all();
-            $snapshot = ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resources' => $resources, 'capabilities' => $capabilities, 'tags' => $tags, 'warnings' => $warnings, 'synced_at' => now()->toIso8601String()];
+            $snapshot = ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resources' => $resources, 'capabilities' => $capabilities, 'tags' => $tags, 'warnings' => $warnings, 'metadata_fresh' => $metadataFresh, 'synced_at' => now()->toIso8601String()];
             Cache::put($key, $snapshot, now()->addSeconds(90));
 
             return $snapshot;
@@ -127,6 +133,16 @@ class BiCatalog
         }
 
         return $rows;
+    }
+
+    private function refreshSnapshotFiles(Connection $connection, Project $context, ?string $resource = null): void
+    {
+        $expected = 'catalog-'.$context->tenant_id.'-'.($connection->metadata['session_generation'] ?? 'initial');
+        if ($context->exists || $context->user_id !== $connection->user_id || $context->id !== $expected) {
+            throw new RuntimeException('Somente o cache de leitura do catálogo pode ser reconstruído desta forma.');
+        }
+        // This workspace holds disposable catalog snapshots, never project authorship.
+        $this->lumo->run($connection, ['pull', ...($resource === null ? [] : [$resource]), '--discard-local'], $context, $resource === null ? 150 : 90);
     }
 
     public function workingMetadata(Project $project): array
@@ -204,7 +220,7 @@ class BiCatalog
             abort_unless($row, 404, 'Recurso não disponível para esta sessão.');
             $ref = $kind.':'.$id;
             try {
-                $this->lumo->run($connection, ['pull', $ref], $project, 90);
+                $this->refreshSnapshotFiles($connection, $project, $ref);
                 $body = $this->workingMetadata($project)[$ref] ?? null;
             } catch (RuntimeException $e) {
                 if ($connection->fresh()->status !== 'connected') {
@@ -218,6 +234,7 @@ class BiCatalog
         }
         $row = collect($this->rows($connection, $project, $kind))->first(fn (array $row): bool => (string) $row['id'] === $id);
         abort_unless($row, 404, 'Recurso não disponível neste tenant para sua sessão.');
+        $this->lumo->run($connection, ['fetch', $kind.':'.$id], $project, 60);
         $data = $this->lumo->run($connection, ['info', $kind.':'.$id, ...($kind === 'app' ? ['--full'] : [])], $project, 60)['data'];
         $payload = is_array($data) ? ($data['payload'] ?? $data) : null;
         if (is_array($payload) && isset($payload['header']['tenantId']) && (string) $payload['header']['tenantId'] !== $tenant) {
@@ -230,7 +247,7 @@ class BiCatalog
         $metadataComplete = true;
         if (in_array($kind, ['flow', 'table', 'schedule', 'agent'], true)) {
             try {
-                $this->lumo->run($connection, ['pull', $kind.':'.$id], $project, 90);
+                $this->refreshSnapshotFiles($connection, $project, $kind.':'.$id);
                 $working = $this->workingMetadata($project)[$kind.':'.$id] ?? null;
                 if (is_array($working)) {
                     $body = array_replace($working, $body);
@@ -253,7 +270,7 @@ class BiCatalog
         $related = [];
         if (in_array($kind, ['app', 'flow', 'table', 'schedule', 'dw-desk', 'bi-desk', 'credential', 'agent'], true)) {
             $snapshot = $this->snapshot($user, $tenant);
-            $metadata = $this->workingMetadata($project);
+            $metadata = ($snapshot['metadata_fresh'] ?? false) ? $this->workingMetadata($project) : [];
             $metadata[$kind.':'.$id] = $body;
             $credentialKeys = [];
             if (in_array($kind, ['flow', 'credential'], true)) {

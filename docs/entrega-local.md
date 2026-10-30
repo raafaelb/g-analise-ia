@@ -13,7 +13,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 30/1
 
 ## Evidências e uso
 
-233 testes PHP e 1.163 verificações aprovados na revisão local ampliada; 19 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+265 testes PHP e 1.415 verificações aprovados na revisão local ampliada; 19 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
@@ -33,7 +33,7 @@ Mesas agora exibem tabelas, ETLs, cadastros e aplicações vinculadas; detalhes 
 
 O painel de plano/limites está em Conexões e junto ao chat. A conta real em modo OSS não disponibilizou plano ou saldo pelos métodos oficiais consultados; a interface informa essa ausência e oferece acesso ao uso no ChatGPT. Respostas oficiais com plano, janelas, saldo e renovação possuem testes isolados, inclusive separação de cache por conta. Não há estimativa fictícia de franquia.
 
-O runtime local foi atualizado para Lumo 3.41.0 com a imagem já homologada; a imagem anterior foi preservada para reversão. A revisão ampliada ainda está na branch local `feature/gestao-completa`; o CI público aprovado refere-se à versão anterior `7e5678d`. Nenhuma implantação pública foi feita.
+O runtime local foi atualizado para Lumo 3.41.0 com a imagem já homologada; a imagem anterior foi preservada para reversão. A revisão ampliada é mantida na branch `feature/gestao-completa` do repositório público. Cada push tem sua própria execução de CI; confira o resultado vinculado ao hash da versão em avaliação. Nenhuma implantação pública foi feita.
 
 A [análise de gestão completa](gestao-completa.md) distingue as funcionalidades implementadas, as possíveis pelo CLI, as dependentes de APIs/permissões adicionais e os limites de homologação do visualizador interativo e de Claude Code. O painel de prévias acompanha novas imagens sem recarregar a página; a navegação de projetos e o padrão global das barras de rolagem também foram corrigidos e conferidos no navegador.
 
@@ -45,10 +45,19 @@ Os processos do Lumo/Codex e de extração usam ambiente explicitamente isolado,
 
 ## Publicação e isolamento de contexto — rodada de 30/10/2026
 
-Aplicações em rascunho registradas pelo portal oferecem publicação manual, sem iniciar IA: seleção da mesa por nome, escolha explícita entre nova aplicação e substituição, revisão do alvo e execução única. Alterações locais precisam estar sincronizadas, e a cobertura diária precisa estar comprovada. O plano vincula sessão e hashes do rascunho/original; uma mudança no alvo invalida a revisão. A substituição usa apenas a confirmação não interativa do CLI, preservando sua proteção de conflito. O projeto passa a apontar para o recurso que sobrevive à publicação. Resultado aceito pelo CLI sem conferência remota fica pendente, sem repetição automática; a reconciliação guiada dessa situação ainda precisa de uma interface própria.
+Aplicações em rascunho registradas pelo portal oferecem publicação manual, sem iniciar IA: seleção da mesa por nome, escolha explícita entre nova aplicação e substituição, revisão do alvo e execução única. Alterações locais precisam estar sincronizadas, e a cobertura diária precisa estar comprovada. O plano vincula sessão e hashes do rascunho/original; uma mudança no alvo invalida a revisão. A substituição usa apenas a confirmação não interativa do CLI, preservando sua proteção de conflito. O projeto passa a apontar para o recurso que sobrevive à publicação. Resultado aceito pelo CLI sem conferência remota fica pendente, sem repetição automática; o botão **Conferir publicação**, disponível no histórico de novas tentativas com registro de envio, consulta o resultado novamente com os acessos atuais. Essa conferência não republica e não retoma a IA. A tentativa é vinculada ao plano revisado; uma troca de sessão durante a consulta impede confirmar o resultado.
 
 Uma entrega duplicada de tarefa já concluída não reinicia a inferência. Cancelamento entre leitura e execução foi testado, assim como troca de tenant/arquivamento durante tarefas e revisões. Projetos vinculados a recursos ou conversas iniciadas precisam de outro projeto para trabalhar em outro tenant. Projetos arquivados recusam novas tarefas e anexos.
 
 O ensaio sintético do Codex inicialmente detectou instruções carregadas automaticamente do perfil e do workspace. Agora o workspace Lumo é separado do diretório de execução; a descoberta de instruções do projeto foi desativada, e o perfil privado recebe uma orientação controlada. As regras do projeto são obtidas pelo broker. Um novo ensaio real com ChatGPT recuperou produto, tenant e nome corretos, sem operações BI, anexos ou recursos criados. O projeto descartável foi arquivado com sua conversa preservada. Isto continua sem equivaler a um isolamento completo do sistema operacional por usuário.
 
 Consultas indisponíveis, incompletas ou com estado de publicação desconhecido exibem contagens desconhecidas, em vez de totais fictícios iguais a zero. Os novos estados possuem testes de frontend.
+
+
+## Atualização segura e correção de metadados
+
+**Atualizar do BI** recebe a versão atual do recurso vinculado ao projeto, sem iniciar IA ou enviar alterações ao servidor do BI. O broker oferece a mesma operação como `refresh_resource`. Edições locais pendentes, revisões em andamento, sessão alterada e dados de diff desconhecidos impedem a substituição. Não há descarte forçado no workspace de autoria.
+
+A homologação real em projeto local separado confirmou o recebimento da versão publicada, o reconhecimento de uma versão já atual e a preservação de uma edição temporária. A mensagem de conflito foi observada no navegador, o hash permaneceu intacto e o arquivo foi restaurado ao conteúdo exato anterior. Não houve tarefas de IA, aprovações ou recursos remotos criados. O projeto descartável foi arquivado, preservando o histórico.
+
+Um cache antigo do catálogo mostrava o rascunho mesmo depois da publicação confirmada. O cache de consulta agora é reconstruído separadamente da autoria; em falha, metadados antigos não são apresentados como atuais. O navegador confirmou a aplicação publicada na mesa correta e a contagem atual de Minha Mesa.

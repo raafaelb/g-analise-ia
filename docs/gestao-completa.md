@@ -46,6 +46,8 @@ No teste real do fluxo Sign in with ChatGPT OSS, a consulta retornou conta sem p
 
 O login e a inferência OSS local já foram homologados. A operação central continua dependendo do enquadramento/configuração oficial para hospedagem, conforme [solicitação preparada](solicitacao-openai.md). Ser gratuito e ter licença aberta não garante automaticamente a elegibilidade remota. Tanto o [fluxo OSS](https://developers.openai.com/siwc/token-sharing-open-source) quanto o [Cookbook oficial](https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt) orientam solicitar acesso para aplicativos hospedados remotamente. A documentação de [VM própria](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms) explica a transferência protegida para um host do mesmo usuário/workspace; ela não comprova a elegibilidade de um serviço central multiusuário. Não há confirmação de preço ou exigência de assinatura comercial para esse caso.
 
+A [referência oficial dos tokens](https://developers.openai.com/siwc/token-sharing-open-source/token-reference) não apresenta nome de plano ou saldo nesses campos e orienta tratar os metadados de autenticação como opacos. As [diretrizes de interface](https://developers.openai.com/siwc/ui-ux-guidelines) orientam mostrar o uso do plano e acesso ao gerenciamento no ChatGPT. A confirmação informativa uma única vez após o primeiro login e um seletor de múltiplas contas são melhorias de onboarding ainda pendentes; não há extração de supostos limites de campos opacos.
+
 ## Claude Code
 
 As [regras oficiais da Anthropic](https://code.claude.com/docs/en/legal-and-compliance) distinguem duas situações: oferecer login Claude.ai em um chat próprio/intermediar credenciais de planos de consumo é proibido; hospedar o binário oficial, sem modificá-lo nem restringir seus métodos de autenticação, pode ser permitido nas condições publicadas, com aceite dos termos aplicáveis e cada usuário autenticando sua própria conta. Isso não equivale a uma aprovação automática do fluxo deste portal.
@@ -64,9 +66,15 @@ Na página inicial, **Escolher um projeto** agora abre a seleção de projetos q
 
 O botão **Publicar aplicação** aparece nos rascunhos registrados pelo portal e vinculados ao projeto atual. A mesa é selecionada pelo nome. Publicar como nova usa `--new`; substituir exige identificar a aplicação original autorizada na mesma mesa e uma decisão explícita com esse alvo. O CLI preserva a proteção nativa de conflito. O portal recusa publicação com autoria local ainda não sincronizada ou atualização diária sem comprovação. A conferência posterior identifica o recurso sobrevivente e atualiza o projeto.
 
-A publicação como nova foi autorizada pelo titular no próprio portal e confirmada no BI; uma segunda leitura conferiu o mesmo resultado. Substituição, alvo alterado, permissão insuficiente e aceitação sem confirmação passaram em testes isolados, sem publicação automática. Um resultado remoto incerto não pode ser repetido; a interface de reconciliação somente por leitura ainda precisa ser acrescentada.
+A publicação como nova foi autorizada pelo titular no próprio portal e confirmada no BI; uma segunda leitura conferiu o mesmo resultado. Substituição, alvo alterado, permissão insuficiente e aceitação sem confirmação passaram em testes isolados, sem publicação automática. Um resultado remoto incerto não é reenviado automaticamente. Novas tentativas registram o hash do plano e o início do envio; **Conferir publicação**, no histórico, valida a revisão e consulta o destino atual. É possível reconectar o BI antes dessa consulta, mas a sessão deve permanecer a mesma enquanto ela ocorre. A conferência preserva a falha anterior no histórico e não retoma a IA.
 
 Arquivamento e troca de tenant são recusados durante tarefas ou revisões ativas. Depois de vincular um recurso ou iniciar uma conversa, outro tenant exige um novo projeto. A tarefa é reivindicada atomicamente, impedindo que entregas duplicadas reiniciem um trabalho concluído. O runtime Codex usa diretório separado da autoria Lumo e recebe as regras pelas ferramentas controladas. A validação real confirmou o contexto do projeto, sem operações BI ou criação de recursos.
+
+## Atualizar autoria sem perder edições
+
+O projeto oferece **Atualizar do BI** para o recurso vinculado. A IA usa `refresh_resource` pelo mesmo serviço. O diff oficial distingue arquivo ausente, autoria sem modificações e alterações locais pendentes. Somente arquivos ausentes ou sem edições locais são recebidos; o comando nativo continua recusando conflitos, sem `--discard-local` ou sobrescrita forçada na autoria. Após receber, outra leitura confere a versão do servidor; uma mudança posterior aparece como pendência. Revisões/tarefas ativas impedem a atualização manual.
+
+O catálogo usa um workspace exclusivo de cache, sem autoria do usuário, que pode ser reconstruído. Uma falha de atualização não autoriza usar seus arquivos antigos como metadados atuais. Esse problema foi encontrado após a publicação de teste e a correção foi confirmada no navegador.
 
 ## Sequência de desenvolvimento
 

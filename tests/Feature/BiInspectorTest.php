@@ -43,6 +43,11 @@ class BiInspectorTest extends TestCase
             if ($args[0] === 'list') {
                 return ['data' => $args[1] === 'variables' ? ['count' => 0, 'variables' => []] : ['matched' => $args[1] === $kind ? 1 : 0, 'results' => $args[1] === $kind ? [['id' => 10, 'nome' => 'Recurso autorizado']] : []]];
             }
+            if ($args[0] === 'fetch') {
+                $this->assertSame(['fetch', $kind.':10'], $args);
+
+                return ['data' => []];
+            }
             if ($args[0] === 'pull') {
                 return ['data' => []];
             }

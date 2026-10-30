@@ -2,6 +2,7 @@
 import {computed,nextTick,onMounted,onUnmounted,ref,watch} from 'vue';
 import {AlertCircle,ArrowRight,Check,CheckCircle2,Copy,LoaderCircle,RefreshCw,ShieldCheck,Trash2,Upload,X} from 'lucide-vue-next';
 import ApprovalReview from './ApprovalReview.vue';
+import PublicationRecovery from './PublicationRecovery.vue';
 import {createRequestGuard} from '../lib/async-response';
 type Item=Record<string,any>;
 type ManualAction='clone_app'|'delete_draft'|'publish_app';
@@ -46,6 +47,7 @@ async function decide(decision:'approved'|'rejected'){
  try{const response=await props.request(`/approvals/${id}/decide`,'POST',{decision,fingerprint:review.value.fingerprint});if(!current())return;review.value=response;emit('updated');if(decision==='approved')await refreshStatus();}
  catch(e){if(current())error.value=(e as Error).message;}finally{if(current())busy.value=false;}
 }
+function recovered(response:Item){review.value=response.approval;project.value=response.project;completed=true;emit('updated');emit('notice','Publicação confirmada na mesa '+result.value.publication.destination.name+'.');emit('published',result.value.publication.resource);}
 function dismiss(){if(busy.value||executing.value||deciding.value)return;selection.invalidate();mode.value=null;review.value=null;project.value=null;error.value='';}
 onMounted(()=>{poll=setInterval(()=>{clock.value=Date.now();if(!document.hidden)refreshStatus();},2200);});
 onUnmounted(()=>{selection.invalidate();if(poll)clearInterval(poll);});
@@ -64,7 +66,7 @@ onUnmounted(()=>{selection.invalidate();if(poll)clearInterval(poll);});
    <div v-else-if="copied" class="manual-success" role="status"><CheckCircle2 :size="22"/><div><strong>Cópia criada na sua mesa</strong><p>{{result.confirmed_name||'Projeto: '+review.payload.action.name}}</p><p v-if="result.management_warning" class="form-error" role="alert">{{result.management_warning}}</p><p>Confira a atualização das fontes antes de publicar a cópia.</p><button v-if="project" class="primary-button" @click="emit('project',project.id)">Abrir projeto da cópia<ArrowRight :size="15"/></button></div></div>
    <div v-else-if="published" class="manual-success" role="status"><CheckCircle2 :size="22"/><div><strong>Aplicação publicada</strong><p>{{result.publication.name}} · {{result.publication.destination.name}}</p><button v-if="project" class="primary-button" @click="emit('project',project.id)">Abrir projeto<ArrowRight :size="15"/></button></div></div>
    <div v-else-if="review.status==='completed'&&result.management_warning" class="form-error" role="alert"><AlertCircle :size="18"/>{{result.management_warning}}</div>
-   <div v-else-if="review.status==='failed'" class="manual-failure" role="alert"><AlertCircle :size="20"/><div><strong>Esta operação precisa de atenção</strong><p>{{review.payload.execution?.message}}</p><p>Confira o recurso no catálogo antes de solicitar outra operação.</p></div></div>
+   <div v-else-if="review.status==='failed'" class="manual-failure" role="alert"><AlertCircle :size="20"/><div><strong>Esta operação precisa de atenção</strong><p>{{review.payload.execution?.message}}</p><p>Confira o recurso no catálogo antes de solicitar outra operação.</p><PublicationRecovery :approval="review" :request="request" @confirmed="recovered"/></div></div>
    <p v-else class="manual-status" role="status">{{expired||review.status==='expired'?'Esta revisão expirou. Prepare outra para conferir o estado atual.':review.status==='rejected'?'Operação recusada. Nenhuma ação desta revisão foi executada.':review.status==='cancelled'?'Operação cancelada.':review.status==='completed'?'Operação concluída.':'Estado indisponível. Consulte Atividade antes de solicitar outra operação.'}}</p>
    <div v-if="error" class="form-error" role="alert"><AlertCircle :size="16"/>{{error}}</div><button v-if="ended" class="secondary-button manual-back" @click="dismiss">Voltar às ações</button>
   </template>

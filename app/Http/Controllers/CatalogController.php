@@ -8,8 +8,11 @@ use App\Services\Audit;
 use App\Services\BiCatalog;
 use App\Services\BiInspector;
 use App\Services\BiManualActions;
+use App\Services\BiPublications;
 use App\Services\BiViewer;
+use App\Services\BiWorkspaceSync;
 use App\Services\RefreshCoverage;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -36,6 +39,28 @@ class CatalogController extends Controller
     public function actionStatus(Request $request, string $id, BiManualActions $actions): JsonResponse
     {
         return response()->json($actions->status($request->user(), $id));
+    }
+
+    public function reconcilePublication(Request $request, string $id, BiPublications $publications): JsonResponse
+    {
+        try {
+            return response()->json($publications->reconcile($request->user(), $id));
+        } catch (ModelNotFoundException|HttpExceptionInterface $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['publication' => $e->getMessage()]);
+        }
+    }
+
+    public function syncProject(Request $request, string $id, BiWorkspaceSync $sync): JsonResponse
+    {
+        try {
+            return response()->json($sync->refreshProject($request->user(), $id));
+        } catch (ModelNotFoundException|HttpExceptionInterface $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['sync' => $e->getMessage()]);
+        }
     }
 
     public function snapshot(Request $request, string $tenant, BiCatalog $catalog): JsonResponse

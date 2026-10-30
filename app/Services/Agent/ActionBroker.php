@@ -15,6 +15,7 @@ use App\Services\Audit;
 use App\Services\BiCatalog;
 use App\Services\BiCloneNames;
 use App\Services\BiPublications;
+use App\Services\BiWorkspaceSync;
 use App\Services\LumoClient;
 use App\Services\ProcessEnvironment;
 use App\Services\RefreshCoverage;
@@ -102,7 +103,7 @@ class ActionBroker
             ['name' => 'tenant_variables', 'description' => 'Lista nomes e referências das variáveis do tenant do projeto. Os valores são protegidos: nunca devolve senhas, chaves ou outros valores. Use a referência no recurso BI.', 'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'additionalProperties' => false]],
             ['name' => 'refresh_coverage', 'description' => 'Confere todas as fontes de uma aplicação no tenant do projeto, agendas diárias ou mais frequentes, resultados reais e a execução de teste correlacionada. Somente leitura remota; não cria agendas ou executa cargas.', 'inputSchema' => ['type' => 'object', 'properties' => ['resource' => ['type' => 'string', 'pattern' => '^app:[1-9][0-9]*$']], 'required' => ['resource'], 'additionalProperties' => false]],
             ['name' => 'project_image', 'description' => 'Devolve a imagem PNG de um dashboard exportado para análise visual somente após autorização explícita do usuário no portal para esse arquivo e esta conversa. Não gera nova imagem. Use o artifact_id retornado pelo export.', 'inputSchema' => ['type' => 'object', 'properties' => ['artifact_id' => ['type' => 'string']], 'required' => ['artifact_id'], 'additionalProperties' => false]],
-            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'scaffold', 'new', 'clone_app', 'push', 'preview', 'export', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft']], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como nova (padrão) ou substituir a aplicação original na mesma mesa. Substituição exige revisão explícita do alvo.'], 'dashboard' => ['type' => 'integer']], 'required' => ['action'], 'additionalProperties' => false]],
+            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'push', 'preview', 'export', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft']], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como nova (padrão) ou substituir a aplicação original na mesma mesa. Substituição exige revisão explícita do alvo.'], 'dashboard' => ['type' => 'integer']], 'required' => ['action'], 'additionalProperties' => false]],
             ['name' => 'workspace_file', 'description' => 'Lista, lê e escreve arquivos YAML e notas do workspace. Não permite caminhos absolutos, arquivos internos, credenciais ou exclusões. Leia o arquivo antes de editar. Para substituir um arquivo existente, expected_sha256 é obrigatório e deve corresponder ao conteúdo lido; omita-o somente ao criar um arquivo novo.', 'inputSchema' => ['type' => 'object', 'properties' => ['operation' => ['type' => 'string', 'enum' => ['list', 'read', 'write']], 'path' => ['type' => 'string'], 'content' => ['type' => 'string'], 'expected_sha256' => ['type' => 'string']], 'required' => ['operation'], 'additionalProperties' => false]],
         ];
     }
@@ -157,6 +158,9 @@ class ActionBroker
         $action = $arguments['action'];
         if ($run->status === 'awaiting_approval') {
             return ['status' => 'awaiting_approval', 'message' => 'Há uma revisão pendente nesta tarefa. Informe isso ao usuário e encerre o turno sem repetir ações.'];
+        }
+        if ($action === 'refresh_resource') {
+            return app(BiWorkspaceSync::class)->refresh($user, $project, $arguments['resource']);
         }
         if ($action === 'delete_draft') {
             $this->assertDeletable($connection, $project, $arguments['resource']);
@@ -225,7 +229,7 @@ class ActionBroker
                 AgentRun::whereKey($approval->agent_run_id)->update(['heartbeat_at' => now()]);
             }
 
-            return $this->perform($user, $project, $connection, $arguments, $manual, $currentRevision['publication'] ?? null);
+            return $this->perform($user, $project, $connection, $arguments, $manual, $currentRevision['publication'] ?? null, $approval);
         };
         if (($arguments['action'] ?? '') === 'publish_app' && ($revision['publication']['mode'] ?? '') === 'replace') {
             $target = $revision['publication']['target']['resource'];
@@ -236,26 +240,26 @@ class ActionBroker
         return $execute();
     }
 
-    private function perform(User $user, Project $project, Connection $connection, array $arguments, bool $approvedManual = false, ?array $publication = null): array
+    private function perform(User $user, Project $project, Connection $connection, array $arguments, bool $approvedManual = false, ?array $publication = null, ?Approval $approval = null): array
     {
         if (in_array($arguments['action'] ?? '', ['push', 'resume_schedule'], true) && str_starts_with($arguments['resource'] ?? '', 'schedule:')) {
-            return Cache::lock('schedule-write:'.$project->tenant_id, 630)->block(5, function () use ($user, $project, $connection, $arguments, $approvedManual, $publication) {
+            return Cache::lock('schedule-write:'.$project->tenant_id, 630)->block(5, function () use ($user, $project, $connection, $arguments, $approvedManual, $publication, $approval) {
                 app(ScheduleChanges::class)->inspect($user, $project, $arguments['resource'], $arguments['action'] === 'resume_schedule');
 
-                return $this->performUnlocked($user, $project, $connection, $arguments, $approvedManual, $publication);
+                return $this->performUnlocked($user, $project, $connection, $arguments, $approvedManual, $publication, $approval);
             });
         }
 
-        return $this->performUnlocked($user, $project, $connection, $arguments, $approvedManual, $publication);
+        return $this->performUnlocked($user, $project, $connection, $arguments, $approvedManual, $publication, $approval);
     }
 
-    private function performUnlocked(User $user, Project $project, Connection $connection, array $arguments, bool $approvedManual = false, ?array $publication = null): array
+    private function performUnlocked(User $user, Project $project, Connection $connection, array $arguments, bool $approvedManual = false, ?array $publication = null, ?Approval $approval = null): array
     {
         $command = $this->command($arguments, $project);
         app(TenantPolicy::class)->assertCommandAllowed((string) $project->tenant_id, $command, $connection);
         $action = $arguments['action'];
         $this->assertRefreshBeforePublish($user, $project, $arguments);
-        if ($action === 'publish_app' && (! is_array($publication) || ($publication['source']['resource'] ?? null) !== $arguments['resource'] || ($publication['destination']['id'] ?? null) !== $arguments['desk'] || ($publication['mode'] ?? null) !== ($arguments['publish_mode'] ?? 'new'))) {
+        if ($action === 'publish_app' && (! $approval || ! is_array($publication) || ($publication['source']['resource'] ?? null) !== $arguments['resource'] || ($publication['destination']['id'] ?? null) !== $arguments['desk'] || ($publication['mode'] ?? null) !== ($arguments['publish_mode'] ?? 'new'))) {
             throw new RuntimeException('A publicação exige uma revisão atual do destino e do efeito esperado.');
         }
         if ($action === 'delete_draft') {
@@ -267,6 +271,9 @@ class ActionBroker
         }
         if ($action === 'export') {
             File::delete(app(WorkspaceFiles::class)->path($project).'/exports/dashboard.png');
+        }
+        if ($action === 'publish_app') {
+            $approval->update(['payload' => [...$approval->payload, 'publication_attempt' => ['plan_sha256' => hash('sha256', json_encode($publication, JSON_THROW_ON_ERROR)), 'started_at' => now()->toIso8601String()]]]);
         }
         $requestedAt = now()->toIso8601String();
         $result = $this->lumo->run($connection, $command, $project, in_array($action, ['export', 'run_schedule'], true) ? 180 : 90);
@@ -318,6 +325,7 @@ class ActionBroker
             }
         }
         if ($action === 'publish_app') {
+            $approval->update(['payload' => [...$approval->payload, 'publication_attempt' => [...$approval->payload['publication_attempt'], 'native_accepted_at' => now()->toIso8601String()]]]);
             Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
             $managed = ManagedBiResource::where('user_id', $user->id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $arguments['resource'])->first();
             if ($managed) {
@@ -330,12 +338,7 @@ class ActionBroker
                 Audit::record($user->id, 'horus.publish.unverified', 'O resultado da publicação ainda precisa ser conferido no catálogo.', $project->id, ['resource' => $arguments['resource'], 'expected_resource' => $publication['target']['resource'], 'exception_type' => get_class($e)]);
                 throw new RuntimeException('O BI aceitou a publicação, mas a confirmação final ficou pendente. Confira '.$publication['target']['resource'].' na mesa “'.$publication['destination']['name'].'” antes de solicitar outra publicação.');
             }
-            if ($managed) {
-                $managed->update(['status' => 'published', 'receipt' => [...$managed->receipt, 'publication' => $confirmation]]);
-            }
-            if ($project->source_ref === $arguments['resource']) {
-                $project->update(['source_ref' => $confirmation['resource']]);
-            }
+            app(BiPublications::class)->recordVerified($project, $arguments['resource'], $confirmation);
             $result['publication'] = $confirmation;
             $result['published_resource'] = $confirmation['resource'];
             $result['confirmed_name'] = $confirmation['name'];
@@ -376,7 +379,7 @@ class ActionBroker
         if ($ref !== '' && ! preg_match('/^(app|flow|table|schedule|agent|bi-desk|dw-desk):[1-9][0-9]*$/D', $ref)) {
             throw new RuntimeException('Referência G-Analise inválida.');
         }
-        $required = ['info', 'columns', 'table_preview', 'diff', 'clone_app', 'push', 'preview', 'export', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft'];
+        $required = ['info', 'columns', 'table_preview', 'diff', 'refresh_resource', 'clone_app', 'push', 'preview', 'export', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft'];
         if (in_array($action, $required, true) && $ref === '') {
             throw new RuntimeException('Informe o recurso que será operado.');
         }
@@ -423,7 +426,7 @@ class ActionBroker
         $dashboard = isset($arguments['dashboard']) ? ['--dashboard', (string) (int) $arguments['dashboard']] : [];
 
         return match ($action) {
-            'list' => ['list', $kind, '--remote', '--limit', '500'], 'info' => ['info', $ref, ...(str_starts_with($ref, 'app:') ? ['--full'] : [])], 'columns' => ['columns', $ref], 'table_preview' => ['table', 'preview', $ref, '--limit', '20'], 'lint' => ['lint'], 'diff' => ['diff', $ref, '--include-remote'],
+            'list' => ['list', $kind, '--remote', '--limit', '500'], 'info' => ['info', $ref, ...(str_starts_with($ref, 'app:') ? ['--full'] : [])], 'columns' => ['columns', $ref], 'table_preview' => ['table', 'preview', $ref, '--limit', '20'], 'lint' => ['lint'], 'diff' => ['diff', $ref, '--include-remote'], 'refresh_resource' => ['pull', $ref],
             'scaffold' => ['scaffold', $kind],
             'new' => $this->newCommand($kind, $arguments),
             'clone_app' => ['app', 'clone', $ref, ...($cloneName !== '' ? ['--name', $cloneName] : [])], 'push' => ['push', $ref],

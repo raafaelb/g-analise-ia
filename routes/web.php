@@ -21,6 +21,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('api')->middleware('throttle:workspace')->group(function () {
         Route::post('/catalog/{tenant}/apps/{id}/actions', [CatalogController::class, 'prepareAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
+        Route::post('/approvals/{id}/publication/verify', [CatalogController::class, 'reconcilePublication'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}', [CatalogController::class, 'snapshot'])->whereNumber('tenant')->middleware('throttle:catalog');
         Route::get('/catalog/{tenant}/variables/{id}', [CatalogController::class, 'variable'])->whereNumber('tenant')->where('id', '[a-f0-9]+');
         Route::get('/catalog/{tenant}/resources/{kind}/{id}/inspect/{action}', [CatalogController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['data', 'status', 'history', 'health', 'events'])->middleware('throttle:bi-inspect');
@@ -33,6 +34,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/bootstrap', [WorkspaceController::class, 'bootstrap']);
         Route::post('/projects', [WorkspaceController::class, 'createProject']);
         Route::patch('/projects/{id}', [WorkspaceController::class, 'updateProject']);
+        Route::post('/projects/{id}/sync-resource', [CatalogController::class, 'syncProject'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::post('/projects/{id}/conversations', [WorkspaceController::class, 'createConversation']);
         Route::get('/conversations/{id}', [WorkspaceController::class, 'conversation']);
         Route::post('/conversations/{id}/messages', [WorkspaceController::class, 'message'])->middleware('throttle:agent-messages');

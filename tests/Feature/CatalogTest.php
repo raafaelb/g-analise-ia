@@ -207,4 +207,60 @@ class CatalogTest extends TestCase
         $this->getJson('/api/catalog/321')->assertJsonPath('resources.app.0.name', 'new-login');
         $this->assertStringEndsWith('new-login', app(BiCatalog::class)->context($c, ['id' => '321', 'name' => 'BI'])->id);
     }
+
+    public function test_catalog_refresh_rebuilds_only_its_disposable_cache_and_reflects_a_new_publication(): void
+    {
+        $user = User::factory()->create();
+        $connection = $this->connect($user);
+        $folder = $this->root.'/'.$user->id.'/catalog-321-initial/apps';
+        File::ensureDirectoryExists($folder, 0700, true);
+        $file = $folder.'/app--1.yaml';
+        File::put($file, "id: 1\nkind: app\ntenantId: 321\n---\nnome: Versão antiga\n_state: {deskId: null}\ndashboards: []\n");
+        $project = Project::create(['user_id' => $user->id, 'tenant_id' => '321', 'name' => 'Edições do usuário']);
+        $authoring = $this->root.'/'.$user->id.'/'.$project->id.'/apps';
+        File::ensureDirectoryExists($authoring, 0700, true);
+        File::put($authoring.'/app--1.yaml', 'Edição local que precisa ser preservada.');
+        $mock = $this->mock(LumoClient::class);
+        $mock->shouldReceive('initialize')->andReturnNull();
+        $mock->shouldReceive('run')->andReturnUsing(function ($c, array $args, $context) use ($file, $user): array {
+            $this->assertSame('catalog-321-initial', $context->id);
+            $this->assertSame($user->id, $context->user_id);
+            $this->assertFalse($context->exists);
+            if ($args[0] === 'pull') {
+                $this->assertSame(['pull', '--discard-local'], $args);
+                File::put($file, "id: 1\nkind: app\ntenantId: 321\n---\nnome: Versão publicada\n_state: {deskId: 7}\ndashboards: []\n");
+
+                return ['data' => []];
+            }
+            if (($args[1] ?? '') === 'variables') {
+                return ['data' => ['count' => 0, 'variables' => []]];
+            }
+
+            return ['data' => ['matched' => $args[1] === 'app' ? 1 : 0, 'results' => $args[1] === 'app' ? [['id' => 1, 'nome' => 'Versão publicada']] : []]];
+        });
+        $this->actingAs($user)->getJson('/api/catalog/321?refresh=1')->assertOk()->assertJsonPath('resources.app.0.state', 'published')->assertJsonPath('resources.app.0.desk_id', '7')->assertJsonPath('resources.app.0.name', 'Versão publicada');
+        $this->assertSame('Edição local que precisa ser preservada.', File::get($authoring.'/app--1.yaml'));
+    }
+
+    public function test_failed_snapshot_refresh_does_not_present_stale_local_publication_metadata_as_current(): void
+    {
+        $user = User::factory()->create();
+        $this->connect($user);
+        $folder = $this->root.'/'.$user->id.'/catalog-321-initial/apps';
+        File::ensureDirectoryExists($folder, 0700, true);
+        File::put($folder.'/old--1.yaml', "id: 1\nkind: app\ntenantId: 321\n---\nnome: Rascunho antigo\n_state: {deskId: null}\ndashboards: []\n");
+        $mock = $this->mock(LumoClient::class);
+        $mock->shouldReceive('initialize')->andReturnNull();
+        $mock->shouldReceive('run')->andReturnUsing(function ($c, array $args): array {
+            if ($args[0] === 'pull') {
+                throw new \RuntimeException('Leitura temporariamente indisponível.');
+            }
+            if (($args[1] ?? '') === 'variables') {
+                return ['data' => ['count' => 0, 'variables' => []]];
+            }
+
+            return ['data' => ['matched' => $args[1] === 'app' ? 1 : 0, 'results' => $args[1] === 'app' ? [['id' => 1, 'nome' => 'Nome atual autorizado']] : []]];
+        });
+        $this->actingAs($user)->getJson('/api/catalog/321')->assertOk()->assertJsonPath('resources.app.0.name', 'Nome atual autorizado')->assertJsonPath('resources.app.0.state', null)->assertJsonPath('resources.app.0.dashboard_count', null)->assertJsonPath('resources.app.0.metadata_available', false)->assertJsonPath('warnings.0', 'Os metadados locais não foram atualizados; alguns detalhes serão carregados ao abrir o recurso.');
+    }
 }

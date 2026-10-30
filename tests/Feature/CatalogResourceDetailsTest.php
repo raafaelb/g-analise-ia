@@ -45,7 +45,7 @@ class CatalogResourceDetailsTest extends TestCase
         $mock = $this->mock(LumoClient::class);
         $mock->shouldReceive('initialize')->once()->andReturnNull();
         $mock->shouldReceive('run')->withArgs(fn ($c, $a) => $a === ['list', 'presentation', '--remote', '--limit', '500', '--offset', '0'])->once()->andReturn(['data' => ['matched' => 1, 'results' => [['id' => 7, 'nome' => 'Telão']]]]);
-        $mock->shouldReceive('run')->withArgs(fn ($c, $a) => $a === ['pull', 'presentation:7'])->once()->andReturnUsing(function () use ($p) {
+        $mock->shouldReceive('run')->withArgs(fn ($c, $a) => $a === ['pull', 'presentation:7', '--discard-local'])->once()->andReturnUsing(function () use ($p) {
             $folder = app(WorkspaceFiles::class)->path($p).'/presentations';
             File::ensureDirectoryExists($folder);
             File::put($folder.'/telao--7.yaml', "id: 7\nkind: presentation\ntenantId: 321\n---\nnome: Telão\nitems: []\n");
