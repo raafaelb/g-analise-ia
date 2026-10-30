@@ -1,0 +1,23 @@
+name: Testes
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cp .env.example .env
+          sed -i "s/^LOCAL_UID=.*/LOCAL_UID=$(id -u)/" .env
+          sed -i "s/^LOCAL_GID=.*/LOCAL_GID=$(id -g)/" .env
+      - run: python3 -m unittest discover -s tests/ops
+      - run: docker compose build app
+      - run: docker compose run --rm --no-deps app composer install --no-interaction --prefer-dist
+      - run: docker compose run --rm --no-deps app php artisan key:generate
+      - run: docker compose run --rm --no-deps app php artisan test --compact
+      - run: docker compose run --rm --no-deps app vendor/bin/pint --test
+      - run: docker compose run --rm frontend npm ci
+      - run: docker compose run --rm frontend npm run build:local
+      - run: docker compose run --rm --no-deps app php scripts/codex-smoke.php

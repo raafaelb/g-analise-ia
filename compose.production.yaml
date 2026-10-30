@@ -1,0 +1,81 @@
+name: horus-ia-production
+x-app: &app
+  image: horus-ia-app:production
+  build: &production-build
+    context: .
+    target: production
+    args:
+      ASSET_URL: ${PUBLIC_PATH:-}
+      VITE_REVERB_PATH: ${PUBLIC_PATH:-}/ws
+      VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?Configure REVERB_APP_KEY}
+      VITE_REVERB_HOST: ${PUBLIC_HOST:?Configure PUBLIC_HOST}
+      VITE_REVERB_PORT: 443
+      VITE_REVERB_SCHEME: https
+  env_file: .env.production
+  environment:
+    APP_ENV: production
+    APP_DEBUG: 'false'
+    LOCAL_PREVIEW: 'false'
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_DATABASE: horus_ia
+    DB_USERNAME: horus
+    DB_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+    REDIS_HOST: redis
+    REDIS_CLIENT: predis
+    CACHE_STORE: redis
+    QUEUE_CONNECTION: redis
+    SESSION_DRIVER: database
+    BROADCAST_CONNECTION: reverb
+    REVERB_HOST: reverb
+    REVERB_PORT: 8080
+    REVERB_SCHEME: http
+  volumes: ["private-storage:/var/www/html/storage"]
+  restart: unless-stopped
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+services:
+  app:
+    <<: *app
+  worker:
+    <<: *app
+    command: ["php","artisan","queue:work","--queue=actions,agents,default","--sleep=1","--tries=1","--timeout=960"]
+    stop_grace_period: 30s
+  documents:
+    <<: *app
+    command: ["php","artisan","queue:work","--queue=documents","--sleep=1","--tries=1","--timeout=90"]
+    stop_grace_period: 100s
+  scheduler:
+    <<: *app
+    command: ["php","artisan","schedule:work"]
+  reverb:
+    <<: *app
+    command: ["php","artisan","reverb:start","--host=0.0.0.0","--port=8080"]
+  web:
+    image: horus-ia-web:production
+    build:
+      <<: *production-build
+      target: web
+    ports: ["127.0.0.1:${APP_PORT:-8089}:8080"]
+    depends_on: [app,reverb]
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: horus_ia
+      POSTGRES_USER: horus
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD}
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL","pg_isready -U horus -d horus_ia"], interval: 5s, retries: 15}
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--appendonly","yes"]
+    volumes: ["redis-data:/data"]
+    healthcheck: {test: ["CMD","redis-cli","ping"], interval: 5s, retries: 15}
+    restart: unless-stopped
+volumes:
+  private-storage:
+  postgres-data:
+  redis-data:
