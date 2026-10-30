@@ -22,5 +22,21 @@ onUnmounted(()=>{guard.invalidate();currentPassword.value='';password.value='';c
  </div>
 </template>
 <style scoped>
-.account-security-view{max-width:940px;width:100%;margin:0 auto}.account-security-card{max-width:580px;padding:29px;background:#fff;border:1px solid #e1e7f0;border-radius:13px;color:#5077ac}.account-security-card h2{font-size:19px;color:#304967;margin:17px 0 12px}.account-security-card>p{font-size:13px;line-height:1.9;color:#74849d}.account-security-card>a{margin-top:20px}.account-security-card form{margin-top:23px}.account-password-hint{font-size:11px;color:#8191a8;line-height:1.8;margin-bottom:20px}.account-password-success{display:flex;align-items:center;gap:8px;font-size:12px;color:#307b5b;margin:15px 0}.account-security-card form>button{margin-top:17px}
+.account-security-view{max-width:940px;width:100%;margin:0 auto}
+.account-security-card{box-sizing:border-box;width:100%;max-width:580px;padding:29px;background:#fff;border:1px solid #e1e7f0;border-radius:13px;color:#5077ac}
+.account-security-card h2{font-size:19px;color:#304967;margin:17px 0 12px}
+.account-security-card>p{font-size:13px;line-height:1.9;color:#74849d}
+.account-security-card>a{margin-top:20px}
+.account-security-card form{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin-top:24px}
+.account-security-card form>label{display:grid;gap:8px;min-width:0;font-size:12px;font-weight:600;color:#50627d}
+.account-security-card input{box-sizing:border-box;display:block;width:100%;min-width:0;height:44px;padding:11px 12px;border:1px solid #dbe3ef;border-radius:8px;background:#fbfcff;color:#30496a;font:inherit;font-size:13px;line-height:1.5;transition:border-color .15s,box-shadow .15s}
+.account-security-card input:hover{border-color:#b6c8e1}
+.account-security-card input:focus-visible{outline:2px solid #0861ee;outline-offset:2px;border-color:#8db6f0;box-shadow:0 0 0 3px #0861ee0b}
+.account-security-card input:disabled{cursor:wait;background:#f2f5fa;color:#74849d}
+.account-password-hint{font-size:11px;color:#8191a8;line-height:1.8;margin:0}
+.account-password-success{display:flex;align-items:center;gap:8px;font-size:12px;color:#307b5b;margin:0}
+.account-security-card form>.form-error{margin:0}
+.account-security-card form>button{justify-self:start;margin-top:3px}
+@media(max-width:600px){.account-security-card{padding:23px}.account-security-card form>button{justify-self:stretch;width:100%}}
+@media(prefers-reduced-motion:reduce){.account-security-card input{transition:none}}
 </style>
