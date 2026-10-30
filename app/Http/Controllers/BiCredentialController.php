@@ -29,12 +29,12 @@ class BiCredentialController extends Controller
 
     public function inspect(Request $request, string $tenant, string $id, string $action, BiCredentials $credentials): JsonResponse
     {
-        if (array_diff(array_keys($request->all()), ['schema']) !== []) {
-            throw ValidationException::withMessages(['schema' => 'Esta consulta aceita somente a seleção de um schema.']);
+        if (array_diff(array_keys($request->all()), ['schema', 'search', 'offset']) !== []) {
+            throw ValidationException::withMessages(['schema' => 'Esta consulta aceita somente schema, termo de busca e posição da estrutura.']);
         }
-        $data = $request->validate(['schema' => ['nullable', 'string', 'max:128']]);
+        $data = $request->validate(['schema' => ['nullable', 'string', 'max:128'], 'search' => ['nullable', 'string', 'max:100'], 'offset' => ['sometimes', 'integer', 'min:0', 'max:1000000']]);
 
-        return $this->respond(fn (): array => $credentials->inspect($request->user(), $tenant, $id, $action, $data['schema'] ?? null));
+        return $this->respond(fn (): array => $credentials->inspect($request->user(), $tenant, $id, $action, $data['schema'] ?? null, $data['search'] ?? null, (int) ($data['offset'] ?? 0)));
     }
 
     private function respond(callable $operation): JsonResponse

@@ -3,9 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Connection;
+use App\Models\Project;
 use App\Models\User;
+use App\Services\BiBusy;
 use App\Services\LumoClient;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -229,5 +234,58 @@ class LumoIntegrationTest extends TestCase
         $this->assertSessionChanged(fn () => $client->refreshTenants($connection));
         $this->assertSame('new-login', $connection->fresh()->metadata['session_generation']);
         $this->assertSame('456', $connection->fresh()->metadata['tenants'][0]['id']);
+    }
+
+    public function test_local_lint_errors_can_be_read_without_being_confused_with_success(): void
+    {
+        $this->fakeCli(['schemaVersion' => 1, 'command' => 'lint', 'data' => ['errorCount' => 1, 'results' => [['issues' => [['message' => 'yaml line 109']]]]]], 8);
+        $user = User::factory()->create();
+        $connection = $this->connection($user);
+        $project = Project::create(['user_id' => $user->id, 'tenant_id' => '100', 'name' => 'Validação local']);
+
+        $result = app(LumoClient::class)->run($connection, ['lint', 'flows/test.yaml'], $project, 45, true);
+
+        $this->assertSame(8, $result['exit_code']);
+        $this->assertSame(1, $result['data']['errorCount']);
+        $this->assertSame('yaml line 109', $result['data']['results'][0]['issues'][0]['message']);
+    }
+
+    public function test_diagnostic_mode_cannot_suppress_a_remote_command_failure(): void
+    {
+        $this->fakeCli(['error' => ['code' => 'INVALID_RESOURCE']], 8);
+        $connection = $this->connection(User::factory()->create());
+
+        $this->expectExceptionMessage('Somente a validação local');
+        app(LumoClient::class)->run($connection, ['push', 'flow:1'], null, 45, true);
+    }
+
+    public function test_lock_contention_before_starting_a_command_has_a_distinct_retryable_failure(): void
+    {
+        $connection = $this->connection(User::factory()->create());
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')->once()->andThrow(new LockTimeoutException);
+        Cache::shouldReceive('lock')->once()->andReturn($lock);
+
+        $this->expectException(BiBusy::class);
+        app(LumoClient::class)->run($connection, ['info', 'flow:1']);
+    }
+
+    public function test_a_lock_failure_after_command_entry_does_not_claim_the_command_was_unstarted(): void
+    {
+        $this->fakeCli(['ok' => true]);
+        $connection = $this->connection(User::factory()->create());
+        $lock = \Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')->once()->andReturnUsing(function ($seconds, $callback) {
+            $callback();
+            throw new LockTimeoutException;
+        });
+        Cache::shouldReceive('lock')->once()->andReturn($lock);
+
+        try {
+            app(LumoClient::class)->run($connection, ['info', 'flow:1']);
+            $this->fail('Falha foi ignorada.');
+        } catch (RuntimeException $e) {
+            $this->assertNotInstanceOf(BiBusy::class, $e);
+        }
     }
 }

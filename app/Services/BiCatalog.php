@@ -69,7 +69,7 @@ class BiCatalog
                 $metadata = $this->workingMetadata($project);
                 $metadataFresh = true;
             } catch (RuntimeException $e) {
-                if ($connection->fresh()->status !== 'connected') {
+                if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected') {
                     throw $e;
                 }
                 $warnings[] = 'Os metadados locais não foram atualizados; alguns detalhes serão carregados ao abrir o recurso.';
@@ -82,7 +82,7 @@ class BiCatalog
                     $resources[$kind] = array_map(fn ($row) => $this->summary($kind, $row, $metadata[$kind.':'.($row['id'] ?? '')] ?? null), $rows);
                     $capabilities[$kind] = ['status' => 'available', 'count' => count($rows), 'reason' => null];
                 } catch (RuntimeException $e) {
-                    if ($connection->fresh()->status !== 'connected') {
+                    if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected') {
                         throw $e;
                     }
                     $resources[$kind] = [];
@@ -225,7 +225,7 @@ class BiCatalog
                 $this->refreshSnapshotFiles($connection, $project, $ref);
                 $body = $this->workingMetadata($project)[$ref] ?? null;
             } catch (RuntimeException $e) {
-                if ($connection->fresh()->status !== 'connected') {
+                if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected') {
                     throw $e;
                 }
                 // Uma cópia antiga do disco não substitui uma leitura atual autorizada.
@@ -277,7 +277,7 @@ class BiCatalog
                     $metadataComplete = false;
                 }
             } catch (RuntimeException $e) {
-                if ($connection->fresh()->status !== 'connected') {
+                if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected') {
                     throw $e;
                 }
                 $metadataComplete = false;
@@ -311,7 +311,7 @@ class BiCatalog
                         }
                     }
                 } catch (RuntimeException $e) {
-                    if ($connection->fresh()->status !== 'connected') {
+                    if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected') {
                         throw $e;
                     }
                 }

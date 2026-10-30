@@ -9,6 +9,7 @@ use App\Models\Message;
 use App\Models\User;
 use App\Services\Agent\CodexRuntime;
 use App\Services\Audit;
+use App\Services\BiBusy;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -20,7 +21,7 @@ class RunAgentTurn implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 1;
+    public int $tries = 30;
 
     public int $timeout = 950;
 
@@ -101,6 +102,9 @@ class RunAgentTurn implements ShouldQueue
             $run->refresh();
             if (in_array($run->status, ['cancel_requested', 'cancelled'], true)) {
                 $run->update(['status' => 'cancelled', 'finished_at' => now()]);
+            } elseif ($e instanceof BiBusy) {
+                $run->update(['status' => 'queued', 'heartbeat_at' => now()]);
+                $this->release(5);
             } else {
                 $this->failRun($run, $e instanceof RuntimeException ? $e->getMessage() : 'Ocorreu uma falha na execução. Sua conversa e seus arquivos foram preservados.', 'execution_failed');
             }Log::warning('G-Analise IA: agent run ended', ['run_id' => $run->id, 'exception_type' => get_class($e)]);

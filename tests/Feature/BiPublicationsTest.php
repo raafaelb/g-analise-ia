@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
 use App\Services\BiPublications;
+use App\Services\BiResourceValidation;
 use App\Services\LumoClient;
 use App\Services\RefreshCoverage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,6 +45,7 @@ class BiPublicationsTest extends TestCase
 
             return ['verified' => $state->refresh_verified];
         });
+        $this->mock(BiResourceValidation::class)->shouldReceive('inspect')->andReturn(['passed' => true]);
         $mock = $this->mock(LumoClient::class);
         $mock->shouldReceive('initialize')->andReturnNull();
         $mock->shouldReceive('run')->andReturnUsing(function (Connection $connection, array $args) use ($state): array {

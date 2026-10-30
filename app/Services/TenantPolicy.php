@@ -24,10 +24,11 @@ class TenantPolicy
         $command = $arguments[0] ?? '';
         $subcommand = $arguments[1] ?? '';
         $readOnly = in_array($command, ['init', 'list', 'info', 'columns', 'lint', 'diff', 'status', 'scaffold', 'fetch', 'pull', 'log'], true)
-            || ($command === 'app' && in_array($subcommand, ['dashboard-preview', 'export'], true))
+            || ($command === 'app' && (in_array($subcommand, ['dashboard-preview', 'export'], true) || ($subcommand === 'open' && in_array('--no-browser', $arguments, true) && ! in_array('--session', $arguments, true))))
             || ($command === 'table' && $subcommand === 'preview')
-            || ($command === 'flow' && in_array($subcommand, ['status', 'logs'], true))
+            || ($command === 'flow' && in_array($subcommand, ['status', 'logs', 'preview-node'], true))
             || ($command === 'schedule' && $subcommand === 'logs')
+            || ($command === 'credential' && $subcommand === 'schema')
             || ($command === 'agent' && in_array($subcommand, ['health', 'events'], true));
         if (! $readOnly) {
             throw new RuntimeException('Este tenant está protegido para somente leitura. Alterações, publicações e execuções estão bloqueadas.');

@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\RefreshSchedule;
 use App\Models\User;
 use App\Services\Agent\CodexRuntime;
+use App\Services\BiBusy;
 use App\Services\RefreshCoverage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -329,5 +330,48 @@ class WorkspaceSecurityTest extends TestCase
         } finally {
             Event::forget('eloquent.retrieved: '.AgentRun::class);
         }
+    }
+
+    public function test_an_agent_waits_for_the_bi_connection_before_starting_without_creating_a_failure_message(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->project($user);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $run = AgentRun::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
+        $runtime = $this->mock(CodexRuntime::class);
+        $runtime->shouldReceive('run')->once()->ordered()->andThrow(new BiBusy);
+        $runtime->shouldReceive('run')->once()->ordered()->andReturnNull();
+        $job = (new RunAgentTurn($run->id))->withFakeQueueInteractions();
+
+        $job->handle($runtime);
+
+        $job->assertReleased(5);
+        $this->assertSame('queued', $run->fresh()->status);
+        $this->assertNull($run->fresh()->error_code);
+        $this->assertDatabaseCount('messages', 0);
+
+        $job->handle($runtime);
+
+        $this->assertSame('completed', $run->fresh()->status);
+    }
+
+    public function test_a_start_cancelled_while_the_bi_connection_is_busy_is_not_requeued(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->project($user);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $run = AgentRun::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
+        $runtime = $this->mock(CodexRuntime::class);
+        $runtime->shouldReceive('run')->once()->andReturnUsing(function () use ($run): never {
+            $run->update(['status' => 'cancel_requested']);
+            throw new BiBusy;
+        });
+        $job = (new RunAgentTurn($run->id))->withFakeQueueInteractions();
+
+        $job->handle($runtime);
+
+        $job->assertNotReleased();
+        $this->assertSame('cancelled', $run->fresh()->status);
+        $this->assertDatabaseCount('messages', 0);
     }
 }

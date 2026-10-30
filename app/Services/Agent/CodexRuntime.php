@@ -119,7 +119,9 @@ class CodexRuntime
                         chmod($toolsState, 0600);
                         $messageInput = $run->input_message_id ? $conversation->messages()->findOrFail($run->input_message_id) : $conversation->messages()->where('role', 'user')->latest()->firstOrFail();
                         $prompt = $messageInput->content;
-                        if ($messageInput->metadata['continuation'] ?? false) {
+                        if ($messageInput->metadata['validation_repair'] ?? false) {
+                            $prompt = "A validação offline falhou ANTES de enviar alterações ao BI. Nenhuma ação desta revisão foi aplicada. Leia os detalhes, corrija somente os arquivos deste recurso, valide com lint e prepare uma NOVA revisão; a aprovação anterior não autoriza o arquivo corrigido. Preserve o pedido de negócio do usuário e os recursos já criados. Não repita criações nem operações de resultado incerto.\n".$prompt."\n".json_encode($messageInput->metadata, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+                        } elseif ($messageInput->metadata['continuation'] ?? false) {
                             $prompt = "Continue a tarefa anterior a partir do resultado confirmado da ação aprovada. Não repita essa ação e não recrie recursos já existentes. Confira o estado canônico, valide métricas e gere a prévia. Se precisar de outra alteração, prepare uma nova revisão.\n".$prompt."\n".json_encode($messageInput->metadata, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
                         }
                         if (! $threadId) {

@@ -497,7 +497,7 @@ class BiCredentialsTest extends TestCase
     {
         [$user] = $this->context();
         $this->mock(LumoClient::class)->shouldNotReceive('run');
-        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema', ['sql' => 'SELECT private_data FROM business_table'])->assertUnprocessable()->assertJsonPath('errors.schema.0', 'Esta consulta aceita somente a seleção de um schema.');
+        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema', ['sql' => 'SELECT private_data FROM business_table'])->assertUnprocessable()->assertJsonPath('errors.schema.0', 'Esta consulta aceita somente schema, termo de busca e posição da estrutura.');
     }
 
     public function test_schema_limits_are_reported_instead_of_claiming_all_columns_were_returned(): void
@@ -561,5 +561,49 @@ class BiCredentialsTest extends TestCase
         $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'credential:12', 'status' => 'config_pending']);
         $this->assertSame(1, $state->created);
         $this->assertSame(0, $state->pushes);
+    }
+
+    public function test_postgres_structure_search_uses_a_fixed_metadata_query_and_escapes_like_wildcards(): void
+    {
+        [$user, , $state] = $this->context();
+        $this->native($state);
+
+        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema', ['schema' => 'public', 'search' => 'visita_domiciliar', 'offset' => 5000])->assertOk()->assertJsonPath('verified', true)->assertJsonPath('offset', 5000)->assertJsonPath('next_offset', null);
+
+        $queries = array_values(array_filter($state->commands, fn (array $command): bool => array_slice($command, 0, 2) === ['credential', 'query']));
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString("table_name ILIKE '%visita!_domiciliar%' ESCAPE '!'", $queries[0][4]);
+        $this->assertStringContainsString('LIMIT 5001 OFFSET 5000', $queries[0][4]);
+        $this->assertSame(0, $state->pushes);
+    }
+
+    public function test_large_postgres_structure_includes_a_cursor_instead_of_claiming_a_complete_catalog(): void
+    {
+        [$user, , $state] = $this->context();
+        $state->schema_data = ['Success' => false, 'Error' => '42601 UNION'];
+        $state->query_rows = array_map(fn (int $index): array => ['SCHEMA_NAME' => 'public', 'TABLE_NAME' => 'wide_table', 'COLUMN_NAME' => 'column_'.$index, 'DATA_TYPE' => 'text', 'IS_NULLABLE' => 'YES'], range(0, 5000));
+        $this->native($state);
+
+        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('truncated', true)->assertJsonPath('next_offset', 5000)->assertJsonCount(5000, 'tables.0.columns');
+    }
+
+    public function test_structure_search_rejects_sql_and_invalid_pagination_before_starting_the_cli(): void
+    {
+        [$user] = $this->context();
+        $this->mock(LumoClient::class)->shouldNotReceive('run');
+
+        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema', ['search' => "visita'; DROP TABLE visitas;"])->assertUnprocessable()->assertJsonValidationErrors('search');
+        $this->postJson('/api/catalog/100/credentials/11/inspect/schema', ['offset' => -1])->assertUnprocessable()->assertJsonValidationErrors('offset');
+    }
+
+    public function test_refined_structure_search_does_not_send_postgres_sql_to_another_connector(): void
+    {
+        [$user, , $state] = $this->context();
+        $state->bodies[11]['type'] = 'oracle';
+        $this->native($state);
+
+        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema', ['search' => 'visita'])->assertOk()->assertJsonPath('verified', false)->assertJsonPath('state', 'unsupported');
+
+        $this->assertSame([], array_values(array_filter($state->commands, fn (array $command): bool => array_slice($command, 0, 2) === ['credential', 'query'])));
     }
 }

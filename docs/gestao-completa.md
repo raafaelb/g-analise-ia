@@ -180,3 +180,24 @@ O usuário enviou as referências abaixo e solicitou apenas seu registro na fila
 - [Recursos de IA](https://docs.horusbi.com.br/ia/): mapear capacidades adicionais e orientações oficiais, identificar sobreposição com os recursos existentes e propor melhorias de consulta e gestão para usuários não técnicos.
 
 A entrega dessa análise deve distinguir disponibilidade documental, capacidade implementada e homologação real, com prioridades e dependências. Nenhum token administrativo, conector MCP ou permissão adicional será ativado apenas pelo registro desses links.
+
+
+## Correções de investigação e prévia no chat — 30/10/2026
+
+O teste de manutenção mostrou uma lacuna do conjunto de ferramentas: a IA conseguia criar um fluxo, mas não executar uma etapa nem consultar a estrutura de uma conexão no chat. A ferramenta de prévia de aplicação também estava sendo usada para um fluxo. Foram acrescentados consulta de estrutura sem senhas, busca de tabelas/colunas e paginação PostgreSQL, teste de etapa ETL com revisão e leitura de resultado já executado. Resultados nulos de prévia não são tratados como banco vazio. A execução só é confirmada quando o comando oficial retorna o estado final da etapa; tabela e valores precisam de conferência adicional.
+
+A consulta geral pode ser extensa. A IA recebe uma lista resumida de tabelas e pode pesquisar o assunto solicitado, sem pedir SQL ou nomes técnicos ao usuário. A busca refinada e a paginação estão homologadas para PostgreSQL; outros conectores mantêm a introspecção geral e informam quando a busca refinada ainda não é suportada.
+
+O acompanhamento do projeto oferece a prévia interativa, escolha de dashboard, imagem opcional e link oficial sem credenciais. Links históricos de imagem na conversa são tratados pelo portal: os do recurso atual abrem a prévia, e imagens de recursos anteriores permanecem identificadas como histórico. O ticket temporário do visualizador é usado apenas no iframe isolado, nunca enviado para a IA como URL comum. A cópia de manutenção passa a ser o recurso de trabalho do projeto, preservando a aplicação publicada.
+
+A validação de autoria passa a tratar somente o YAML do recurso escolhido e devolver os erros ao agente. Um arquivo inválido deve ser corrigido antes de preparar uma revisão de sincronização. Falhas de validação após uma aprovação podem retomar a IA para corrigir o arquivo, com limite de tentativas e nova revisão obrigatória; isso não autoriza repetir operações de resultado incerto.
+
+As consultas de contexto da prévia agora acompanham mudanças reais de projeto/recurso, em vez de reiniciar a cada atualização do chat. A disputa pela sessão BI é distinguida de uma operação já iniciada: etapas simples ainda não iniciadas podem aguardar com a mesma autorização; operações de resultado incerto não são repetidas. Cancelamentos continuam sendo respeitados. A execução longa de ETL mantém o sinal de atividade para não ser interrompida pelo monitor da fila.
+
+A homologação real confirmou descoberta da estrutura da demonstração, extração e transformação, criação/carga de tabela privada, correção de YAML pela própria IA e inclusão do mapa em uma cópia privada. A prévia interativa foi aberta no portal; selecionar e limpar um responsável atualizou mapa e indicador. O componente de mapa nativo usa pins de cor fixa, com identificação e filtro por responsável. A exportação PNG falhou no renderizador nativo e permanece uma limitação a investigar; ela não é requisito para abrir o visualizador interativo. A fonte nova permanece privada, sem agenda diária ativa: sua publicação e o destino de dados ainda precisam de autorização para concluir essa cobertura. A aplicação publicada e os demais recursos preexistentes foram preservados.
+
+A regressão passou em SQLite e PostgreSQL (451 testes em cada banco, 2.532 asserções), mais 38 testes de interface e compilação com verificação TypeScript. Esses resultados cobrem esta revisão e não declaram concluídas as integrações ainda listadas como pendentes.
+
+### Melhoria de espaço da prévia — registrada em 30/10/2026
+
+Pendente, conforme solicitação do usuário: aumentar a área realmente destinada ao dashboard, compactar ou recolher os controles, oferecer expansão clara do painel e conferir desktop e celular. Avaliar a proporção entre conversa e dashboard e reduzir barras e rolagens sobrepostas. Qualquer modo nativo de exibição sem menus deve ser confirmado na integração antes de ser oferecido. Esta melhoria visual fica na fila enquanto se conclui a correção de validação e execução.

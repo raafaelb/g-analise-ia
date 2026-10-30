@@ -16,7 +16,11 @@ use App\Services\BiCatalog;
 use App\Services\BiCloneNames;
 use App\Services\BiCredentials;
 use App\Services\BiDesks;
+use App\Services\BiFlowExecution;
 use App\Services\BiPublications;
+use App\Services\BiResourceValidation;
+use App\Services\BiValidationFailure;
+use App\Services\BiViewer;
 use App\Services\BiWorkspaceSync;
 use App\Services\LumoClient;
 use App\Services\ProcessEnvironment;
@@ -95,7 +99,7 @@ class ActionBroker
         }
 
         return Approval::create(['user_id' => $user->id, 'project_id' => $project->id, 'agent_run_id' => $run?->id, 'type' => $run === null ? 'manual' : (str_starts_with($action, 'publish') ? 'publish' : 'execution'), 'title' => match ($action) {
-            'push' => 'Sincronizar alterações com o G-Analise BI', 'publish_app' => 'Publicar aplicação no G-Analise BI', 'publish_flow' => 'Publicar fonte de dados no G-Analise BI', 'run_schedule' => 'Executar carga de teste', 'clone_app' => 'Duplicar aplicação no G-Analise BI', 'delete_draft' => 'Excluir rascunho criado por este projeto', default => 'Ativar agenda no G-Analise BI'
+            'push' => 'Sincronizar alterações com o G-Analise BI', 'publish_app' => 'Publicar aplicação no G-Analise BI', 'publish_flow' => 'Publicar fonte de dados no G-Analise BI', 'run_schedule' => 'Executar carga de teste', 'run_flow_node' => 'Executar etapa do ETL', 'clone_app' => 'Duplicar aplicação no G-Analise BI', 'delete_draft' => 'Excluir rascunho criado por este projeto', default => 'Ativar agenda no G-Analise BI'
         }, 'description' => $run === null ? 'Confira o tenant, a aplicação e o resultado esperado. Esta operação usa sua conexão BI e não inicia uma tarefa de IA.' : 'Confira tenant, recurso, destino e alterações. Após a autorização, o portal executará esta revisão e retomará a IA com o resultado.', 'payload' => $payload, 'fingerprint' => hash('sha256', json_encode([$user->id, $project->id, $project->tenant_id, $arguments, $revision], JSON_THROW_ON_ERROR)), 'expires_at' => now()->addMinutes(12)]);
     }
 
@@ -105,7 +109,7 @@ class ActionBroker
             ['name' => 'tenant_variables', 'description' => 'Lista nomes e referências das variáveis do tenant do projeto. Os valores são protegidos: nunca devolve senhas, chaves ou outros valores. Use a referência no recurso BI.', 'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'additionalProperties' => false]],
             ['name' => 'refresh_coverage', 'description' => 'Confere todas as fontes de uma aplicação no tenant do projeto, agendas diárias ou mais frequentes, resultados reais e a execução de teste correlacionada. Somente leitura remota; não cria agendas ou executa cargas.', 'inputSchema' => ['type' => 'object', 'properties' => ['resource' => ['type' => 'string', 'pattern' => '^app:[1-9][0-9]*$']], 'required' => ['resource'], 'additionalProperties' => false]],
             ['name' => 'project_image', 'description' => 'Devolve a imagem PNG de um dashboard exportado para análise visual somente após autorização explícita do usuário no portal para esse arquivo e esta conversa. Não gera nova imagem. Use o artifact_id retornado pelo export.', 'inputSchema' => ['type' => 'object', 'properties' => ['artifact_id' => ['type' => 'string']], 'required' => ['artifact_id'], 'additionalProperties' => false]],
-            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'push', 'preview', 'export', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft']], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como nova (padrão) ou substituir a aplicação original na mesma mesa. Substituição exige revisão explícita do alvo.'], 'dashboard' => ['type' => 'integer']], 'required' => ['action'], 'additionalProperties' => false]],
+            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Para investigar o banco use list com kind credential e credential_schema; não peça ao usuário nomes técnicos de tabelas. run_flow_node executa uma etapa ETL em rascunho após revisão; flow_preview lê seu resultado já executado. app_link retorna a URL real da aplicação sem credenciais. preview é a conferência de dados de um app, nunca uma prévia de ETL. lint exige resource e devolve os erros do YAML para corrigir sem pedir intervenção técnica do usuário. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft']], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar', 'credential']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como nova (padrão) ou substituir a aplicação original na mesma mesa. Substituição exige revisão explícita do alvo.'], 'dashboard' => ['type' => 'integer'], 'schema' => ['type' => 'string', 'maxLength' => 128], 'search' => ['type' => 'string', 'maxLength' => 100, 'description' => 'Termo para localizar tabelas/colunas no PostgreSQL sem SQL.'], 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000000, 'description' => 'Use next_offset da resposta para continuar o catálogo.']], 'required' => ['action'], 'additionalProperties' => false]],
             ['name' => 'workspace_file', 'description' => 'Lista, lê e escreve arquivos YAML e notas do workspace. Não permite caminhos absolutos, arquivos internos, credenciais ou exclusões. Leia o arquivo antes de editar. Para substituir um arquivo existente, expected_sha256 é obrigatório e deve corresponder ao conteúdo lido; omita-o somente ao criar um arquivo novo.', 'inputSchema' => ['type' => 'object', 'properties' => ['operation' => ['type' => 'string', 'enum' => ['list', 'read', 'write']], 'path' => ['type' => 'string'], 'content' => ['type' => 'string'], 'expected_sha256' => ['type' => 'string']], 'required' => ['operation'], 'additionalProperties' => false]],
         ];
     }
@@ -167,7 +171,13 @@ class ActionBroker
         if ($action === 'delete_draft') {
             $this->assertDeletable($connection, $project, $arguments['resource']);
         }
-        if (in_array($action, ['push', 'publish_app', 'publish_flow', 'run_schedule', 'resume_schedule', 'delete_draft'], true)) {
+        if ($action === 'push') {
+            $validation = app(BiResourceValidation::class)->inspect($connection, $project, $arguments['resource']);
+            if (! $validation['passed']) {
+                return ['status' => 'validation_failed', 'validation' => $validation, 'message' => 'Corrija o arquivo local com os detalhes da validação e solicite uma nova revisão somente depois de validar. Nenhuma alteração foi enviada ao BI.'];
+            }
+        }
+        if (in_array($action, ['push', 'publish_app', 'publish_flow', 'run_schedule', 'run_flow_node', 'resume_schedule', 'delete_draft'], true)) {
             $revision = $this->revision($connection, $project, $arguments);
             $approval = $this->createReview($user, $project, $arguments, $revision, $run);
             $run->update(['status' => 'awaiting_approval', 'heartbeat_at' => now()]);
@@ -209,7 +219,7 @@ class ActionBroker
         if ($manual && ($arguments['action'] ?? '') === 'clone_app' && ($project->status === 'archived' || $project->source_ref !== null)) {
             throw new RuntimeException('O projeto mudou após a revisão. Prepare uma nova operação.');
         }
-        $allowed = $manual ? ['clone_app', 'delete_draft', 'publish_app'] : ['push', 'publish_app', 'publish_flow', 'run_schedule', 'resume_schedule', 'delete_draft'];
+        $allowed = $manual ? ['clone_app', 'delete_draft', 'publish_app'] : ['push', 'publish_app', 'publish_flow', 'run_schedule', 'run_flow_node', 'resume_schedule', 'delete_draft'];
         if (! in_array($arguments['action'] ?? '', $allowed, true)) {
             throw new RuntimeException('Ação de revisão inválida.');
         }
@@ -273,6 +283,47 @@ class ActionBroker
         $command = $this->command($arguments, $project);
         app(TenantPolicy::class)->assertCommandAllowed((string) $project->tenant_id, $command, $connection);
         $action = $arguments['action'];
+        if ($action === 'new' && ($arguments['kind'] ?? '') === 'table') {
+            app(BiFlowExecution::class)->assertTableCreation($connection, $project, $arguments);
+        }
+        if ($action === 'lint') {
+            return app(BiResourceValidation::class)->inspect($connection, $project, $arguments['resource']);
+        }
+        if ($action === 'run_flow_node') {
+            if (! $approval) {
+                throw new RuntimeException('A execução de ETL exige a revisão autorizada desta etapa.');
+            }
+            $result = app(BiFlowExecution::class)->run($connection, $project, $arguments, $approval);
+            Audit::record($user->id, 'horus.run_flow_node', 'Etapa ETL executada após revisão.', $project->id, ['resource' => $arguments['resource'], 'node' => $arguments['node']]);
+            Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+
+            return $result;
+        }
+        if ($action === 'flow_preview') {
+            return app(BiFlowExecution::class)->preview($connection, $project, $arguments);
+        }
+        if ($action === 'credential_schema') {
+            $report = app(BiCredentials::class)->inspect($user, (string) $project->tenant_id, substr($arguments['resource'], 11), 'schema', $arguments['schema'] ?? null, $arguments['search'] ?? null, (int) ($arguments['offset'] ?? 0));
+            if (! isset($arguments['search']) && strlen(json_encode($report, JSON_THROW_ON_ERROR)) > 60000) {
+                $report['tables'] = array_map(fn (array $table): array => ['schema' => $table['schema'] ?? null, 'name' => $table['name'], 'column_count' => count($table['columns'] ?? [])], $report['tables'] ?? []);
+                $report['columns_omitted'] = true;
+                $report['message'] = 'Catálogo resumido para a IA. Use search para buscar o assunto solicitado e receber as colunas. Se houver next_offset, a lista ainda tem outras páginas.';
+            }
+
+            return $report;
+        }
+        if ($action === 'app_link') {
+            $detail = app(BiCatalog::class)->detail($user, (string) $project->tenant_id, 'app', substr($arguments['resource'], 4), false);
+            if (isset($arguments['dashboard']) && ! collect($detail['resource']['dashboards'] ?? [])->contains(fn (array $item): bool => (int) ($item['id'] ?? 0) === $arguments['dashboard'])) {
+                throw new RuntimeException('O dashboard não pertence à aplicação selecionada.');
+            }
+            $result = $this->lumo->run($connection, $command, $project, 60);
+            $url = app(BiViewer::class)->plainUrl($result['data'], substr($arguments['resource'], 4));
+
+            Audit::record($user->id, 'horus.app_link', 'Link comum da aplicação consultado.', $project->id, ['resource' => $arguments['resource']]);
+
+            return ['resource' => $arguments['resource'], 'url' => $url, 'desk_id' => $detail['resource']['desk_id'] ?? null, 'state' => $detail['resource']['state'] ?? null, 'preview_path' => $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id]).'?preview=interactive'.(isset($arguments['dashboard']) ? '&dashboard='.$arguments['dashboard'] : '') : null, 'message' => 'URL oficial sem credenciais. Quem abrir usará o próprio login BI. Para a prévia dentro da conversa, use preview_path.'];
+        }
         $this->assertRefreshBeforePublish($user, $project, $arguments);
         if ($action === 'publish_app' && (! $approval || ! is_array($publication) || ($publication['source']['resource'] ?? null) !== $arguments['resource'] || ($publication['destination']['id'] ?? null) !== $arguments['desk'] || ($publication['mode'] ?? null) !== ($arguments['publish_mode'] ?? 'new'))) {
             throw new RuntimeException('A publicação exige uma revisão atual do destino e do efeito esperado.');
@@ -282,7 +333,10 @@ class ActionBroker
             $this->checkpointDraft($project, $arguments['resource']);
         }
         if (in_array($action, ['push', 'publish_app', 'publish_flow'], true)) {
-            $this->lumo->run($connection, ['lint'], $project, 90);
+            $validation = app(BiResourceValidation::class)->inspect($connection, $project, $arguments['resource']);
+            if (! $validation['passed']) {
+                throw new BiValidationFailure($validation);
+            }
         }
         if ($action === 'export') {
             File::delete(app(WorkspaceFiles::class)->path($project).'/exports/dashboard.png');
@@ -364,7 +418,7 @@ class ActionBroker
                 $result['project_provenance'] = ['resource' => $managed->resource, 'origin' => $managed->origin, 'source_ref' => $managed->source_ref, 'status' => $managed->status, 'created_at' => $managed->receipt['created_at'] ?? null];
             }
         }
-        if (in_array($action, ['new', 'clone_app', 'push', 'publish_app', 'publish_flow', 'delete_draft', 'resume_schedule', 'run_schedule'], true)) {
+        if (in_array($action, ['new', 'clone_app', 'push', 'publish_app', 'publish_flow', 'delete_draft', 'resume_schedule', 'run_schedule', 'run_flow_node'], true)) {
             Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
         }
         Audit::record($user->id, 'horus.'.$action, 'Operação G-Analise: '.$action.'.', $project->id, ['resource' => $arguments['resource'] ?? null]);
@@ -380,6 +434,7 @@ class ActionBroker
                 $artifact = Artifact::create(['user_id' => $user->id, 'project_id' => $project->id, 'name' => $project->name.' - '.str_replace(':', '-', $arguments['resource']).' - '.now()->format('Y-m-d_H-i-s').'.png', 'kind' => 'dashboard_export', 'mime' => 'image/png', 'path' => $stored, 'metadata' => ['resource' => $arguments['resource'], 'dashboard_id' => $arguments['dashboard'] ?? null, 'width' => $size[0], 'height' => $size[1], 'generated_at' => now()->toIso8601String()]]);
                 $result['artifact_id'] = $artifact->id;
                 $result['download_path'] = rtrim((string) parse_url(config('app.url'), PHP_URL_PATH), '/').'/api/artifacts/'.$artifact->id.'/download';
+                $result['preview_path'] = $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id]).'?preview=interactive' : null;
                 $result['visual_review'] = 'Abra a prévia no portal para autorizar o envio deste arquivo à OpenAI; depois use project_image com artifact_id.';
             }
         }
@@ -391,10 +446,10 @@ class ActionBroker
     {
         $action = $arguments['action'] ?? '';
         $ref = (string) ($arguments['resource'] ?? '');
-        if ($ref !== '' && ! preg_match('/^(app|flow|table|schedule|agent|bi-desk|dw-desk):[1-9][0-9]*$/D', $ref)) {
+        if ($ref !== '' && ! preg_match('/^(app|flow|table|schedule|agent|bi-desk|dw-desk|credential):[1-9][0-9]*$/D', $ref)) {
             throw new RuntimeException('Referência G-Analise inválida.');
         }
-        $required = ['info', 'columns', 'table_preview', 'diff', 'refresh_resource', 'clone_app', 'push', 'preview', 'export', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft'];
+        $required = ['lint', 'info', 'columns', 'table_preview', 'diff', 'refresh_resource', 'clone_app', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft'];
         if (in_array($action, $required, true) && $ref === '') {
             throw new RuntimeException('Informe o recurso que será operado.');
         }
@@ -411,17 +466,32 @@ class ActionBroker
             return ['scaffold', $kind, ...($template !== '' ? [$template] : [])];
         }
 
-        if (! in_array($kind, ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent'], true)) {
+        if (! in_array($kind, ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'credential'], true)) {
             throw new RuntimeException('Tipo de recurso inválido.');
         }
-        $appActions = ['clone_app', 'preview', 'export', 'publish_app', 'delete_draft'];
-        $flowActions = ['publish_flow', 'flow_status', 'flow_logs'];
+        $appActions = ['clone_app', 'preview', 'export', 'app_link', 'publish_app', 'delete_draft'];
+        $flowActions = ['publish_flow', 'flow_status', 'flow_logs', 'flow_preview', 'run_flow_node'];
         $scheduleActions = ['schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule'];
         if ((in_array($action, $appActions, true) && ! str_starts_with($ref, 'app:')) || (in_array($action, $flowActions, true) && ! str_starts_with($ref, 'flow:')) || (in_array($action, $scheduleActions, true) && ! str_starts_with($ref, 'schedule:')) || (in_array($action, ['columns', 'table_preview'], true) && ! str_starts_with($ref, 'table:'))) {
             throw new RuntimeException('Tipo de referência incompatível com a operação.');
         }
         if (in_array($action, ['publish_app', 'publish_flow'], true) && (! isset($arguments['desk']) || ! is_int($arguments['desk']) || $arguments['desk'] < 1)) {
             throw new RuntimeException('Escolha uma mesa válida para publicar.');
+        }
+        if (str_starts_with($ref, 'credential:') && $action !== 'credential_schema') {
+            throw new RuntimeException('Use credential_schema para consultar a estrutura sem expor a configuração da conexão.');
+        }
+        if ($action === 'credential_schema' && ! str_starts_with($ref, 'credential:')) {
+            throw new RuntimeException('Escolha uma conexão válida para consultar a estrutura.');
+        }
+        if (in_array($action, ['flow_preview', 'run_flow_node'], true) && ! preg_match('/^[A-Za-z0-9_-]{1,100}$/D', (string) ($arguments['node'] ?? ''))) {
+            throw new RuntimeException('Informe o identificador da etapa ETL.');
+        }
+        if (isset($arguments['schema']) && (! is_string($arguments['schema']) || ! preg_match('/^[\pL\pN_][\pL\pN_. -]{0,127}$/uD', $arguments['schema']))) {
+            throw new RuntimeException('O schema informado é inválido.');
+        }
+        if ((isset($arguments['search']) && (! is_string($arguments['search']) || ! preg_match('/^[\pL\pN_ .-]{1,100}$/uD', $arguments['search']))) || (isset($arguments['offset']) && (! is_int($arguments['offset']) || $arguments['offset'] < 0 || $arguments['offset'] > 1000000))) {
+            throw new RuntimeException('Use um termo e uma posição de consulta de estrutura válidos.');
         }
         if ($action === 'delete_draft') {
             $this->managed($project, $ref);
@@ -445,6 +515,10 @@ class ActionBroker
             'scaffold' => ['scaffold', $kind],
             'new' => $this->newCommand($kind, $arguments),
             'clone_app' => ['app', 'clone', $ref, ...($cloneName !== '' ? ['--name', $cloneName] : [])], 'push' => ['push', $ref],
+            'flow_preview' => ['flow', 'preview-node', $ref, '--node', $arguments['node']],
+            'run_flow_node' => ['flow', 'run-node', $ref, '--node', $arguments['node']],
+            'credential_schema' => ['credential', 'schema', $ref],
+            'app_link' => ['app', 'open', $ref, '--no-browser', ...$dashboard],
             'preview' => ['app', 'dashboard-preview', $ref, '--limit', '20', ...$dashboard],
             'export' => ['app', 'export', $ref, '--image-format', 'png', '--output', app(WorkspaceFiles::class)->path($project).'/exports/dashboard.png', ...$dashboard],
             'publish_app' => ['app', 'publish', $ref, '--desk', (string) $arguments['desk'], ...$publicationFlags], 'publish_flow' => ['flow', 'publish', $ref, '--desk', (string) $arguments['desk']],
@@ -549,8 +623,9 @@ class ActionBroker
             return $result;
         }
         ManagedBiResource::firstOrCreate(['user_id' => $project->user_id, 'tenant_id' => $project->tenant_id, 'resource' => $ref], ['project_id' => $project->id, 'origin' => $arguments['action'], 'source_ref' => $arguments['resource'] ?? null, 'receipt' => ['created_at' => now()->toIso8601String(), 'cli_exit_code' => $result['exit_code'] ?? 0]]);
-        if ($kind === 'app' && ! $project->source_ref) {
+        if ($kind === 'app' && (! $project->source_ref || ($arguments['action'] === 'clone_app' && $project->source_ref === ($arguments['resource'] ?? null)))) {
             $project->update(['source_ref' => $ref]);
+            $result['project_resource'] = $ref;
         }
         $result['managed_resource'] = $ref;
 
@@ -583,6 +658,9 @@ class ActionBroker
     private function revision(Connection $connection, Project $project, array $arguments): array
     {
         $ref = $arguments['resource'];
+        if ($arguments['action'] === 'run_flow_node') {
+            return app(BiFlowExecution::class)->revision($connection, $project, $arguments);
+        }
         if ($arguments['action'] === 'clone_app') {
             $data = $this->lumo->run($connection, ['info', $ref, '--full'], $project)['data'];
             $payload = is_array($data) ? ($data['payload'] ?? $data) : [];

@@ -24,7 +24,15 @@ class ProjectPreviews
         abort_unless(preg_match('/^app:([1-9][0-9]*)$/D', (string) $project->source_ref, $match), 422, 'Vincule uma aplicação ao projeto para gerar sua prévia.');
         $detail = $this->catalog->detail($user, (string) $project->tenant_id, 'app', $match[1], includeRelations: false);
 
-        return ['resource' => $project->source_ref, 'name' => $detail['resource']['name'], 'dashboards' => $detail['resource']['dashboards'] ?? [], 'dashboards_available' => is_array($detail['resource']['dashboards'] ?? null)];
+        $nativeUrl = null;
+        try {
+            [$connection, $tenant] = $this->catalog->access($user, (string) $project->tenant_id);
+            $link = $this->lumo->run($connection, ['app', 'open', $project->source_ref, '--no-browser'], $this->catalog->context($connection, $tenant), 45);
+            $nativeUrl = app(BiViewer::class)->plainUrl($link['data'], $match[1]);
+        } catch (RuntimeException) {
+        }
+
+        return ['interactive_available' => config('horus.viewer.enabled') && $user->role !== 'viewer' && ! ($detail['tenant']['read_only'] ?? false), 'native_app_url' => $nativeUrl, 'resource' => $project->source_ref, 'name' => $detail['resource']['name'], 'dashboards' => $detail['resource']['dashboards'] ?? [], 'dashboards_available' => is_array($detail['resource']['dashboards'] ?? null)];
     }
 
     public function render(User $user, Project $project, ?int $dashboard = null): Artifact

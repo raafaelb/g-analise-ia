@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Connection;
 use App\Models\User;
+use App\Services\BiBusy;
 use App\Services\BiCatalog;
 use App\Services\LumoClient;
 use App\Services\WorkspaceFiles;
@@ -80,5 +81,16 @@ class CatalogResourceDetailsTest extends TestCase
         $this->assertStringNotContainsString('hidden', json_encode($result));
         $this->assertSame(23, $result['tokenId']);
         $this->assertSame(8, $result['primaryKeyId']);
+    }
+
+    public function test_busy_metadata_is_not_reported_as_missing_configuration(): void
+    {
+        [$user] = $this->context();
+        $mock = $this->mock(LumoClient::class);
+        $mock->shouldReceive('initialize')->andReturnNull();
+        $mock->shouldReceive('run')->withArgs(fn ($c, $a) => $a[0] === 'list')->once()->andReturn(['data' => ['matched' => 1, 'results' => [['id' => 7, 'nome' => 'Cadastro']]]]);
+        $mock->shouldReceive('run')->withArgs(fn ($c, $a) => $a[0] === 'pull')->once()->andThrow(new BiBusy);
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/writeback/7')->assertUnprocessable()->assertJsonMissingPath('metadata_complete')->assertJsonPath('errors.catalog.0', 'Outra operação do BI está em andamento nesta conta. Aguarde a conclusão e tente novamente.');
     }
 }

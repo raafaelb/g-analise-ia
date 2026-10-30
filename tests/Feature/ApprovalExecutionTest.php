@@ -13,6 +13,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
 use App\Services\Agent\CodexRuntime;
+use App\Services\BiResourceValidation;
 use App\Services\LumoClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -24,6 +25,7 @@ class ApprovalExecutionTest extends TestCase
 
     private function context(): array
     {
+        $this->mock(BiResourceValidation::class)->shouldReceive('inspect')->andReturn(['passed' => true]);
         Queue::fake();
         $user = User::factory()->create();
         $project = Project::create(['user_id' => $user->id, 'tenant_id' => '100', 'name' => 'Revisão']);

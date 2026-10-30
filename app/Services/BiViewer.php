@@ -41,6 +41,25 @@ class BiViewer
         return ['url' => $url, 'origin' => $origin, 'resource' => 'app:'.$appId, 'dashboard_id' => $dashboard, 'ticket_expires_at' => now()->addSeconds($ticketSeconds)->toIso8601String(), 'session_expires_at' => now()->addMinutes($sessionMinutes)->toIso8601String()];
     }
 
+    public function plainUrl(mixed $data, string $appId): string
+    {
+        if (! is_array($data)) {
+            throw new RuntimeException('O BI não retornou um link comum válido da aplicação.');
+        }
+        $url = $data['url'] ?? null;
+        $parts = is_string($url) ? parse_url($url) : false;
+        $query = [];
+        if (is_array($parts)) {
+            parse_str($parts['query'] ?? '', $query);
+        }
+        $queryAllowed = array_diff(array_keys($query), ['ds', 'dashboard']) === [] && collect($query)->every(fn (mixed $value): bool => is_string($value) && preg_match('/^[1-9][0-9]*$/D', $value));
+        if (! $queryAllowed || ! is_string($url) || ! is_array($parts) || ! in_array($this->origin($url), $this->allowedOrigins(), true) || ($data['session'] ?? false) === true || ($parts['path'] ?? '') !== '/app/'.$appId || preg_match('/(?:token|ticket|session|auth|code)=/i', (string) ($parts['query'] ?? ''))) {
+            throw new RuntimeException('O BI não retornou um link comum válido da aplicação.');
+        }
+
+        return $url;
+    }
+
     /** @return list<string> */
     public function allowedOrigins(): array
     {

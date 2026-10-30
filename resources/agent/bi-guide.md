@@ -15,7 +15,7 @@ Leia este guia antes de criar ou manter dashboards. As regras do usuário e do p
 
 Uma aplicação com `deskId: null` está em Minha Mesa. Publicar é uma decisão humana. Trabalhe em rascunhos; para alterar a estrutura de uma aplicação publicada, duplique-a e mantenha a cópia privada até receber uma autorização concreta de publicação.
 
-Crie arquivos a partir do recurso produzido por `new`/`clone_app`. Não substitua cabeçalhos canônicos e não edite `.lumo/`. `lint` valida a estrutura; não prova que métricas ou renderização estão corretas.
+Crie arquivos a partir do recurso produzido por `new`/`clone_app`. Não substitua cabeçalhos canônicos e não edite `.lumo/`. `lint` exige `resource` e valida somente o YAML selecionado, retornando `passed`, `issues` e o arquivo. Corrija erros no mesmo turno, lendo o hash atual antes de salvar; não peça ao usuário que interprete o YAML. Um `push` com `status: validation_failed` não criou revisão nem enviou alterações. Depois de corrigir, valide e prepare uma nova revisão. `lint` não prova que métricas ou renderização estão corretas.
 
 ## Atualizar a versão de autoria
 
@@ -70,7 +70,7 @@ Use uma cor de destaque e cinzas de contexto; escolha cor, título e unidade de 
 
 ## Validação e imagens
 
-Depois do push confirmado, execute `preview` e `export` da aplicação. Inspecione os valores, datas, ordenação e erros dos widgets. Use `download_path` retornado pelo export em links; caminhos `exports/...` são internos e não servem para download no navegador.
+Depois do push confirmado, execute `preview` da aplicação e inspecione os valores, datas, ordenação e erros dos widgets. Para mostrar o dashboard ao usuário, obtenha `preview_path` com `app_link`: o visualizador interativo não depende de exportar uma imagem. Gere `export` quando o usuário pedir um arquivo ou quando for necessária uma imagem para análise visual autorizada. Uma falha do renderizador PNG não confirma que o dashboard interativo esteja indisponível; mantenha os links de visualização e informe a pendência da imagem sem repetir a sincronização ou a carga. Use `app_link` quando ele pedir a URL do BI/mesa/aplicação: é um link comum para entrar com a própria conta, sem ticket. `download_path` é somente a exportação opcional da imagem; não substitua um pedido de link ou de interação por esse download. Caminhos `exports/...` são internos.
 
 `project_image` retorna à IA um PNG exportado somente quando o usuário autorizou esse arquivo específico nesta conversa. Se faltar autorização, peça ao usuário que abra a prévia e use “Autorizar análise visual com IA”. A criação pode continuar com a validação de dados e a prévia no portal; não declare inspeção visual pela IA antes de receber a imagem.
 
@@ -85,3 +85,17 @@ Uma fonte privada exige autorização de publicação antes de agendar. Não pub
 Antes de entregar ou preparar publicação, use `refresh_coverage` com `resource: app:<id>` para conferir automaticamente todas as fontes e o teste de carga. O portal bloqueia a publicação de aplicações criadas neste projeto enquanto essa conferência não estiver verificada.
 
 Para parâmetros do tenant use `tenant_variables`: lista somente nomes e referências, nunca valores. Não tente ler variables/tenant.yaml ou obter senhas. Use a referência no recurso BI sem revelar seu valor.
+
+
+## Investigar fontes e testar ETL
+
+O usuário descreve o resultado de negócio; cabe à IA descobrir as tabelas, campos e relacionamentos. Liste `credential` para identificar as conexões existentes e use `credential_schema` com `resource: credential:<id>` (e `schema` quando necessário). Se a lista for extensa, use `search` com o assunto pedido (por exemplo, visita, coordenada ou profissional) para localizar tabelas e colunas no PostgreSQL. Use `next_offset` como `offset` para continuar uma lista truncada; não conclua que uma tabela não existe só porque não apareceu na primeira página. Essa ferramenta consulta a estrutura sem revelar senhas ou exigir que o usuário escreva SQL. Inspecione os fluxos e as colunas existentes antes de concluir que uma informação não existe no banco original. Uma extração agregada não representa todo o conteúdo da fonte.
+
+Para uma nova fonte, use `new` com `kind: flow`, obtenha o scaffold de nó, escreva consultas a partir da estrutura confirmada, limite diagnósticos e valide o YAML. Faça `push` e aguarde a revisão. Depois use `run_flow_node` com o fluxo e `node` (internalId): essa execução também precisa de revisão concreta, na conversa. O comando aguarda a conclusão da etapa; não repita uma execução por falta de prévia ou sincronização local. Confira `execution` e `workspace_refresh`.
+
+`flow_preview` visualiza o resultado de uma etapa já executada; `preview` confere widgets de uma aplicação. Não use um no lugar do outro. A prévia pode retornar nula no BI mesmo com um esquema capturado: não trate isso como ausência de dados. Use `credential_schema` para metadados e, após criar a tabela com `new`/`kind: table`/`flow`/`node`, execute o nó de inserção e confirme `columns` e `table_preview`. Não invente coordenadas, relacionamentos ou dados para completar um mapa.
+
+Um fluxo publicado precisa de uma cópia antes de testar nós. Para manutenção estrutural de aplicação publicada, use `clone_app`; a cópia vira o recurso de trabalho deste projeto. Preserve a original. Criação de ETL/tabela e teste não autorizam publicação: prepare a revisão de compartilhamento necessária e confira a atualização diária antes da entrega.
+
+
+`new` de tabela cria somente a primeira tabela de uma etapa de inserção ainda sem vínculo. Não o repita se já houver tabela: o comando nativo pode recriar sua estrutura e apagar dados. Consulte o ID existente com `info`, confira `columns` e `table_preview` e continue o trabalho com esse recurso.

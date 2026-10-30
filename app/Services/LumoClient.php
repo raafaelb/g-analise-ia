@@ -67,10 +67,12 @@ class LumoClient
         }
     }
 
-    public function run(Connection $connection, array $arguments, ?Project $project = null, int $timeout = 45): array
+    public function run(Connection $connection, array $arguments, ?Project $project = null, int $timeout = 45, bool $captureValidation = false, ?callable $heartbeat = null): array
     {
+        $entered = false;
         try {
-            return Cache::lock('lumo-session:'.$connection->id, $timeout + 20)->block(10, function () use ($connection, $arguments, $project, $timeout) {
+            return Cache::lock('lumo-session:'.$connection->id, $timeout + 20)->block(10, function () use ($connection, $arguments, $project, $timeout, $captureValidation, $heartbeat, &$entered) {
+                $entered = true;
                 $user = User::find($connection->user_id);
                 if (! $user?->canStartWork()) {
                     throw new RuntimeException('O acesso do usuário está inativo ou requer atualização da senha.');
@@ -81,7 +83,7 @@ class LumoClient
                 }
                 $connection->refresh();
                 $generation = $connection->metadata['session_generation'] ?? null;
-                $result = $this->execute($connection, $arguments, $project, $timeout);
+                $result = $this->execute($connection, $arguments, $project, $timeout, $captureValidation, $heartbeat);
                 $currentUser = $user->fresh();
                 if (! $currentUser?->canStartWork() || $currentUser->access_version !== $connection->operationAccessVersion) {
                     throw new RuntimeException('Seu acesso ao portal mudou durante a operação. Confira o resultado antes de repetir.');
@@ -94,12 +96,18 @@ class LumoClient
                 return $result;
             });
         } catch (LockTimeoutException) {
+            if (! $entered) {
+                throw new BiBusy;
+            }
             throw new RuntimeException('Outra operação do BI está em andamento nesta conta. Aguarde a conclusão e tente novamente.');
         }
     }
 
-    private function execute(Connection $connection, array $arguments, ?Project $project, int $timeout): array
+    private function execute(Connection $connection, array $arguments, ?Project $project, int $timeout, bool $captureValidation, ?callable $heartbeat): array
     {
+        if ($captureValidation && ($arguments[0] ?? null) !== 'lint') {
+            throw new RuntimeException('Somente a validação local pode retornar diagnósticos de falha.');
+        }
         if ($connection->provider !== 'horus' || $connection->status !== 'connected') {
             throw new RuntimeException('Conecte sua conta G-Analise BI.');
         }
@@ -122,12 +130,25 @@ class LumoClient
             }
             $process = new Process($command, $home, $this->environment($home));
             $process->setTimeout($timeout);
-            $process->run();
+            if ($heartbeat === null) {
+                $process->run();
+            } else {
+                $process->start();
+                $lastHeartbeat = 0;
+                while ($process->isRunning()) {
+                    $process->checkTimeout();
+                    if (microtime(true) - $lastHeartbeat >= 2) {
+                        $heartbeat();
+                        $lastHeartbeat = microtime(true);
+                    }
+                    usleep(100000);
+                }
+            }
             $output = $process->getOutput();
             if (strlen($output) > 2_000_000) {
                 throw new RuntimeException('O resultado do G-Analise excedeu o limite. Reduza o escopo da consulta.');
             }
-            if (! $process->isSuccessful() && ! ($arguments[0] === 'diff' && $process->getExitCode() === 1)) {
+            if (! $process->isSuccessful() && ! ($arguments[0] === 'diff' && $process->getExitCode() === 1) && ! ($captureValidation && $arguments[0] === 'lint' && $process->getExitCode() === 8)) {
                 if ($process->getExitCode() === 6) {
                     $failure = $output.' '.$process->getErrorOutput();
                     $session = json_decode(File::get($home.'/.lumo/auth.json'), true);

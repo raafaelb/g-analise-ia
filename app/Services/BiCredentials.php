@@ -187,20 +187,34 @@ class BiCredentials
     }
 
     /** @return array<string, mixed> */
-    public function inspect(User $user, string $tenant, string $id, string $action, ?string $schema = null): array
+    public function inspect(User $user, string $tenant, string $id, string $action, ?string $schema = null, ?string $search = null, int $offset = 0): array
     {
         [$connection, $item] = $this->access($user, $tenant);
         abort_unless(in_array($action, ['test', 'schema'], true), 422);
         if ($schema !== null && ! preg_match('/^[\pL\pN_][\pL\pN_. -]{0,127}$/uD', $schema)) {
             throw ValidationException::withMessages(['schema' => 'Escolha um nome de schema válido.']);
         }
+        if (($search !== null && ! preg_match('/^[\pL\pN_ .-]{1,100}$/uD', $search)) || $offset < 0 || $offset > 1000000 || ($action !== 'schema' && ($search !== null || $offset !== 0))) {
+            throw ValidationException::withMessages(['search' => 'Use um termo de estrutura válido e uma posição de consulta permitida.']);
+        }
         $this->policy->assertCommandAllowed($tenant, ['credential', $action, 'credential:'.$id], $connection);
 
-        return $this->withContext($connection, $item, function (Project $context) use ($connection, $id, $action, $schema): array {
+        return $this->withContext($connection, $item, function (Project $context) use ($connection, $id, $action, $schema, $search, $offset): array {
             $ref = 'credential:'.$id;
             $this->assertListed($connection, $context, $ref);
             $generation = $connection->metadata['session_generation'] ?? null;
             try {
+                if ($action === 'schema' && ($search !== null || $offset > 0)) {
+                    [, $document] = $this->document($connection, $context, $ref);
+                    if ($this->types->driver((string) ($document['type'] ?? '')) !== 'postgres') {
+                        return ['verified' => false, 'state' => 'unsupported', 'message' => 'A busca refinada e a paginação da estrutura estão disponíveis para PostgreSQL nesta versão. A consulta geral continua disponível para este conector.'];
+                    }
+                    $report = $this->postgresSchema($connection, $context, $ref, $schema, $search, $offset);
+                    $this->assertGeneration($connection, $generation);
+                    Audit::record($connection->user_id, 'bi.credential.schema_read', 'Consulta refinada da estrutura da fonte.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $report['verified'], 'method' => 'postgres_information_schema']);
+
+                    return [...$report, 'method' => 'postgres_information_schema'];
+                }
                 $result = $this->lumo->run($connection, ['credential', $action, $ref, ...($action === 'schema' && $schema !== null ? ['--schema', $schema] : []), ...($action === 'schema' ? ['--timeout', '45s'] : [])], $context, 60);
                 $data = $result['data'] ?? null;
                 $this->assertGeneration($connection, $generation);
@@ -225,7 +239,7 @@ class BiCredentials
 
                 return [...$report, 'method' => $method];
             } catch (RuntimeException $e) {
-                if ($connection->fresh()->status !== 'connected' || $e->getCode() === 6) {
+                if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected' || $e->getCode() === 6) {
                     throw $e;
                 }
                 $this->assertGeneration($connection, $generation);
@@ -366,10 +380,14 @@ class BiCredentials
     }
 
     /** @return array<string, mixed> */
-    private function postgresSchema(Connection $connection, Project $context, string $ref, ?string $schema): array
+    private function postgresSchema(Connection $connection, Project $context, string $ref, ?string $schema, ?string $search = null, int $offset = 0): array
     {
         $where = $schema === null ? "table_schema NOT IN ('pg_catalog','information_schema')" : "table_schema = '".str_replace("'", "''", $schema)."'";
-        $sql = 'SELECT table_schema AS schema_name, table_name, column_name, data_type, is_nullable, ordinal_position FROM information_schema.columns WHERE '.$where.' ORDER BY table_schema, table_name, ordinal_position LIMIT 5001';
+        if ($search !== null) {
+            $literal = str_replace(['!', '%', '_', "'"], ['!!', '!%', '!_', "''"], $search);
+            $where .= " AND (table_name ILIKE '%".$literal."%' ESCAPE '!' OR column_name ILIKE '%".$literal."%' ESCAPE '!')";
+        }
+        $sql = 'SELECT table_schema AS schema_name, table_name, column_name, data_type, is_nullable, ordinal_position FROM information_schema.columns WHERE '.$where.' ORDER BY table_schema, table_name, ordinal_position LIMIT 5001'.($offset > 0 ? ' OFFSET '.$offset : '');
         $result = $this->lumo->run($connection, ['credential', 'query', $ref, '--sql', $sql, '--limit', '5001', '--timeout', '45s'], $context, 60)['data'] ?? null;
         $rows = is_array($result) ? ($result['rows'] ?? null) : null;
         if (! is_array($rows) || ! array_is_list($rows) || $rows === []) {
@@ -389,15 +407,10 @@ class BiCredentials
             }
             $key = json_encode([$row['schema_name'], $row['table_name']], JSON_THROW_ON_ERROR);
             $tables[$key] ??= ['schema' => $row['schema_name'], 'name' => $row['table_name'], 'columns' => []];
-            if (count($tables[$key]['columns']) < 300) {
-                $tables[$key]['columns'][] = ['name' => $row['column_name'], 'type' => $row['data_type'], 'nullable' => ($row['is_nullable'] ?? '') === 'YES'];
-            } else {
-                $truncated = true;
-            }
+            $tables[$key]['columns'][] = ['name' => $row['column_name'], 'type' => $row['data_type'], 'nullable' => ($row['is_nullable'] ?? '') === 'YES'];
         }
-        $truncated = $truncated || count($tables) > 500;
 
-        return ['verified' => true, 'state' => 'available', 'tables' => array_slice(array_values($tables), 0, 500), 'truncated' => $truncated, 'total_tables' => count($tables), 'message' => count($tables).' tabela(s) identificada(s) na consulta de estrutura.', 'checked_at' => now()->toIso8601String()];
+        return ['verified' => true, 'state' => 'available', 'tables' => array_values($tables), 'truncated' => $truncated, 'next_offset' => $truncated ? $offset + 5000 : null, 'offset' => $offset, 'search' => $search, 'total_tables' => count($tables), 'message' => count($tables).' tabela(s) identificada(s) na consulta de estrutura.', 'checked_at' => now()->toIso8601String()];
     }
 
     /** @return array<string, mixed> */
