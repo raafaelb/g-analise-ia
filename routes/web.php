@@ -19,9 +19,13 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/app/{section?}', [WorkspaceController::class, 'page'])->where('section', '.*')->name('workspace');
     Route::prefix('api')->middleware('throttle:workspace')->group(function () {
+        Route::post('/catalog/{tenant}/apps/{id}/actions', [CatalogController::class, 'prepareAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
+        Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
         Route::get('/catalog/{tenant}', [CatalogController::class, 'snapshot'])->whereNumber('tenant')->middleware('throttle:catalog');
         Route::get('/catalog/{tenant}/variables/{id}', [CatalogController::class, 'variable'])->whereNumber('tenant')->where('id', '[a-f0-9]+');
+        Route::get('/catalog/{tenant}/resources/{kind}/{id}/inspect/{action}', [CatalogController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['data', 'status', 'history', 'health', 'events'])->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/resources/{kind}/{id}', [CatalogController::class, 'detail'])->whereNumber(['tenant', 'id']);
+        Route::post('/catalog/{tenant}/apps/{id}/viewer', [CatalogController::class, 'viewer'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-viewer');
         Route::get('/catalog/{tenant}/apps/{id}/image', [CatalogController::class, 'image'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-images');
         Route::get('/catalog/{tenant}/apps/{id}/refresh-coverage', [CatalogController::class, 'coverage'])->whereNumber(['tenant', 'id'])->middleware('throttle:coverage');
         Route::get('/catalog/{tenant}/apps/{id}/preview', [CatalogController::class, 'preview'])->whereNumber(['tenant', 'id']);
@@ -34,6 +38,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/conversations/{id}/messages', [WorkspaceController::class, 'message'])->middleware('throttle:agent-messages');
         Route::post('/runs/{id}/cancel', [WorkspaceController::class, 'cancel']);
         Route::post('/approvals/{id}/decide', [WorkspaceController::class, 'decide']);
+        Route::get('/projects/{id}/preview-context', [WorkspaceController::class, 'previewContext'])->middleware('throttle:bi-inspect');
+        Route::post('/projects/{id}/preview', [WorkspaceController::class, 'renderPreview'])->middleware('throttle:bi-images');
         Route::get('/projects/{id}/refresh-coverage', [WorkspaceController::class, 'refreshCoverage'])->middleware('throttle:coverage');
         Route::post('/projects/{id}/files', [WorkspaceController::class, 'upload'])->middleware('throttle:attachments');
         Route::post('/artifacts/{id}/visual-consent', [WorkspaceController::class, 'visualConsent']);
@@ -41,6 +47,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/schedules', [WorkspaceController::class, 'schedule']);
         Route::patch('/profile', [WorkspaceController::class, 'profile']);
         Route::post('/connections/openai/verify', [ConnectionController::class, 'verifyOpenAi'])->middleware('throttle:openai-verify');
+        Route::get('/connections/openai/usage', [ConnectionController::class, 'usage']);
         Route::get('/connections/openai/models', [ConnectionController::class, 'models']);
         Route::post('/connections/horus/login', [ConnectionController::class, 'horusLogin'])->middleware('throttle:bi-login');
         Route::post('/connections/horus/refresh', [ConnectionController::class, 'refreshHorus']);

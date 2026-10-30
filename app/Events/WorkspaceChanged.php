@@ -7,7 +7,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
 class WorkspaceChanged implements ShouldBroadcastNow
 {
-    public function __construct(public int $userId, public string $runId) {}
+    public function __construct(public int $userId, public ?string $runId = null) {}
 
     public function broadcastOn(): array
     {

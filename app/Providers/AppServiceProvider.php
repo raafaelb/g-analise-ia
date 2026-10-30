@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        foreach (['workspace' => 600, 'login' => 10, 'registration' => 5, 'openai-login' => 10, 'bi-images' => 20, 'coverage' => 10, 'agent-messages' => 15, 'openai-verify' => 3, 'bi-login' => 5, 'attachments' => 10, 'catalog' => 20] as $name => $count) {
+        foreach (['workspace' => 600, 'login' => 10, 'registration' => 5, 'openai-login' => 10, 'bi-images' => 20, 'bi-viewer' => 6, 'bi-actions' => 15, 'bi-inspect' => 60, 'coverage' => 10, 'agent-messages' => 15, 'openai-verify' => 3, 'bi-login' => 5, 'attachments' => 10, 'catalog' => 20] as $name => $count) {
             RateLimiter::for($name, fn (Request $request) => Limit::perMinute($count)->by((string) ($request->user()?->id ?? $request->ip())));
         }
         if (trim((string) parse_url(config('app.url'), PHP_URL_PATH), '/') !== '') {

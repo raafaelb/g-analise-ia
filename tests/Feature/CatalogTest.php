@@ -49,6 +49,14 @@ class CatalogTest extends TestCase
                 return ['data' => ['count' => 0, 'variables' => []]];
             }
             $rows = ($args[0] === 'list' && $args[1] === 'app') ? $apps : [];
+            if ($args[0] === 'list') {
+                foreach ($bodies as $reference => $body) {
+                    [$type, $id] = explode(':', $reference);
+                    if ($args[1] === $type && ! collect($rows)->contains(fn ($row) => (string) $row['id'] === $id)) {
+                        $rows[] = ['id' => (int) $id, 'nome' => $body['nome'] ?? $reference];
+                    }
+                }
+            }
 
             return ['exit_code' => 0, 'data' => ['count' => count($rows), 'matched' => count($rows), 'results' => $rows]];
         });
@@ -133,7 +141,7 @@ class CatalogTest extends TestCase
     {
         $user = User::factory()->create();
         $this->connect($user);
-        $this->fakeLumo();
+        $this->fakeLumo([['id' => 1, 'nome' => 'App autorizado']]);
         $response = $this->actingAs($user)->postJson('/api/catalog/321/projects', ['resource' => 'app:1'])->assertCreated();
         $this->assertDatabaseHas('projects', ['id' => $response->json('project.id'), 'user_id' => $user->id, 'tenant_id' => '321', 'source_ref' => 'app:1']);
     }
@@ -160,7 +168,7 @@ class CatalogTest extends TestCase
         $this->connect($user);
         $mock = Mockery::mock(LumoClient::class);
         $mock->shouldReceive('initialize')->andReturnNull();
-        $mock->shouldReceive('run')->andReturn(['data' => ['payload' => ['header' => ['tenantId' => 999], 'body' => ['nome' => 'Outro tenant']]]]);
+        $mock->shouldReceive('run')->andReturnUsing(fn ($c, $args) => ['data' => $args[0] === 'list' ? ['matched' => 1, 'results' => [['id' => 1]]] : ['payload' => ['header' => ['tenantId' => 999], 'body' => ['nome' => 'Outro tenant']]]]);
         $this->app->instance(LumoClient::class, $mock);
         $this->actingAs($user)->getJson('/api/catalog/321/resources/app/1')->assertUnprocessable();
     }

@@ -7,6 +7,7 @@ use App\Models\Approval;
 use App\Models\Connection;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\ChatGptUsage;
 use App\Services\ChatGptVerifier;
 use App\Services\LumoClient;
 use App\Services\OpenAiIdentity;
@@ -92,6 +93,17 @@ class ConnectionController extends Controller
         }
     }
 
+    public function usage(Request $request, ChatGptUsage $usage): JsonResponse
+    {
+        $connection = Connection::where('user_id', $request->user()->id)->where('provider', 'openai')->where('status', 'connected')->first();
+        abort_unless($connection, 422, 'Conecte sua conta ChatGPT para consultar o plano.');
+        try {
+            return response()->json($usage->read($connection));
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['connection' => $e->getMessage()]);
+        }
+    }
+
     public function verifyOpenAi(Request $request, ChatGptVerifier $verifier): JsonResponse
     {
         $data = $request->validate(['model' => ['nullable', 'string', 'max:100']]);
@@ -108,7 +120,6 @@ class ConnectionController extends Controller
 
     public function horusLogin(Request $request, LumoClient $lumo): JsonResponse
     {
-        abort_if($request->user()->role === 'viewer', 403);
         $data = $request->validate(['email' => ['required', 'email'], 'password' => ['required', 'string', 'max:500'], 'otp' => ['nullable', 'string', 'max:20']]);
         try {
             $connection = $lumo->login($request->user()->id, $data['email'], $data['password'], $data['otp'] ?? null);
@@ -146,7 +157,11 @@ class ConnectionController extends Controller
         DB::transaction(function () use ($request, $connection, $provider) {
             // A paused review has no live worker to acknowledge cancel_requested.
             // Cancel it immediately so reconnecting can start a fresh task.
-            Approval::where('user_id', $request->user()->id)->whereIn('status', ['pending', 'approved'])->update(['status' => 'cancelled', 'decided_at' => now()]);
+            $reviews = Approval::where('user_id', $request->user()->id)->whereIn('status', ['pending', 'approved']);
+            if ($provider === 'openai') {
+                $reviews->whereNotNull('agent_run_id');
+            }
+            $reviews->update(['status' => 'cancelled', 'decided_at' => now()]);
             AgentRun::where('user_id', $request->user()->id)->whereIn('status', ['queued', 'awaiting_approval'])->update(['status' => 'cancelled', 'finished_at' => now()]);
             AgentRun::where('user_id', $request->user()->id)->where('status', 'running')->update(['status' => 'cancel_requested']);
             $connection->update(['status' => 'disconnected', 'credentials' => null, 'scopes' => [], 'metadata' => $provider === 'openai' ? array_merge(array_intersect_key($connection->metadata ?? [], array_flip(['issuer', 'client_id', 'auth_mode'])), ['plan_usage' => false]) : [], 'expires_at' => null]);

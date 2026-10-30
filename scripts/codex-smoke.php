@@ -3,6 +3,7 @@
 use App\Services\Agent\ActionBroker;
 use App\Services\Agent\CodexProtocol;
 use App\Services\Agent\JsonRpcBuffer;
+use App\Services\ProcessEnvironment;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\InputStream;
@@ -14,7 +15,7 @@ $app->make(Kernel::class)->bootstrap();
 
 $home = sys_get_temp_dir().'/horus-codex-smoke-'.bin2hex(random_bytes(8));
 File::ensureDirectoryExists($home, 0700, true);
-$env = array_fill_keys(array_keys(getenv()), false);
+$env = ProcessEnvironment::isolated();
 $env = array_merge($env, ['PATH' => '/usr/local/bin:/usr/bin:/bin', 'HOME' => $home, 'CODEX_HOME' => $home]);
 $process = new Process(CodexProtocol::command(config('horus.codex.binary'), 'http://127.0.0.1:9'), $home, $env);
 $input = new InputStream;

@@ -18,9 +18,11 @@ use App\Services\ArtifactImages;
 use App\Services\Audit;
 use App\Services\LocalPreview;
 use App\Services\OpenAiIdentity;
+use App\Services\ProjectPreviews;
 use App\Services\RefreshCoverage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -30,6 +32,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class WorkspaceController extends Controller
 {
@@ -49,7 +52,7 @@ class WorkspaceController extends Controller
         $projects = Project::where('user_id', $uid)->where('status', '!=', 'archived')->withCount('conversations')->latest('updated_at')->get();
         $connections = Connection::where('user_id', $uid)->get();
 
-        return ['user' => $request->user()->only('id', 'name', 'email', 'role'), 'projects' => $projects, 'conversations' => Conversation::where('user_id', $uid)->latest('updated_at')->get(), 'connections' => $connections, 'approvals' => Approval::where('user_id', $uid)->latest()->limit(100)->get(), 'schedules' => RefreshSchedule::where('user_id', $uid)->latest()->get(), 'activity' => AuditEvent::where('user_id', $uid)->latest()->limit(100)->get(), 'artifacts' => Artifact::where('user_id', $uid)->latest()->get(), 'runs' => AgentRun::where('user_id', $uid)->latest()->limit(30)->get(), 'preview' => app(LocalPreview::class)->enabled(), 'integration' => ['openai_configured' => app(OpenAiIdentity::class)->configured(), 'plan_usage_enabled' => config('horus.openai.plan_enabled'), 'auth_mode' => config('horus.openai.mode'), 'lumo_login_enabled' => config('horus.lumo.login_enabled'), 'timezone' => 'America/Sao_Paulo']];
+        return ['user' => $request->user()->only('id', 'name', 'email', 'role'), 'projects' => $projects, 'conversations' => Conversation::where('user_id', $uid)->latest('updated_at')->get(), 'connections' => $connections, 'approvals' => Approval::where('user_id', $uid)->latest()->limit(100)->get(), 'schedules' => RefreshSchedule::where('user_id', $uid)->latest()->get(), 'activity' => AuditEvent::where('user_id', $uid)->latest()->limit(100)->get(), 'artifacts' => Artifact::where('user_id', $uid)->latest()->orderByDesc('id')->get(), 'runs' => AgentRun::where('user_id', $uid)->latest()->limit(30)->get(), 'preview' => app(LocalPreview::class)->enabled(), 'integration' => ['openai_configured' => app(OpenAiIdentity::class)->configured(), 'plan_usage_enabled' => config('horus.openai.plan_enabled'), 'auth_mode' => config('horus.openai.mode'), 'lumo_login_enabled' => config('horus.lumo.login_enabled'), 'timezone' => 'America/Sao_Paulo']];
     }
 
     private function author(Request $request): void
@@ -82,15 +85,35 @@ class WorkspaceController extends Controller
         $this->author($request);
         $project = $this->project($request, $id);
         $data = $request->validate(['name' => ['sometimes', 'required', 'string', 'max:100'], 'description' => ['nullable', 'string', 'max:2000'], 'color' => ['sometimes', Rule::in(['violet', 'mint', 'amber', 'blue', 'rose'])], 'instructions' => ['nullable', 'string', 'max:10000'], 'tenant_id' => ['sometimes', 'nullable', 'string', 'max:80'], 'status' => ['sometimes', Rule::in(['draft', 'archived'])]]);
-        if (array_key_exists('tenant_id', $data) && $data['tenant_id'] !== $project->tenant_id) {
-            abort_if($project->conversations()->whereNotNull('thread_id')->exists(), 409, 'Crie outro projeto para trocar o tenant de uma conversa já iniciada.');
-            if ($data['tenant_id']) {
-                $this->verifyTenant($request, $data['tenant_id']);
-                $data['tenant_name'] = $this->tenantName($request, $data['tenant_id']);
-            }$data['is_example'] = false;
+        $lock = Cache::lock('project:'.$project->id, 30);
+        abort_unless($lock->get(), 409, 'Há uma operação usando este projeto. Aguarde ou interrompa a tarefa antes de alterar seu contexto.');
+        try {
+            $project = DB::transaction(function () use ($request, $id, $data): Project {
+                $project = Project::where('user_id', $request->user()->id)->lockForUpdate()->findOrFail($id);
+                $contextChange = (array_key_exists('tenant_id', $data) && $data['tenant_id'] !== $project->tenant_id) || (isset($data['status']) && $data['status'] !== $project->status);
+                if ($contextChange) {
+                    $activeRun = $project->conversations()->whereHas('runs', fn ($query) => $query->whereIn('status', ['queued', 'running', 'awaiting_approval', 'cancel_requested']))->exists();
+                    $activeReview = Approval::where('project_id', $project->id)->whereIn('status', ['pending', 'approved', 'executing'])->exists();
+                    abort_if($activeRun || $activeReview, 409, 'Conclua ou cancele as tarefas e revisões deste projeto antes de alterar seu contexto.');
+                }
+                if (array_key_exists('tenant_id', $data) && $data['tenant_id'] !== $project->tenant_id) {
+                    abort_if($project->source_ref || $project->conversations()->where(fn ($query) => $query->whereNotNull('thread_id')->orWhereHas('messages'))->exists(), 409, 'Crie outro projeto para trabalhar em outro tenant depois de vincular um recurso ou iniciar uma conversa.');
+                    if ($data['tenant_id']) {
+                        $this->verifyTenant($request, $data['tenant_id']);
+                        $data['tenant_name'] = $this->tenantName($request, $data['tenant_id']);
+                    } else {
+                        $data['tenant_name'] = null;
+                    }
+                    $data['is_example'] = false;
+                }
+                $project->update($data);
+                Audit::record($request->user()->id, 'project.updated', 'Projeto “'.$project->name.'” atualizado.', $project->id);
+
+                return $project;
+            });
+        } finally {
+            $lock->release();
         }
-        $project->update($data);
-        Audit::record($request->user()->id, 'project.updated', 'Projeto “'.$project->name.'” atualizado.', $project->id);
 
         return response()->json($project);
     }
@@ -110,6 +133,7 @@ class WorkspaceController extends Controller
     {
         $this->author($request);
         $project = $this->project($request, $id);
+        abort_if($project->status === 'archived', 409, 'Este projeto está arquivado. Reabra-o antes de iniciar outra conversa.');
         $conversation = Conversation::create(['user_id' => $request->user()->id, 'project_id' => $project->id]);
 
         return response()->json($conversation, 201);
@@ -128,6 +152,8 @@ class WorkspaceController extends Controller
         $data = $request->validate(['content' => ['required', 'string', 'max:30000'], 'model' => ['nullable', 'string', 'max:100']]);
         $conversation = Conversation::where('user_id', $request->user()->id)->findOrFail($id);
         $result = DB::transaction(function () use ($request, $data, $conversation) {
+            $project = Project::where('user_id', $request->user()->id)->lockForUpdate()->findOrFail($conversation->project_id);
+            abort_if($project->status === 'archived', 409, 'Este projeto está arquivado. Reabra-o antes de enviar outra mensagem.');
             $conversation = Conversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
             abort_if($conversation->runs()->whereIn('status', ['queued', 'running', 'awaiting_approval', 'cancel_requested'])->exists(), 409, 'Já existe uma tarefa em execução nesta conversa.');
             $inputMessage = Message::create(['conversation_id' => $conversation->id, 'role' => 'user', 'content' => $data['content']]);
@@ -194,6 +220,7 @@ class WorkspaceController extends Controller
     {
         $this->author($request);
         $project = $this->project($request, $id);
+        abort_if($project->status === 'archived', 409, 'Este projeto está arquivado. Reabra-o antes de anexar arquivos.');
         $request->validate(['file' => ['required', 'file', 'max:10240', 'mimes:csv,txt,pdf,xlsx,json,yaml,yml,md,png,jpg,jpeg']]);
         abort_if(Artifact::where('project_id', $project->id)->where('user_id', $request->user()->id)->where('kind', 'attachment')->count() >= 20, 422, 'Cada projeto aceita até 20 anexos.');
         $file = $request->file('file');
@@ -222,6 +249,33 @@ class WorkspaceController extends Controller
         abort_unless($artifact->path && Storage::disk('local')->exists($artifact->path), 404);
 
         return Storage::disk('local')->download($artifact->path, $artifact->name, ['Content-Type' => $artifact->mime, 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    public function previewContext(Request $request, string $id, ProjectPreviews $previews): JsonResponse
+    {
+        $project = $this->project($request, $id);
+        try {
+            return response()->json($previews->context($request->user(), $project));
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['preview' => $e->getMessage()]);
+        }
+    }
+
+    public function renderPreview(Request $request, string $id, ProjectPreviews $previews): JsonResponse
+    {
+        $project = $this->project($request, $id);
+        $data = $request->validate(['dashboard' => ['nullable', 'integer', 'min:1']]);
+        try {
+            $artifact = $previews->render($request->user(), $project, isset($data['dashboard']) ? (int) $data['dashboard'] : null);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
+        } catch (\RuntimeException $e) {
+            throw ValidationException::withMessages(['preview' => $e->getMessage()]);
+        }
+
+        return response()->json(['artifact' => $artifact], 201);
     }
 
     public function refreshCoverage(Request $request, string $id): JsonResponse

@@ -1,0 +1,76 @@
+<script setup lang="ts">
+import {computed,nextTick,onMounted,onUnmounted,ref,watch} from 'vue';
+import {AlertCircle,ArrowRight,Check,CheckCircle2,Copy,LoaderCircle,RefreshCw,ShieldCheck,Trash2,Upload,X} from 'lucide-vue-next';
+import ApprovalReview from './ApprovalReview.vue';
+import {createRequestGuard} from '../lib/async-response';
+type Item=Record<string,any>;
+type ManualAction='clone_app'|'delete_draft'|'publish_app';
+const props=defineProps<{tenant:string;tenantName:string;resource:Item;desks:Item[];management?:Item|null;request:(path:string,method?:string,data?:unknown)=>Promise<any>}>();
+const emit=defineEmits<{updated:[];deleted:[];published:[resource:string];project:[id:string];notice:[message:string]}>();
+const mode=ref<ManualAction|null>(null);
+const publishMode=ref<'new'|'replace'>('new');const publishDesk=ref('');
+watch(publishMode,value=>{publishDesk.value=value==='replace'?String(props.management?.publication_origin?.desk_id??''):'';});
+const name=ref('');const requestId=ref('');const review=ref<Item|null>(null);const project=ref<Item|null>(null);
+const busy=ref(false);const error=ref('');const clock=ref(Date.now());const nameInput=ref<HTMLInputElement|null>(null);
+const selection=createRequestGuard();
+let pollBusy=false;let completed=false;let poll:ReturnType<typeof setInterval>|undefined;
+const expired=computed(()=>review.value?.status==='pending'&&new Date(review.value.expires_at).getTime()<=clock.value);
+const deciding=computed(()=>review.value?.status==='pending'&&!expired.value);
+const executing=computed(()=>['approved','executing'].includes(review.value?.status));
+const result=computed<Item>(()=>review.value?.payload?.execution?.result??{});
+const copied=computed(()=>review.value?.status==='completed'&&mode.value==='clone_app'&&/^app:[1-9][0-9]*$/.test(result.value.managed_resource??''));
+const published=computed(()=>review.value?.status==='completed'&&mode.value==='publish_app'&&result.value.publication?.verified===true);
+const ended=computed(()=>!!review.value&&!deciding.value&&!executing.value);
+async function start(action:ManualAction){
+ if(busy.value||executing.value||(action==='publish_app'&&!props.management?.can_publish))return;
+ selection.next();mode.value=action;review.value=null;project.value=null;error.value='';completed=false;requestId.value=crypto.randomUUID();name.value=Array.from('Cópia de '+props.resource.name).slice(0,100).join('');publishMode.value='new';publishDesk.value='';
+ await nextTick();nameInput.value?.focus();
+}
+async function prepare(){
+ if(!mode.value||busy.value||(mode.value==='publish_app'&&!/^[1-9][0-9]*$/.test(publishDesk.value)))return;
+ const current=selection.current();busy.value=true;error.value='';
+ try{const response=await props.request(`/catalog/${props.tenant}/apps/${props.resource.id}/actions`,'POST',{action:mode.value,request_id:requestId.value,...(mode.value==='clone_app'?{name:name.value.trim()}:mode.value==='publish_app'?{desk:Number(publishDesk.value),publish_mode:publishMode.value}:{})});if(!current())return;if(typeof response.approval?.status!=='string')throw new Error('Não foi possível confirmar o estado da revisão. Tente novamente para recuperar esta solicitação.');review.value=response.approval;project.value=response.project;emit('updated');}
+ catch(e){if(current())error.value=(e as Error).message;}finally{if(current())busy.value=false;}
+}
+async function refreshStatus(){
+ if(!executing.value||pollBusy||!review.value)return;
+ const id=review.value.id;const current=selection.current();pollBusy=true;
+ try{const response=await props.request(`/bi-actions/${id}`);if(!current()||review.value?.id!==id)return;review.value=response.approval;project.value=response.project;error.value='';
+  if(review.value?.status==='completed'&&!completed){completed=true;emit('updated');if(mode.value==='delete_draft'){emit('notice','Rascunho excluído. A aplicação original foi preservada.');emit('deleted');}else if(mode.value==='publish_app'&&result.value.publication?.verified){emit('notice','Aplicação publicada na mesa '+result.value.publication.destination.name+'.');emit('published',result.value.publication.resource);}else emit('notice',result.value.management_warning??'Cópia criada na sua mesa. Você já pode abrir o projeto dela.');}
+  else if(review.value?.status==='failed')emit('updated');
+ }catch(e){if(current())error.value=(e as Error).message;}finally{pollBusy=false;}
+}
+async function decide(decision:'approved'|'rejected'){
+ if(!deciding.value||!review.value||busy.value)return;
+ const current=selection.current();const id=review.value.id;busy.value=true;error.value='';
+ try{const response=await props.request(`/approvals/${id}/decide`,'POST',{decision,fingerprint:review.value.fingerprint});if(!current())return;review.value=response;emit('updated');if(decision==='approved')await refreshStatus();}
+ catch(e){if(current())error.value=(e as Error).message;}finally{if(current())busy.value=false;}
+}
+function dismiss(){if(busy.value||executing.value||deciding.value)return;selection.invalidate();mode.value=null;review.value=null;project.value=null;error.value='';}
+onMounted(()=>{poll=setInterval(()=>{clock.value=Date.now();if(!document.hidden)refreshStatus();},2200);});
+onUnmounted(()=>{selection.invalidate();if(poll)clearInterval(poll);});
+</script>
+
+<template>
+ <section class="manual-bi-action" aria-label="Gerenciar aplicação">
+  <div class="manual-heading"><ShieldCheck :size="18"/><div><strong>Gerenciar aplicação</strong><p>Use sua conexão BI. Estas ações não iniciam uma tarefa de IA.</p></div></div>
+  <div v-if="!mode" class="manual-buttons"><button class="secondary-button" @click="start('clone_app')"><Copy :size="16"/>Duplicar aplicação</button><button v-if="management?.can_publish" class="secondary-button" @click="start('publish_app')"><Upload :size="16"/>Publicar aplicação</button><button v-if="management?.can_delete_draft" class="danger-text" @click="start('delete_draft')"><Trash2 :size="15"/>Excluir rascunho criado aqui</button></div>
+  <template v-else-if="!review">
+   <form @submit.prevent="prepare"><template v-if="mode==='clone_app'"><h3>Uma cópia para trabalhar</h3><p>A aplicação original permanece como está. A cópia terá um novo projeto e ficará na sua mesa.</p><label>Nome da cópia<input ref="nameInput" v-model="name" :disabled="busy" required maxlength="100" placeholder="Ex.: Minha visão comercial" aria-label="Nome da cópia da aplicação"></label></template><template v-else-if="mode==='publish_app'"><h3>Publicar aplicação</h3><p>Compartilhe esta versão com os usuários de uma mesa de aplicações.</p><label v-if="management?.publication_origin">Como publicar<select v-model="publishMode" :disabled="busy" aria-label="Modo de publicação"><option value="new">Como uma nova aplicação</option><option value="replace">Substituir a versão original</option></select></label><p v-else class="manual-status">Esta publicação criará uma nova entrada na mesa escolhida.</p><label v-if="publishMode==='new'">Mesa de aplicações<select v-model="publishDesk" required :disabled="busy" aria-label="Mesa de publicação"><option value="">Escolha onde compartilhar</option><option v-for="desk in desks" :key="desk.id" :value="String(desk.id)">{{desk.name}}</option></select></label><p v-else class="publication-target">A versão <strong>{{management?.publication_origin?.name}}</strong> será substituída na mesa <strong>{{management?.publication_origin?.desk_name}}</strong>.</p><p v-if="!desks.length" class="manual-status">Não há mesas disponíveis nesta consulta. Atualize o catálogo e confira as permissões da sua conta.</p><p>As fontes precisam ter agenda ativa ao menos diária e carga concluída. O sistema confere isso antes de preparar a revisão.</p></template><template v-else><h3>Excluir este rascunho?</h3><p>A exclusão permite somente rascunhos registrados pelo portal. A aplicação original e as fontes de dados são preservadas.</p></template><div v-if="error" class="form-error" role="alert"><AlertCircle :size="16"/>{{error}}</div><div class="manual-buttons"><button type="button" class="secondary-button" :disabled="busy" @click="dismiss">Voltar</button><button class="primary-button" :disabled="busy||(mode==='clone_app'&&!name.trim())||(mode==='publish_app'&&!publishDesk)"><LoaderCircle v-if="busy" :size="15" class="spin"/><ShieldCheck v-else :size="15"/>Preparar revisão</button></div></form>
+  </template>
+  <template v-else>
+   <template v-if="deciding"><h3>Confira antes de autorizar</h3><ApprovalReview :approval="review" :tenants="[{id:tenant,name:tenantName}]"/><div class="manual-buttons"><button class="secondary-button" :disabled="busy" @click="decide('rejected')"><X :size="15"/>Recusar</button><button class="primary-button" :disabled="busy" @click="decide('approved')"><LoaderCircle v-if="busy" :size="15" class="spin"/><Check v-else :size="15"/>{{mode==='clone_app'?'Autorizar duplicação':mode==='publish_app'?(review.payload.action.publish_mode==='replace'?'Autorizar substituição':'Autorizar publicação'):'Autorizar exclusão'}}</button></div></template>
+   <div v-else-if="executing" class="manual-progress" role="status"><LoaderCircle :size="20" class="spin"/><div><strong>{{review.status==='approved'?'Aguardando execução':'Executando no BI'}}</strong><p>Você pode acompanhar esta operação também em Atividade.</p></div><button class="icon-button" aria-label="Atualizar operação de BI" @click="refreshStatus"><RefreshCw :size="16"/></button></div>
+   <div v-else-if="copied" class="manual-success" role="status"><CheckCircle2 :size="22"/><div><strong>Cópia criada na sua mesa</strong><p>{{result.confirmed_name||'Projeto: '+review.payload.action.name}}</p><p v-if="result.management_warning" class="form-error" role="alert">{{result.management_warning}}</p><p>Confira a atualização das fontes antes de publicar a cópia.</p><button v-if="project" class="primary-button" @click="emit('project',project.id)">Abrir projeto da cópia<ArrowRight :size="15"/></button></div></div>
+   <div v-else-if="published" class="manual-success" role="status"><CheckCircle2 :size="22"/><div><strong>Aplicação publicada</strong><p>{{result.publication.name}} · {{result.publication.destination.name}}</p><button v-if="project" class="primary-button" @click="emit('project',project.id)">Abrir projeto<ArrowRight :size="15"/></button></div></div>
+   <div v-else-if="review.status==='completed'&&result.management_warning" class="form-error" role="alert"><AlertCircle :size="18"/>{{result.management_warning}}</div>
+   <div v-else-if="review.status==='failed'" class="manual-failure" role="alert"><AlertCircle :size="20"/><div><strong>Esta operação precisa de atenção</strong><p>{{review.payload.execution?.message}}</p><p>Confira o recurso no catálogo antes de solicitar outra operação.</p></div></div>
+   <p v-else class="manual-status" role="status">{{expired||review.status==='expired'?'Esta revisão expirou. Prepare outra para conferir o estado atual.':review.status==='rejected'?'Operação recusada. Nenhuma ação desta revisão foi executada.':review.status==='cancelled'?'Operação cancelada.':review.status==='completed'?'Operação concluída.':'Estado indisponível. Consulte Atividade antes de solicitar outra operação.'}}</p>
+   <div v-if="error" class="form-error" role="alert"><AlertCircle :size="16"/>{{error}}</div><button v-if="ended" class="secondary-button manual-back" @click="dismiss">Voltar às ações</button>
+  </template>
+ </section>
+</template>
+
+<style scoped>
+.manual-bi-action{margin-top:22px;border:1px solid #dce6f5;border-radius:10px;padding:18px;background:#f8fbff}.manual-heading{display:flex;gap:10px;align-items:flex-start;color:#355b91;margin-bottom:14px}.manual-heading strong{font-size:13px}.manual-heading p,.manual-bi-action form>p,.manual-progress p,.manual-success p,.manual-failure p,.manual-status{font-size:12px;color:#68778f;line-height:1.7;margin:5px 0 12px}.manual-bi-action h3{font-size:14px;color:#253b5a;margin-bottom:9px}.manual-bi-action label{display:block;max-width:520px;margin:16px 0}.manual-bi-action input,.manual-bi-action select{display:block;width:100%;background:white}.manual-buttons{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:13px}.manual-buttons .danger-text{display:flex;align-items:center;gap:7px;padding:10px}.manual-progress,.manual-success,.manual-failure{display:flex;align-items:flex-start;gap:12px;background:white;border:1px solid #dce6f5;padding:15px;border-radius:8px}.manual-progress strong,.manual-success strong,.manual-failure strong{font-size:13px}.manual-progress>button{margin-left:auto}.manual-success{color:#287655}.manual-success p{margin-bottom:12px}.manual-failure{color:#99552c}.manual-back{margin-top:13px}.manual-bi-action :deep(.approval-review){margin:12px 0}.publication-target{padding:12px;border:1px solid #efdfbe;border-radius:7px;background:#fff8eb}.manual-bi-action .form-error{margin:12px 0}@media(max-width:650px){.manual-bi-action{padding:14px}.manual-buttons>button{flex-grow:1}}
+</style>

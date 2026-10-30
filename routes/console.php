@@ -2,7 +2,6 @@
 
 use App\Jobs\OperationsHeartbeat;
 use App\Models\AgentRun;
-use App\Models\Approval;
 use App\Models\User;
 use App\Services\Audit;
 use Illuminate\Support\Facades\Artisan;
@@ -38,10 +37,7 @@ Artisan::command('horus:user {email} {--name=} {--role=author}', function () {
     return 0;
 })->purpose('Cria ou atualiza um acesso local sem expor a senha nos argumentos.');
 Schedule::call(function () {
-    Approval::where('status', 'pending')->where('expires_at', '<', now())->each(function ($approval) {
-        $approval->update(['status' => 'expired']);
-        AgentRun::whereKey($approval->agent_run_id)->where('status', 'awaiting_approval')->update(['status' => 'failed', 'finished_at' => now(), 'error_code' => 'approval_expired', 'error_message' => 'O prazo da revisão terminou. Envie uma nova mensagem para continuar.']);
-    });
+    Artisan::call('ganalise:expire-reviews');
     AgentRun::whereIn('status', ['running'])->where('heartbeat_at', '<', now()->subMinutes(5))->each(function ($run) {
         $run->update(['status' => 'failed', 'finished_at' => now(), 'error_code' => 'worker_lost', 'error_message' => 'O worker perdeu a conexão. Sua conversa foi preservada.']);
         Audit::record($run->user_id, 'agent.interrupted', 'Worker interrompido; tarefa requer retomada.', $run->conversation->project_id);

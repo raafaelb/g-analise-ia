@@ -6,7 +6,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
-    "build:local": "vue-tsc --noEmit && vite build --mode development"
+    "build:local": "vue-tsc --noEmit && vite build --mode development",
+    "test:frontend": "node --test tests/frontend/*.test.mjs"
   },
   "dependencies": {
     "@inertiajs/vue3": "^3.0.0",

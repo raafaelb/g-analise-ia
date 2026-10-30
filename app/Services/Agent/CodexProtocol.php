@@ -14,9 +14,31 @@ class CodexProtocol
         return ['clientInfo' => ['name' => 'G-Analise IA', 'title' => 'G-Analise IA', 'version' => '0.1.0'], 'capabilities' => ['experimentalApi' => true]];
     }
 
+    /** @return array<string, mixed> */
+    public static function restrictedResponse(array $request): array
+    {
+        $response = ['id' => $request['id']];
+        $method = $request['method'] ?? '';
+        $result = match ($method) {
+            'item/commandExecution/requestApproval', 'item/fileChange/requestApproval' => ['decision' => 'decline'],
+            'item/permissions/requestApproval' => ['permissions' => (object) [], 'scope' => 'turn'],
+            'item/tool/requestUserInput' => ['answers' => (object) []],
+            default => null,
+        };
+
+        return $result === null
+            ? [...$response, 'error' => ['code' => -32601, 'message' => 'Use as ferramentas autorizadas do G-Analise IA.']]
+            : [...$response, 'result' => $result];
+    }
+
+    public static function homeInstructions(): string
+    {
+        return "Use somente as ferramentas do portal para obter contexto, regras, anexos e recursos do projeto selecionado. Não descubra arquivos de outros projetos ou do host. As operações nativas não estão autorizadas.\n";
+    }
+
     public static function command(string $binary, string $baseUrl = 'https://api.openai.com/v1'): array
     {
-        return [$binary, 'app-server', '--listen', 'stdio://', '-c', 'model_provider="openai_chatgpt_plan"', '-c', 'model_providers.openai_chatgpt_plan.name="ChatGPT plan"', '-c', 'model_providers.openai_chatgpt_plan.base_url="'.$baseUrl.'"', '-c', 'model_providers.openai_chatgpt_plan.env_key="ACCESS_TOKEN"', '-c', 'model_providers.openai_chatgpt_plan.wire_api="responses"', '-c', 'model_providers.openai_chatgpt_plan.requires_openai_auth=false', '-c', 'model_providers.openai_chatgpt_plan.supports_websockets=false', '-c', 'shell_environment_policy.inherit="none"', '-c', 'features.shell_tool=false', '-c', 'features.unified_exec=false', '-c', 'features.multi_agent=false', '-c', 'features.multi_agent_v2=false', '-c', 'features.js_repl=false', '-c', 'features.view_image=false', '-c', 'features.image_generation=false', '-c', 'features.apps=false', '-c', 'features.plugins=false', '-c', 'features.skip_host_skill_discovery=true', '-c', 'web_search="disabled"', '-c', 'features.memory_tool=false', '-c', 'features.memories=false', '-c', 'features.code_mode=false', '-c', 'features.code_mode_host=true', '-c', 'features.goals=false', '-c', 'features.sleep_tool=false', '-c', 'features.hooks=false', '-c', 'features.codex_hooks=false', '-c', 'features.computer_use=false', '-c', 'features.browser_use=false'];
+        return [$binary, 'app-server', '--listen', 'stdio://', '-c', 'project_doc_max_bytes=0', '-c', 'model_provider="openai_chatgpt_plan"', '-c', 'model_providers.openai_chatgpt_plan.name="ChatGPT plan"', '-c', 'model_providers.openai_chatgpt_plan.base_url="'.$baseUrl.'"', '-c', 'model_providers.openai_chatgpt_plan.env_key="ACCESS_TOKEN"', '-c', 'model_providers.openai_chatgpt_plan.wire_api="responses"', '-c', 'model_providers.openai_chatgpt_plan.requires_openai_auth=false', '-c', 'model_providers.openai_chatgpt_plan.supports_websockets=false', '-c', 'shell_environment_policy.inherit="none"', '-c', 'features.shell_tool=false', '-c', 'features.unified_exec=false', '-c', 'agents.enabled=false', '-c', 'tools.view_image=false', '-c', 'features.multi_agent=false', '-c', 'features.multi_agent_v2=false', '-c', 'features.js_repl=false', '-c', 'features.view_image=false', '-c', 'features.image_generation=false', '-c', 'features.apps=false', '-c', 'features.plugins=false', '-c', 'features.skip_host_skill_discovery=true', '-c', 'web_search="disabled"', '-c', 'features.memory_tool=false', '-c', 'features.memories=false', '-c', 'features.code_mode=false', '-c', 'features.code_mode_host=true', '-c', 'features.goals=false', '-c', 'features.sleep_tool=false', '-c', 'features.hooks=false', '-c', 'features.codex_hooks=false', '-c', 'features.computer_use=false', '-c', 'features.browser_use=false'];
     }
 
     public static function thread(string $workspace, string $model, array $tools, ?string $threadId = null): array

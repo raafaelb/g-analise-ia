@@ -7,6 +7,7 @@ use App\Models\AgentRun;
 use App\Models\Approval;
 use App\Models\Connection;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\Project;
 use App\Models\RefreshSchedule;
 use App\Models\User;
@@ -14,6 +15,7 @@ use App\Services\Agent\CodexRuntime;
 use App\Services\RefreshCoverage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -195,5 +197,137 @@ class WorkspaceSecurityTest extends TestCase
         require base_path('routes/channels.php');
         $this->actingAs($u)->postJson('/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => 'private-users.'.$other->id])->assertForbidden();
         $this->postJson('/broadcasting/auth', ['socket_id' => '1.2', 'channel_name' => 'private-users.'.$u->id])->assertOk()->assertJsonStructure(['auth']);
+    }
+
+    public function test_a_queued_task_blocks_archiving_or_switching_the_project_tenant(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Contexto', 'tenant_id' => '100']);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $this->actingAs($user)->postJson('/api/conversations/'.$conversation->id.'/messages', ['content' => 'Conferir o catálogo'])->assertAccepted();
+        $this->patchJson('/api/projects/'.$project->id, ['tenant_id' => '200'])->assertConflict();
+        $this->patchJson('/api/projects/'.$project->id, ['status' => 'archived'])->assertConflict();
+        $this->assertSame('100', $project->fresh()->tenant_id);
+        $this->assertSame('draft', $project->fresh()->status);
+        Queue::assertPushed(RunAgentTurn::class, 1);
+    }
+
+    public function test_a_manual_review_locks_the_project_context_until_it_is_resolved(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Revisão', 'tenant_id' => '100']);
+        Approval::create(['user_id' => $user->id, 'project_id' => $project->id, 'type' => 'manual', 'title' => 'Publicação em revisão', 'payload' => [], 'fingerprint' => str_repeat('a', 64), 'expires_at' => now()->addMinutes(10)]);
+        $this->actingAs($user)->patchJson('/api/projects/'.$project->id, ['tenant_id' => '200'])->assertConflict();
+        $this->patchJson('/api/projects/'.$project->id, ['status' => 'archived'])->assertConflict();
+        $this->assertSame('100', $project->fresh()->tenant_id);
+    }
+
+    public function test_an_archived_project_cannot_receive_new_conversations_or_messages(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Arquivado']);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $lock = Cache::lock('project:'.$project->id, 30);
+        $lock->get();
+        try {
+            $this->actingAs($user)->patchJson('/api/projects/'.$project->id, ['status' => 'archived'])->assertConflict();
+        } finally {
+            $lock->release();
+        }
+        $this->patchJson('/api/projects/'.$project->id, ['status' => 'archived'])->assertOk();
+        $this->postJson('/api/projects/'.$project->id.'/conversations')->assertConflict();
+        $this->postJson('/api/conversations/'.$conversation->id.'/messages', ['content' => 'Não executar'])->assertConflict();
+        $this->assertDatabaseCount('agent_runs', 0);
+        $this->assertDatabaseCount('messages', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_resource_linked_project_cannot_be_reassigned_to_another_tenant(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Recurso vinculado', 'tenant_id' => '100', 'source_ref' => 'app:2']);
+        $this->actingAs($user)->patchJson('/api/projects/'.$project->id, ['tenant_id' => '200'])->assertConflict();
+        $this->assertSame('100', $project->fresh()->tenant_id);
+        $this->assertSame('app:2', $project->fresh()->source_ref);
+    }
+
+    public function test_a_queued_job_cannot_restart_an_archived_project(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Arquivado', 'status' => 'archived']);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $run = AgentRun::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
+        $runtime = $this->mock(CodexRuntime::class);
+        $runtime->shouldNotReceive('run');
+        (new RunAgentTurn($run->id))->handle($runtime);
+        $this->assertSame('project_archived', $run->fresh()->error_code);
+        $this->assertSame('failed', $run->fresh()->status);
+    }
+
+    public function test_a_worker_rejects_inconsistent_ownership_without_writing_to_the_other_users_conversation(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $project = $this->project($owner);
+        $conversation = Conversation::create(['user_id' => $owner->id, 'project_id' => $project->id]);
+        $run = AgentRun::create(['user_id' => $other->id, 'conversation_id' => $conversation->id]);
+        $runtime = $this->mock(CodexRuntime::class);
+        $runtime->shouldNotReceive('run');
+        (new RunAgentTurn($run->id))->handle($runtime);
+        $this->assertSame('invalid_project_context', $run->fresh()->error_code);
+        $this->assertSame('failed', $run->fresh()->status);
+        $this->assertSame(0, Message::where('conversation_id', $conversation->id)->count());
+    }
+
+    public function test_a_duplicate_delivery_cannot_restart_a_task_that_finished_after_it_was_read(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->project($user);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $run = AgentRun::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
+        $observed = false;
+        Event::listen('eloquent.retrieved: '.AgentRun::class, function (AgentRun $loaded) use ($run, &$observed): void {
+            if (! $observed && $loaded->id === $run->id) {
+                $observed = true;
+                AgentRun::whereKey($run->id)->update(['status' => 'completed']);
+            }
+        });
+        $runtime = $this->mock(CodexRuntime::class);
+        $runtime->shouldNotReceive('run');
+        try {
+            (new RunAgentTurn($run->id))->handle($runtime);
+            $this->assertTrue($observed);
+            $this->assertSame('completed', $run->fresh()->status);
+            $this->assertDatabaseCount('messages', 0);
+        } finally {
+            Event::forget('eloquent.retrieved: '.AgentRun::class);
+        }
+    }
+
+    public function test_cancellation_between_read_and_claim_finishes_without_starting_the_native_runtime(): void
+    {
+        $user = User::factory()->create();
+        $project = $this->project($user);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $run = AgentRun::create(['user_id' => $user->id, 'conversation_id' => $conversation->id]);
+        $observed = false;
+        Event::listen('eloquent.retrieved: '.AgentRun::class, function (AgentRun $loaded) use ($run, &$observed): void {
+            if (! $observed && $loaded->id === $run->id) {
+                $observed = true;
+                AgentRun::whereKey($run->id)->update(['status' => 'cancel_requested']);
+            }
+        });
+        $runtime = $this->mock(CodexRuntime::class);
+        $runtime->shouldNotReceive('run');
+        try {
+            (new RunAgentTurn($run->id))->handle($runtime);
+            $this->assertTrue($observed);
+            $this->assertSame('cancelled', $run->fresh()->status);
+            $this->assertDatabaseCount('messages', 0);
+        } finally {
+            Event::forget('eloquent.retrieved: '.AgentRun::class);
+        }
     }
 }

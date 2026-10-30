@@ -6,6 +6,9 @@ use App\Models\Conversation;
 use App\Models\Project;
 use App\Services\Audit;
 use App\Services\BiCatalog;
+use App\Services\BiInspector;
+use App\Services\BiManualActions;
+use App\Services\BiViewer;
 use App\Services\RefreshCoverage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +19,25 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class CatalogController extends Controller
 {
+    public function prepareAction(Request $request, string $tenant, string $id, BiManualActions $actions): JsonResponse
+    {
+        $data = $request->validate(['action' => ['required', 'in:clone_app,delete_draft,publish_app'], 'name' => ['required_if:action,clone_app', 'nullable', 'string', 'max:100', 'not_regex:/[\x00-\x1F\x7F]/'], 'desk' => ['required_if:action,publish_app', 'nullable', 'integer', 'min:1'], 'publish_mode' => ['required_if:action,publish_app', 'nullable', 'in:new,replace'], 'request_id' => ['required', 'uuid']]);
+        try {
+            $result = $actions->prepare($request->user(), $tenant, $id, $data);
+
+            return response()->json($result, $result['reused'] ? 200 : 201);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['operation' => $e->getMessage()]);
+        }
+    }
+
+    public function actionStatus(Request $request, string $id, BiManualActions $actions): JsonResponse
+    {
+        return response()->json($actions->status($request->user(), $id));
+    }
+
     public function snapshot(Request $request, string $tenant, BiCatalog $catalog): JsonResponse
     {
         try {
@@ -35,6 +57,17 @@ class CatalogController extends Controller
             throw $e;
         } catch (RuntimeException $e) {
             throw ValidationException::withMessages(['catalog' => $e->getMessage()]);
+        }
+    }
+
+    public function inspect(Request $request, string $tenant, string $kind, string $id, string $action, BiInspector $inspector): JsonResponse
+    {
+        try {
+            return response()->json($inspector->inspect($request->user(), $tenant, $kind, $id, $action));
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['inspection' => $e->getMessage()]);
         }
     }
 
@@ -67,6 +100,18 @@ class CatalogController extends Controller
         }
 
         return response()->file($path, ['Content-Type' => 'image/png', 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
+    }
+
+    public function viewer(Request $request, string $tenant, string $id, BiViewer $viewer): JsonResponse
+    {
+        $data = $request->validate(['dashboard' => ['nullable', 'integer', 'min:1'], 'isolated_context' => ['required', 'accepted']]);
+        try {
+            return response()->json($viewer->create($request->user(), $tenant, $id, isset($data['dashboard']) ? (int) $data['dashboard'] : null));
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['viewer' => $e->getMessage()]);
+        }
     }
 
     public function coverage(Request $request, string $tenant, string $id): JsonResponse

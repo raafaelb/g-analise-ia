@@ -18,7 +18,7 @@ class InspectBackupState extends Command
     public function handle(): int
     {
         $runs = AgentRun::whereIn('status', ['queued', 'running', 'cancel_requested'])->count();
-        $actions = Approval::where('status', 'executing')->count() + Approval::where('status', 'approved')->whereIn('agent_run_id', AgentRun::whereIn('status', ['queued', 'running', 'awaiting_approval', 'cancel_requested'])->select('id'))->count();
+        $actions = Approval::whereIn('status', ['approved', 'executing'])->count();
         $documents = Artifact::where('kind', 'attachment')->whereIn('metadata->extraction->status', ['queued', 'processing'])->count();
         $this->line(json_encode(['ready' => $runs + $actions + $documents === 0, 'maintenance' => app()->isDownForMaintenance(), 'active_runs' => $runs, 'active_actions' => $actions, 'pending_documents' => $documents, 'users' => User::count(), 'projects' => Project::count(), 'artifacts' => Artifact::count()], JSON_THROW_ON_ERROR));
 

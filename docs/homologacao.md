@@ -20,13 +20,13 @@ Os testes automatizados usam SQLite em memória, cache em memória e HTTP simula
 | HTTPS/subpasta | Certificado de teste validado, assets, login, sessão segura, redirect e Inertia em /ia-ganalise; WebSocket retornou HTTP 101 e pusher:connection_established; origem indevida recebeu erro 4009 |
 | Saúde/retencão | Heartbeats de workers/scheduler e limites de disco conferidos; retenção simulada sem apagar dados atuais |
 
-Publicação: preparada para decisão humana, sem execução automática. O relatório privado da instalação registra tenant, aplicação e revisão específicos; não integra o repositório público.
+Publicação: a rodada inicial preparou a revisão; em 30/10 a publicação como nova foi autorizada pelo titular no portal, executada uma vez e confirmada em duas consultas. O relatório privado da instalação registra tenant, aplicação e revisão específicos; não integra o repositório público.
 
 ## Cobertura automatizada
 
 Inclui propriedade/roles, CSRF/autenticação, callbacks inválidos, PKCE/nonce/JWKS/audience, escopos de inferência, bloqueio OSS remoto, criptografia e rotação de sessão Lumo; envelope/paginação/permissões do catálogo; conflitos de workspace, cancelamento, revisão expirada/alterada, execução única e retomada assíncrona; ingestão e integridade de anexos; consentimento de PNG por arquivo/hash/conversa; fontes compartilhadas, agendas mais frequentes, fonte privada, logs antigos/ambíguos e publicação bloqueada sem carga confirmada; saúde e retenção com preservação de anexos/caminhos de outros projetos.
 
-Resultado final: **138 testes e 453 verificações aprovados**, além do build Vue/TypeScript, Pint e smoke do Codex. Auditorias Composer/npm de produção sem vulnerabilidades conhecidas na data do teste. O relatório privado registra as evidências da instalação. CI repete os testes sem conexões pessoais.
+Resultado da versão inicial: **138 testes e 453 verificações aprovados**, além do build Vue/TypeScript, Pint e smoke do Codex. Auditorias Composer/npm de produção sem vulnerabilidades conhecidas na data do teste. O relatório privado registra as evidências da instalação. CI repete os testes sem conexões pessoais.
 
 ## Limites
 
@@ -56,3 +56,12 @@ A tentativa de upload automatizado no Chrome foi recusada pela extensão com Not
 ## Compatibilidade Lumo 3.41 e primeiro CI público
 
 O primeiro build no GitHub recusou o pacote 3.41 porque a versão fixada ainda era 3.40. O fornecedor substitui o arquivo do canal de download. A atualização foi validada antes da troca: comandos de listagem/aplicações preservados, catálogo dos oito tenants consultado com os 13 tipos, ausência de falhas de formato e três consultas da prévia de teste com status ok. Essa conferência foi somente em leitura remota, com workspaces locais separados. A imagem 3.41 passou nos 138 testes/453 verificações e no smoke do Codex. O build agora também fixa o SHA-256 do pacote homologado. Novas versões do canal exigem nova conferência; o projeto não aceita uma troca silenciosa de binário.
+
+
+## Publicação, contexto e concorrência — 30/10/2026
+
+A publicação manual como nova foi homologada com a conta real, após autorização no portal. Nome, destino e quantidade de dashboards foram confirmados; o projeto permaneceu vinculado ao recurso publicado. Não houve nova carga ou agenda duplicada. O modo de substituição e os cenários de conflito/resultado incerto ainda têm evidência isolada, sem ensaio mutativo real dessa modalidade.
+
+O teste do binário Codex com provedor sintético detectou e depois confirmou a retirada de instruções automáticas do workspace e do perfil não controlado. A tarefa real seguinte leu o contexto correto pelos arquivos do projeto: produto, tenant e nome. O diretório de execução permaneceu separado e vazio, sem operações BI, aprovações ou recursos criados. O projeto do ensaio foi arquivado, preservando a conversa.
+
+A regressão ampliada passou com **233 testes PHP / 1.163 verificações**, **19 testes de frontend**, build Vue/TypeScript e Pint. A suíte de publicação verifica criação como nova, substituição explícita, atualização do vínculo do projeto, alteração do alvo, fonte/destino não autorizado, estado desconhecido, falta de cobertura diária, autoria suja e aceitação sem comprovação. A suíte de contexto/concorrrência verifica tarefas duplicadas, cancelamento entre leitura e reivindicação e proteção de projetos arquivados ou com outra propriedade. Os testes não usam contas pessoais.

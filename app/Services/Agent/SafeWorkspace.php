@@ -4,6 +4,7 @@ namespace App\Services\Agent;
 
 use App\Models\Project;
 use App\Services\WorkspaceFiles;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 
@@ -66,7 +67,9 @@ class SafeWorkspace
                 throw new RuntimeException('Este formato não pode ser lido como texto.');
             }
 
-            return ['path' => $relative, 'content' => File::get($path), 'sha256' => hash_file('sha256', $path)];
+            $content = File::get($path);
+
+            return ['path' => $relative, 'content' => $content, 'sha256' => hash('sha256', $content)];
         }
         if ($operation !== 'write') {
             throw new RuntimeException('Operação de arquivo não permitida.');
@@ -84,13 +87,20 @@ class SafeWorkspace
         if (strlen($content) > 256000) {
             throw new RuntimeException('O arquivo excede o limite de 256 KB.');
         }
-        if (is_file($path) && isset($arguments['expected_sha256']) && ! hash_equals(hash_file('sha256', $path), (string) $arguments['expected_sha256'])) {
-            throw new RuntimeException('O arquivo foi alterado. Leia novamente antes de salvar.');
-        }
-        File::ensureDirectoryExists(dirname($path), 0700, true);
-        File::put($path, $content);
-        chmod($path, 0600);
 
-        return ['path' => $relative, 'sha256' => hash_file('sha256', $path), 'saved' => true];
+        return Cache::lock('workspace-file:'.hash('sha256', $path), 10)->block(3, function () use ($arguments, $path, $relative, $content): array {
+            $expected = $arguments['expected_sha256'] ?? null;
+            if (is_file($path)) {
+                if (! is_string($expected) || ! preg_match('/^[a-f0-9]{64}$/D', $expected) || ! hash_equals(hash_file('sha256', $path), $expected)) {
+                    throw new RuntimeException('O arquivo existente pode ter sido alterado. Leia novamente e envie o sha256 recebido antes de salvar.');
+                }
+            } elseif ($expected !== null) {
+                throw new RuntimeException('O arquivo lido foi removido. Confira o estado atual antes de recriá-lo.');
+            }
+            File::ensureDirectoryExists(dirname($path), 0700, true);
+            File::replace($path, $content, 0600);
+
+            return ['path' => $relative, 'sha256' => hash('sha256', $content), 'saved' => true];
+        });
     }
 }

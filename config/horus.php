@@ -18,5 +18,6 @@ return [
         'plan_enabled' => (bool) env('OPENAI_PLAN_USAGE_ENABLED', false),
     ],
     'lumo' => ['binary' => env('LUMO_BINARY', '/usr/local/bin/lumo'), 'server' => env('LUMO_API_URL', 'https://api.horusbi.com.br/cli/v2'), 'web_url' => env('LUMO_WEB_URL', 'https://dataviz.horusbi.com.br'), 'login_enabled' => (bool) env('LUMO_LOGIN_ENABLED', false)],
+    'viewer' => ['enabled' => (bool) env('BI_VIEWER_ENABLED', false), 'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('BI_VIEWER_ALLOWED_ORIGINS', env('LUMO_WEB_URL', 'https://dataviz.horusbi.com.br'))))))],
     'codex' => ['binary' => env('CODEX_BINARY', '/usr/local/bin/codex'), 'model' => env('CODEX_DEFAULT_MODEL'), 'timeout' => (int) env('CODEX_TURN_TIMEOUT', 900)],
 ];

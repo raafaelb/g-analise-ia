@@ -97,7 +97,7 @@ class AttachmentContext
         if (! is_executable('/usr/bin/pdftotext')) {
             throw new RuntimeException('O leitor de PDF não está instalado no worker. Reconstrua a imagem Docker.');
         }
-        $process = new Process(['/usr/bin/pdftotext', '-f', '1', '-l', '20', '-layout', '-enc', 'UTF-8', $path, '-']);
+        $process = new Process(['/usr/bin/pdftotext', '-f', '1', '-l', '20', '-layout', '-enc', 'UTF-8', $path, '-'], null, [...ProcessEnvironment::isolated(), 'PATH' => '/usr/bin:/bin']);
         $process->setTimeout(30);
         $process->disableOutput();
         $text = '';

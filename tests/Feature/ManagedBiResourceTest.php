@@ -9,6 +9,7 @@ use App\Models\ManagedBiResource;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
+use App\Services\BiCloneNames;
 use App\Services\LumoClient;
 use App\Services\RefreshCoverage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +38,17 @@ class ManagedBiResourceTest extends TestCase
         $this->assertSame('app:2000', $result['managed_resource']);
         $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2000', 'source_ref' => 'app:1000', 'project_id' => $project->id]);
         $this->assertDatabaseMissing('managed_bi_resources', ['resource' => 'app:1000']);
+    }
+
+    public function test_ai_cannot_enable_name_push_by_injecting_a_manual_approval_flag(): void
+    {
+        [$project, $run] = $this->context();
+        $this->mock(BiCloneNames::class)->shouldNotReceive('ensure');
+        $this->mock(LumoClient::class)->shouldReceive('run')->once()->withArgs(fn ($connection, $args) => $args === ['app', 'clone', 'app:1000', '--name', 'Homologação'])->andReturn(['exit_code' => 0, 'data' => ['ref' => 'app:2000']]);
+        $result = app(ActionBroker::class)->execute($run, 'horus_action', ['action' => 'clone_app', 'resource' => 'app:1000', 'name' => 'Homologação', 'approved_manual' => true]);
+        $this->assertFalse($result['name_verification']['verified']);
+        $this->assertStringContainsString('revisão de push', $result['name_verification']['message']);
+        $this->assertSame('app:2000', $result['managed_resource']);
     }
 
     public function test_ambiguous_clone_response_never_marks_original_as_deletable(): void

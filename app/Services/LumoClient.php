@@ -25,7 +25,7 @@ class LumoClient
 
     private function environment(string $home, array $extra = []): array
     {
-        return array_merge(array_fill_keys(array_keys(getenv()), false), ['PATH' => '/usr/local/bin:/usr/bin:/bin', 'HOME' => $home, 'LUMO_NO_UPDATE_NOTIFIER' => '1', 'APP_KEY' => false, 'OPENAI_CLIENT_SECRET' => false, 'DB_PASSWORD' => false, 'ACCESS_TOKEN' => false], $extra);
+        return array_merge(ProcessEnvironment::isolated(), ['PATH' => '/usr/local/bin:/usr/bin:/bin', 'HOME' => $home, 'LUMO_NO_UPDATE_NOTIFIER' => '1', 'APP_KEY' => false, 'OPENAI_CLIENT_SECRET' => false, 'DB_PASSWORD' => false, 'ACCESS_TOKEN' => false], $extra);
     }
 
     public function login(int $userId, string $email, string $password, ?string $otp): Connection

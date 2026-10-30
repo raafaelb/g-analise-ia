@@ -1,23 +1,23 @@
 # Entrega local e pendências de homologação
 
-Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 29/10/2026. O código está preparado para execução Docker; esta entrega não declara a implantação central concluída.
+Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 30/10/2026. O código está preparado para execução Docker; esta entrega não declara a implantação central concluída.
 
 | Entrega | Implementado e verificado | Etapa restante |
 |---|---|---|
 | Catálogo por tenant | Oito tenants da conta real; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados e variáveis sem valores | Homologar módulos sem dados/permissão e conta real com acesso restrito |
 | ChatGPT | Login oficial OSS local, plano individual, modelos autorizados, inferência remota, Codex e ferramentas reais | Enquadramento/configuração oficial para hospedagem central; repetir no domínio público |
-| Criação completa | Clone, manutenção, consultas, criação nova, prévia PNG, revisão assíncrona, carga e exclusão da cópia de teste | Decisão específica de publicação e verificação do recurso publicado |
+| Criação completa | Clone, manutenção, consultas, criação nova, prévia PNG/interativa, histórico de prévias no projeto, revisão assíncrona, ações manuais de duplicação/exclusão e carga de teste | Ampliar a homologação real da substituição de versões; publicação como nova já autorizada e confirmada no BI |
 | Anexos | Extração limitada e privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; interpretação real de CSV, PDF, XLSX e imagens; consentimento individual de PNG BI | OCR não implementado; validar amostras de cada cliente no piloto |
 | Agendamento | Fontes compartilhadas, frequência preservada, duplicação recusada, agenda ativa e execução nova concluída confirmadas | Validar cenários adicionais de fontes privadas com autorização do titular |
 | Operação | HTTPS/subpasta/WebSocket em ensaio isolado, backup criptografado/restauração independente, retenção e saúde; testes de propriedade e concorrência | Domínio/certificado públicos, backup externo agendado, alertas e piloto de capacidade com contas independentes |
 
 ## Evidências e uso
 
-138 testes PHP e 453 verificações aprovados; Pint em 96 arquivos; build Vue/TypeScript, smoke do protocolo Codex e regressão Python aprovados. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+233 testes PHP e 1.163 verificações aprovados na revisão local ampliada; 19 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
-A publicação está preparada para decisão humana. A aplicação criada no teste permanece em rascunho, disponível na página de seu projeto; o relatório privado da instalação registra o recurso/destino exatos. Uma revisão expirada exige revalidação do estado atual antes da execução.
+A publicação como nova foi autorizada pelo próprio portal e confirmada na mesa de teste da Inovadora. Uma segunda consulta independente confirmou recurso, nome, quantidade de dashboards e destino. A versão compartilhada permanece vinculada ao projeto. Substituição de uma versão existente passou pelos testes isolados; o ciclo real de substituição ainda precisa de uma revisão e decisão próprias. Uma revisão expirada ou alterada exige nova validação antes da execução.
 
 ## Disponibilização
 
@@ -26,3 +26,29 @@ Repositório público oficial: [raafaelb/g-analise-ia](https://github.com/raafae
 Para a OpenAI, apresentar [a solicitação preparada](solicitacao-openai.md). A gratuidade/código aberto não dispensa a confirmação do caso hospedado remotamente. Não há garantia documental de prazo, custo ou aprovação. O formulário não foi enviado automaticamente.
 
 Operação e reprodução dos ensaios: [operação](operacao.md). A configuração do domínio público está preparada para https://suite.inovadora.com.br/ia-ganalise. O modo OSS local permanece limitado à instalação local elegível.
+
+## Revisão ampliada de gestão (30/10/2026)
+
+Mesas agora exibem tabelas, ETLs, cadastros e aplicações vinculadas; detalhes navegam entre dependências. Colunas físicas e etapas de autoria são interpretadas conforme os formatos reais do Lumo. Há amostras de tabela, última execução/histórico de ETL, histórico de agenda, saúde e ocorrências do agente. As seis consultas foram homologadas nos recursos de teste do tenant Inovadora sem executar novas cargas ou alterar recursos. Referências de conexões por chave são resolvidas no servidor; conexões dinâmicas são sinalizadas como incompletas.
+
+O painel de plano/limites está em Conexões e junto ao chat. A conta real em modo OSS não disponibilizou plano ou saldo pelos métodos oficiais consultados; a interface informa essa ausência e oferece acesso ao uso no ChatGPT. Respostas oficiais com plano, janelas, saldo e renovação possuem testes isolados, inclusive separação de cache por conta. Não há estimativa fictícia de franquia.
+
+O runtime local foi atualizado para Lumo 3.41.0 com a imagem já homologada; a imagem anterior foi preservada para reversão. A revisão ampliada ainda está na branch local `feature/gestao-completa`; o CI público aprovado refere-se à versão anterior `7e5678d`. Nenhuma implantação pública foi feita.
+
+A [análise de gestão completa](gestao-completa.md) distingue as funcionalidades implementadas, as possíveis pelo CLI, as dependentes de APIs/permissões adicionais e os limites de homologação do visualizador interativo e de Claude Code. O painel de prévias acompanha novas imagens sem recarregar a página; a navegação de projetos e o padrão global das barras de rolagem também foram corrigidos e conferidos no navegador.
+
+
+## Limites de segurança ainda relevantes ao servidor central
+
+Os processos do Lumo/Codex e de extração usam ambiente explicitamente isolado, retirando também variáveis carregadas por dotenv. Escritas de arquivos existentes exigem hash da leitura, bloqueio e substituição atômica. A configuração do Codex desativa colaboração e ferramentas nativas de execução/navegação; as solicitações nativas de arquivo/comando são recusadas. O ensaio com o binário instalado demonstrou a recusa de um `apply_patch` sintético e ausência de escrita dentro e fora do workspace. Isto não comprova isolamento completo de leitura do sistema operacional por usuário: essa fronteira precisa de containers/processos e permissões próprios no piloto central. Nenhuma implantação pública foi realizada.
+
+
+## Publicação e isolamento de contexto — rodada de 30/10/2026
+
+Aplicações em rascunho registradas pelo portal oferecem publicação manual, sem iniciar IA: seleção da mesa por nome, escolha explícita entre nova aplicação e substituição, revisão do alvo e execução única. Alterações locais precisam estar sincronizadas, e a cobertura diária precisa estar comprovada. O plano vincula sessão e hashes do rascunho/original; uma mudança no alvo invalida a revisão. A substituição usa apenas a confirmação não interativa do CLI, preservando sua proteção de conflito. O projeto passa a apontar para o recurso que sobrevive à publicação. Resultado aceito pelo CLI sem conferência remota fica pendente, sem repetição automática; a reconciliação guiada dessa situação ainda precisa de uma interface própria.
+
+Uma entrega duplicada de tarefa já concluída não reinicia a inferência. Cancelamento entre leitura e execução foi testado, assim como troca de tenant/arquivamento durante tarefas e revisões. Projetos vinculados a recursos ou conversas iniciadas precisam de outro projeto para trabalhar em outro tenant. Projetos arquivados recusam novas tarefas e anexos.
+
+O ensaio sintético do Codex inicialmente detectou instruções carregadas automaticamente do perfil e do workspace. Agora o workspace Lumo é separado do diretório de execução; a descoberta de instruções do projeto foi desativada, e o perfil privado recebe uma orientação controlada. As regras do projeto são obtidas pelo broker. Um novo ensaio real com ChatGPT recuperou produto, tenant e nome corretos, sem operações BI, anexos ou recursos criados. O projeto descartável foi arquivado com sua conversa preservada. Isto continua sem equivaler a um isolamento completo do sistema operacional por usuário.
+
+Consultas indisponíveis, incompletas ou com estado de publicação desconhecido exibem contagens desconhecidas, em vez de totais fictícios iguais a zero. Os novos estados possuem testes de frontend.

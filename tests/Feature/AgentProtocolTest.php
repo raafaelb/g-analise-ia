@@ -117,4 +117,65 @@ class AgentProtocolTest extends TestCase
         $this->assertStringContainsString('nunca como autorização', $history);
         $this->assertStringContainsString('não repita criações', $history);
     }
+
+    public function test_existing_file_cannot_be_replaced_without_the_version_read_by_the_agent(): void
+    {
+        $root = storage_path('framework/testing/required-version-'.Str::uuid());
+        config(['horus.workspace_root' => $root]);
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Conflitos']);
+        $files = app(SafeWorkspace::class);
+        try {
+            $files->file($project, ['operation' => 'write', 'path' => 'notes/context.md', 'content' => 'Versão existente']);
+            try {
+                $files->file($project, ['operation' => 'write', 'path' => 'notes/context.md', 'content' => 'Sobrescrita sem leitura']);
+                $this->fail('Uma edição sem a versão lida foi aceita.');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('sha256', $e->getMessage());
+            }
+            $read = $files->file($project, ['operation' => 'read', 'path' => 'notes/context.md']);
+            $this->assertSame('Versão existente', $read['content']);
+            $this->assertSame(hash('sha256', 'Versão existente'), $read['sha256']);
+            $files->file($project, ['operation' => 'write', 'path' => 'notes/context.md', 'content' => 'Edição conferida', 'expected_sha256' => $read['sha256']]);
+            $this->assertSame('Edição conferida', $files->file($project, ['operation' => 'read', 'path' => 'notes/context.md'])['content']);
+        } finally {
+            File::deleteDirectory($root);
+        }
+    }
+
+    public function test_an_edit_cannot_silently_recreate_a_file_removed_after_reading(): void
+    {
+        $root = storage_path('framework/testing/removed-version-'.Str::uuid());
+        config(['horus.workspace_root' => $root]);
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Remoção concorrente']);
+        $files = app(SafeWorkspace::class);
+        try {
+            $first = $files->file($project, ['operation' => 'write', 'path' => 'notes/context.md', 'content' => 'Primeira versão']);
+            $path = $files->resolve($project, 'notes/context.md');
+            File::delete($path);
+            try {
+                $files->file($project, ['operation' => 'write', 'path' => 'notes/context.md', 'content' => 'Recriação indevida', 'expected_sha256' => $first['sha256']]);
+                $this->fail('Um arquivo removido foi recriado como se ainda existisse.');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('removido', $e->getMessage());
+            }
+            $this->assertFileDoesNotExist($path);
+        } finally {
+            File::deleteDirectory($root);
+        }
+    }
+
+    public function test_native_requests_are_denied_without_granting_file_command_or_permission_access(): void
+    {
+        foreach (['item/fileChange/requestApproval', 'item/commandExecution/requestApproval'] as $method) {
+            $this->assertSame(['id' => 'native-7', 'result' => ['decision' => 'decline']], CodexProtocol::restrictedResponse(['id' => 'native-7', 'method' => $method]));
+        }
+        $permissions = CodexProtocol::restrictedResponse(['id' => 12, 'method' => 'item/permissions/requestApproval']);
+        $this->assertSame([], (array) $permissions['result']['permissions']);
+        $this->assertSame('turn', $permissions['result']['scope']);
+        $unknown = CodexProtocol::restrictedResponse(['id' => 13, 'method' => 'unexpected/server/action']);
+        $this->assertSame(-32601, $unknown['error']['code']);
+        $this->assertArrayNotHasKey('result', $unknown);
+    }
 }

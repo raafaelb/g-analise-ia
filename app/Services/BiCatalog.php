@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Connection;
+use App\Models\ManagedBiResource;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -47,7 +48,7 @@ class BiCatalog
     public function snapshot(User $user, string $tenant, bool $refresh = false): array
     {
         [$connection,$item] = $this->access($user, $tenant);
-        $key = 'bi-catalog:v2:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$tenant;
+        $key = 'bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$tenant;
         if (! $refresh && ($cached = Cache::get($key))) {
             return $cached;
         }
@@ -80,6 +81,7 @@ class BiCatalog
                     $capabilities[$kind] = ['status' => $e->getCode() === 6 ? 'access_denied' : 'unavailable', 'count' => null, 'reason' => $e->getMessage()];
                 }
             }
+            $resources = app(BiResourceRelations::class)->deskCounters($resources, $capabilities);
             $tags = collect($resources)->flatten(1)->flatMap(fn ($row) => $row['tags'] ?? [])->unique()->sort()->values()->all();
             $snapshot = ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resources' => $resources, 'capabilities' => $capabilities, 'tags' => $tags, 'warnings' => $warnings, 'synced_at' => now()->toIso8601String()];
             Cache::put($key, $snapshot, now()->addSeconds(90));
@@ -88,7 +90,7 @@ class BiCatalog
         });
     }
 
-    public function rows(Connection $connection, Project $project, string $kind): array
+    public function rows(Connection $connection, Project $project, string $kind, bool $remote = true): array
     {
         abort_unless(in_array($kind, self::KINDS, true), 422, 'Tipo de recurso inválido.');
         if ($kind === 'variables') {
@@ -104,7 +106,7 @@ class BiCatalog
         $rows = [];
         $offset = 0;
         do {
-            $data = $this->lumo->run($connection, ['list', $kind, '--remote', '--limit', '500', '--offset', (string) $offset], $project, 60)['data'];
+            $data = $this->lumo->run($connection, ['list', $kind, ...($remote ? ['--remote'] : []), '--limit', '500', '--offset', (string) $offset], $project, 60)['data'];
             $page = is_array($data) ? ($data['results'] ?? (array_is_list($data) ? $data : null)) : null;
             if (! is_array($page) || ! array_is_list($page)) {
                 throw new RuntimeException('A listagem de '.$kind.' não retornou um formato reconhecido.');
@@ -170,15 +172,21 @@ class BiCatalog
             $body = ['nome' => $row['nome'], 'descricao' => 'Valor protegido. Referência: '.$row['reference']];
         }
         $id = (string) $row['id'];
-        $desk = $body['deskId'] ?? $row['deskId'] ?? null;
-        $state = $body['_state'] ?? (in_array($kind, ['app', 'flow', 'table', 'writeback', 'deck'], true) ? ($desk ? 'published' : 'draft') : null);
+        $nativeState = $body['_state'] ?? null;
+        $stateMetadata = is_array($nativeState) ? $nativeState : [];
+        $deskKnown = array_key_exists('deskId', $body) || array_key_exists('deskId', $row) || array_key_exists('deskId', $stateMetadata);
+        $desk = array_key_exists('deskId', $body) ? $body['deskId'] : ($row['deskId'] ?? $stateMetadata['deskId'] ?? null);
+        $state = is_string($nativeState) ? $nativeState : ($stateMetadata['state'] ?? null);
+        if (! is_string($state)) {
+            $state = in_array($kind, ['app', 'flow', 'table', 'writeback', 'deck'], true) && $deskKnown ? ($desk ? 'published' : 'draft') : null;
+        }
         $dashboards = $kind === 'app' && array_key_exists('dashboards', $body) ? array_map(function ($document) {
             $d = $document['body'] ?? $document;
 
             return ['id' => $document['header']['id'] ?? $d['id'] ?? null, 'name' => $d['nome'] ?? $d['name'] ?? 'Dashboard', 'widget_count' => count($d['widgets'] ?? [])];
         }, $body['dashboards'] ?? []) : null;
 
-        return ['id' => $id, 'ref' => $kind === 'variables' ? '{{'.$row['nome'].'}}' : $kind.':'.$id, 'kind' => $kind, 'name' => $body['nome'] ?? $row['nome'] ?? $row['name'] ?? ($kind.' '.$id), 'description' => $body['descricao'] ?? $body['description'] ?? null, 'state' => $state, 'desk_id' => $desk === null ? null : (string) $desk, 'tags' => array_values(array_filter($body['tags'] ?? [], is_string(...))), 'dashboard_count' => $dashboards === null ? null : count($dashboards), 'dashboards' => $dashboards, 'table_count' => isset($body['tables']) ? count($body['tables']) : null, 'active' => $body['ativo'] ?? null, 'online' => $body['online'] ?? null, 'metadata_available' => $body !== []];
+        return ['id' => $id, 'ref' => $kind === 'variables' ? '{{'.$row['nome'].'}}' : $kind.':'.$id, 'kind' => $kind, 'name' => $body['nome'] ?? $body['name'] ?? $row['nome'] ?? $row['name'] ?? ($kind.' '.$id), 'description' => $body['descricao'] ?? $body['description'] ?? null, 'state' => $state, 'desk_id' => $desk === null ? null : (string) $desk, 'desk_known' => $deskKnown, 'tags' => array_values(array_filter($body['tags'] ?? [], is_string(...))), 'dashboard_count' => $dashboards === null ? null : count($dashboards), 'dashboards' => $dashboards, 'table_count' => isset($body['tables']) ? count($body['tables']) : null, 'active' => $body['ativo'] ?? null, 'online' => $body['online'] ?? null, 'metadata_available' => $body !== []];
     }
 
     public function detail(User $user, string $tenant, string $kind, string $id): array
@@ -206,8 +214,10 @@ class BiCatalog
                 $body = null;
             }
 
-            return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $this->summary($kind, $row, $body), 'details' => $this->redact($body ?? ['id' => $id, 'nome' => $row['nome'] ?? $row['name'] ?? $id]), 'metadata_complete' => is_array($body), 'metadata_message' => is_array($body) ? null : 'O recurso está disponível, mas o servidor não forneceu sua configuração de autoria para esta sessão.'];
+            return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $this->summary($kind, $row, $body), 'details' => $this->redact($body ?? ['id' => $id, 'nome' => $row['nome'] ?? $row['name'] ?? $id]), 'metadata_complete' => is_array($body), 'metadata_message' => is_array($body) ? null : 'O recurso está disponível, mas o servidor não forneceu sua configuração de autoria para esta sessão.', 'overview' => app(BiResourceOverview::class)->build($kind, $body ?? []), 'related' => []];
         }
+        $row = collect($this->rows($connection, $project, $kind))->first(fn (array $row): bool => (string) $row['id'] === $id);
+        abort_unless($row, 404, 'Recurso não disponível neste tenant para sua sessão.');
         $data = $this->lumo->run($connection, ['info', $kind.':'.$id, ...($kind === 'app' ? ['--full'] : [])], $project, 60)['data'];
         $payload = is_array($data) ? ($data['payload'] ?? $data) : null;
         if (is_array($payload) && isset($payload['header']['tenantId']) && (string) $payload['header']['tenantId'] !== $tenant) {
@@ -217,12 +227,69 @@ class BiCatalog
         if (! is_array($body)) {
             throw new RuntimeException('Os detalhes do recurso não retornaram um formato reconhecido.');
         }
-        $summary = $this->summary($kind, ['id' => $id], $body);
+        $metadataComplete = true;
+        if (in_array($kind, ['flow', 'table', 'schedule', 'agent'], true)) {
+            try {
+                $this->lumo->run($connection, ['pull', $kind.':'.$id], $project, 90);
+                $working = $this->workingMetadata($project)[$kind.':'.$id] ?? null;
+                if (is_array($working)) {
+                    $body = array_replace($working, $body);
+                } else {
+                    $metadataComplete = false;
+                }
+            } catch (RuntimeException $e) {
+                if ($connection->fresh()->status !== 'connected') {
+                    throw $e;
+                }
+                $metadataComplete = false;
+            }
+        }
+        $summary = $this->summary($kind, $row, $body);
         if ($kind === 'credential') {
             $body = array_intersect_key($body, array_flip(['id', 'nome', 'name', 'type', 'ativo', 'descricao']));
         }
 
-        return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $summary, 'details' => $this->redact($body)];
+        $overview = app(BiResourceOverview::class)->build($kind, $body);
+        $related = [];
+        if (in_array($kind, ['app', 'flow', 'table', 'schedule', 'dw-desk', 'bi-desk', 'credential', 'agent'], true)) {
+            $snapshot = $this->snapshot($user, $tenant);
+            $metadata = $this->workingMetadata($project);
+            $metadata[$kind.':'.$id] = $body;
+            $credentialKeys = [];
+            if (in_array($kind, ['flow', 'credential'], true)) {
+                try {
+                    $authorizedIds = array_map(fn (array $credential): string => (string) $credential['id'], $this->rows($connection, $project, 'credential'));
+                    foreach ($this->rows($connection, $project, 'credential', false) as $credential) {
+                        $key = $credential['extra']['key'] ?? $credential['key'] ?? null;
+                        if (in_array((string) $credential['id'], $authorizedIds, true) && is_string($key) && $key !== '') {
+                            $credentialKeys[$key] = (string) $credential['id'];
+                        }
+                    }
+                } catch (RuntimeException $e) {
+                    if ($connection->fresh()->status !== 'connected') {
+                        throw $e;
+                    }
+                }
+            }
+            $related = app(BiResourceRelations::class)->build($kind, $id, $body, $snapshot, $metadata, $credentialKeys);
+        }
+
+        $management = null;
+        if ($kind === 'app' && $summary['state'] === 'draft' && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection)) {
+            $managed = ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $tenant)->where('resource', 'app:'.$id)->where('status', 'draft')->whereIn('project_id', Project::where('user_id', $user->id)->where('tenant_id', $tenant)->select('id'))->first();
+            if ($managed) {
+                $ownerProject = Project::find($managed->project_id);
+                $management = ['project_id' => $managed->project_id, 'can_delete_draft' => true, 'can_publish' => $ownerProject?->status !== 'archived' && $ownerProject?->source_ref === 'app:'.$id, 'publication_origin' => null];
+                $origin = $body['cloned_from'] ?? $body['_state']['cloned_from'] ?? null;
+                $original = collect($snapshot['resources']['app'] ?? [])->first(fn (array $row): bool => (string) $row['id'] === (string) $origin && $row['state'] === 'published' && ! empty($row['desk_id']));
+                if ($original) {
+                    $originDesk = collect($snapshot['resources']['bi-desk'] ?? [])->first(fn (array $row): bool => (string) $row['id'] === (string) $original['desk_id']);
+                    $management['publication_origin'] = ['resource' => $original['ref'], 'name' => $original['name'], 'desk_id' => (int) $original['desk_id'], 'desk_name' => $originDesk['name'] ?? 'Mesa #'.$original['desk_id']];
+                }
+            }
+        }
+
+        return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $summary, 'management' => $management, 'details' => $this->redact($body), 'overview' => $this->redact($overview), 'related' => $related, 'viewer_available' => $kind === 'app' && config('horus.viewer.enabled') && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection), 'metadata_complete' => $metadataComplete, 'metadata_message' => $metadataComplete ? null : 'O resumo atual está disponível, mas os metadados de autoria não foram fornecidos nesta consulta. Alguns vínculos e configurações podem não aparecer.'];
     }
 
     private function variableDetail(User $user, string $tenant, string $id): array
@@ -281,7 +348,7 @@ class BiCatalog
         if (! is_array($value)) {
             return $value;
         }
-        $sensitive = ['password', 'senha', 'pass', 'accesstoken', 'refreshtoken', 'authorization', 'apikey', 'clientsecret', 'connectionstring', 'dsn', 'token', 'secret', 'privatekey', 'bearertoken', 'authtoken', 'tokenkey'];
+        $sensitive = ['password', 'senha', 'pass', 'accesstoken', 'refreshtoken', 'authorization', 'apikey', 'clientsecret', 'connectionstring', 'dsn', 'token', 'secret', 'privatekey', 'bearertoken', 'authtoken', 'tokenkey', 'credentialkey', 'credential'];
         foreach ($value as $key => $item) {
             $value[$key] = in_array(str_replace(['_', '-'], '', strtolower((string) $key)), $sensitive, true) ? '[protegido]' : $this->redact($item);
         }

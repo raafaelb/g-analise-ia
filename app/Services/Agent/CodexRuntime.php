@@ -11,6 +11,7 @@ use App\Services\AttachmentContext;
 use App\Services\Audit;
 use App\Services\LumoClient;
 use App\Services\OpenAiIdentity;
+use App\Services\ProcessEnvironment;
 use App\Services\WorkspaceFiles;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -47,6 +48,9 @@ class CodexRuntime
         File::ensureDirectoryExists($workspace.'/exports', 0700, true);
         $home = storage_path('app/private/codex/'.$run->user_id.'/'.$project->id);
         File::ensureDirectoryExists($home, 0700, true);
+        File::replace($home.'/AGENTS.override.md', CodexProtocol::homeInstructions(), 0600);
+        $execution = $home.'/execution';
+        File::ensureDirectoryExists($execution, 0700, true);
         $model = $conversation->model ?? config('horus.codex.model');
         if (! $model) {
             $result = Http::withoutRedirecting()->withToken($token)->timeout(20)->get('https://api.openai.com/v1/models');
@@ -61,15 +65,15 @@ class CodexRuntime
         }
         $attachments = app(AttachmentContext::class)->inputs($project);
         $tools = $this->broker->tools();
-        $toolsHash = hash('sha256', json_encode([$tools, CodexProtocol::command(config('horus.codex.binary'))], JSON_THROW_ON_ERROR));
+        $toolsHash = hash('sha256', json_encode([$tools, CodexProtocol::command(config('horus.codex.binary')), CodexProtocol::homeInstructions()], JSON_THROW_ON_ERROR));
         $toolsState = $home.'/tools-'.$conversation->id.'.sha256';
         $renewThread = $conversation->thread_id && (! is_file($toolsState) || ! hash_equals($toolsHash, trim(File::get($toolsState))));
         $threadId = $renewThread ? null : $conversation->thread_id;
         $command = CodexProtocol::command(config('horus.codex.binary'));
-        $environment = array_fill_keys(array_keys(getenv()), false);
+        $environment = ProcessEnvironment::isolated();
         $environment = array_merge($environment, ['PATH' => '/usr/local/bin:/usr/bin:/bin', 'HOME' => $home, 'ACCESS_TOKEN' => $token, 'CODEX_HOME' => $home]);
         $input = new InputStream;
-        $process = new Process($command, $workspace, $environment);
+        $process = new Process($command, $execution, $environment);
         $process->setInput($input);
         $process->setTimeout(config('horus.codex.timeout') + 30);
         $send = fn (array $message) => $input->write(json_encode($message, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)."\n");
@@ -99,7 +103,7 @@ class CodexRuntime
                     }
                     if (CodexProtocol::isResponse($message, 1)) {
                         $send(['method' => 'initialized', 'params' => (object) []]);
-                        $params = CodexProtocol::thread($workspace, $model, $tools, $threadId);
+                        $params = CodexProtocol::thread($execution, $model, $tools, $threadId);
                         $send(['id' => 2, 'method' => $threadId ? 'thread/resume' : 'thread/start', 'params' => $params]);
                     }
                     if (CodexProtocol::isResponse($message, 2)) {
@@ -154,14 +158,8 @@ class CodexRuntime
                     } elseif (array_key_exists('id', $message) && $method !== '') {
                         if (in_array($method, ['item/commandExecution/requestApproval', 'item/fileChange/requestApproval'], true)) {
                             Audit::record($run->user_id, 'agent.native_operation_denied', 'Operação nativa recusada; use as ferramentas autorizadas do projeto.', $project->id, ['method' => $method]);
-                            $send(['id' => $message['id'], 'result' => ['decision' => 'decline']]);
-                        } elseif ($method === 'item/permissions/requestApproval') {
-                            $send(['id' => $message['id'], 'result' => ['permissions' => (object) [], 'scope' => 'turn']]);
-                        } elseif ($method === 'item/tool/requestUserInput') {
-                            $send(['id' => $message['id'], 'result' => ['answers' => (object) []]]);
-                        } else {
-                            $send(['id' => $message['id'], 'error' => ['code' => -32601, 'message' => 'Use as ferramentas autorizadas do G-Analise IA.']]);
                         }
+                        $send(CodexProtocol::restrictedResponse($message));
                     }
                     if ($method === 'turn/completed') {
                         $status = $message['params']['turn']['status'] ?? null;

@@ -1,0 +1,179 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Connection;
+use App\Models\Project;
+use App\Models\User;
+use RuntimeException;
+
+class BiPublications
+{
+    public function __construct(private BiCatalog $catalog, private LumoClient $lumo, private TenantPolicy $policy) {}
+
+    /** @return array<string, mixed> */
+    public function plan(Connection $connection, Project $project, array $arguments): array
+    {
+        $ref = $arguments['resource'] ?? '';
+        $mode = $arguments['publish_mode'] ?? 'new';
+        $desk = $arguments['desk'] ?? null;
+        if (! preg_match('/^app:[1-9][0-9]*$/D', $ref) || ! is_int($desk) || $desk < 1 || ! in_array($mode, ['new', 'replace'], true)) {
+            throw new RuntimeException('Escolha a aplicação, a mesa e o modo de publicação.');
+        }
+        $this->policy->assertCommandAllowed((string) $project->tenant_id, ['app', 'publish', $ref], $connection);
+        [$context, $apps, $desks] = $this->context($connection, $project);
+        if (! $this->listed($apps, $ref)) {
+            throw new RuntimeException('A aplicação não está disponível neste tenant para sua sessão.');
+        }
+        $destination = collect($desks)->first(fn (array $row): bool => (string) $row['id'] === (string) $desk);
+        if (! $destination) {
+            throw new RuntimeException('A mesa de aplicações não está disponível neste tenant. Atualize o catálogo e escolha outra mesa.');
+        }
+        $source = $this->body($connection, $context, $ref);
+        if ($this->desk($source) !== null) {
+            throw new RuntimeException('Esta aplicação já foi publicada. Confira a versão atual antes de preparar outra publicação.');
+        }
+        if (! is_array($source['dashboards'] ?? null) || $source['dashboards'] === []) {
+            throw new RuntimeException('A aplicação precisa ter ao menos um dashboard antes de publicar.');
+        }
+        $target = ['resource' => $ref, 'name' => $this->name($source), 'sha256' => null];
+        if ($mode === 'replace') {
+            $origin = $source['cloned_from'] ?? $source['_state']['cloned_from'] ?? null;
+            if (! is_numeric($origin) || (int) $origin < 1 || ! $this->listed($apps, 'app:'.$origin) || 'app:'.$origin === $ref) {
+                throw new RuntimeException('Não foi possível identificar uma aplicação original autorizada para substituir. Publique como nova ou confira a origem da cópia.');
+            }
+            $original = $this->body($connection, $context, 'app:'.$origin);
+            if ($this->desk($original) !== $desk) {
+                throw new RuntimeException('A substituição exige a mesma mesa da aplicação original. Atualize o catálogo e confira o destino.');
+            }
+            $target = ['resource' => 'app:'.$origin, 'name' => $this->name($original), 'sha256' => $this->digest($original)];
+        }
+        $this->assertSession($connection, $project);
+
+        return [
+            'mode' => $mode,
+            'source' => ['resource' => $ref, 'name' => $this->name($source), 'dashboard_count' => count($source['dashboards']), 'sha256' => $this->digest($source)],
+            'destination' => ['id' => $desk, 'resource' => 'bi-desk:'.$desk, 'name' => (string) ($destination['nome'] ?? $destination['name'] ?? 'Mesa #'.$desk)],
+            'target' => $target,
+            'connection_generation' => $connection->metadata['session_generation'] ?? null,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function verify(Connection $connection, Project $project, array $plan): array
+    {
+        [$context, $apps] = $this->context($connection, $project);
+        $ref = $plan['target']['resource'] ?? '';
+        if (! $this->listed($apps, $ref)) {
+            throw new RuntimeException('A aplicação publicada ainda não apareceu na listagem autorizada.');
+        }
+        if (($plan['mode'] ?? '') === 'replace' && $this->listed($apps, $plan['source']['resource'] ?? '')) {
+            throw new RuntimeException('O BI ainda mantém a cópia separada; a substituição não foi confirmada.');
+        }
+        $body = $this->body($connection, $context, $ref);
+        if ($this->desk($body) !== ($plan['destination']['id'] ?? null) || $this->name($body) !== ($plan['source']['name'] ?? null) || ! is_array($body['dashboards'] ?? null) || count($body['dashboards']) !== ($plan['source']['dashboard_count'] ?? null)) {
+            throw new RuntimeException('O destino ou o conteúdo resumido retornado pelo BI não corresponde à revisão autorizada.');
+        }
+        $this->assertSession($connection, $project);
+        if (($connection->metadata['session_generation'] ?? null) !== ($plan['connection_generation'] ?? null)) {
+            throw new RuntimeException('A sessão mudou durante a confirmação da publicação.');
+        }
+
+        return ['verified' => true, 'mode' => $plan['mode'], 'resource' => $ref, 'name' => $this->name($body), 'dashboard_count' => count($body['dashboards']), 'destination' => $plan['destination'], 'checked_at' => now()->toIso8601String()];
+    }
+
+    /** @return array{Project, array, array} */
+    private function context(Connection $connection, Project $project): array
+    {
+        $user = $this->assertSession($connection, $project);
+        [$current, $tenant] = $this->catalog->access($user, (string) $project->tenant_id);
+        if ($current->id !== $connection->id || ($current->metadata['session_generation'] ?? null) !== ($connection->metadata['session_generation'] ?? null)) {
+            throw new RuntimeException('A conexão mudou. Prepare uma nova revisão de publicação.');
+        }
+        $context = $this->catalog->context($connection, $tenant);
+        $this->lumo->initialize($connection, $context, true);
+
+        return [$context, $this->catalog->rows($connection, $context, 'app'), $this->catalog->rows($connection, $context, 'bi-desk')];
+    }
+
+    private function assertSession(Connection $connection, Project $project): User
+    {
+        $user = User::find($project->user_id);
+        $current = $connection->fresh();
+        if (! $user || $user->role === 'viewer' || $connection->user_id !== $project->user_id || ! $current || $current->status !== 'connected' || ($current->metadata['session_generation'] ?? null) !== ($connection->metadata['session_generation'] ?? null)) {
+            throw new RuntimeException('A permissão ou a sessão mudou. Confira seus acessos antes de publicar.');
+        }
+
+        return $user;
+    }
+
+    private function listed(array $rows, string $ref): bool
+    {
+        return (bool) preg_match('/^app:([1-9][0-9]*)$/D', $ref, $match) && collect($rows)->contains(fn (array $row): bool => (string) $row['id'] === $match[1]);
+    }
+
+    /** @return array<string, mixed> */
+    private function body(Connection $connection, Project $context, string $ref): array
+    {
+        $this->lumo->run($connection, ['fetch', $ref], $context, 90);
+        $data = $this->lumo->run($connection, ['info', $ref, '--full'], $context, 60)['data'];
+        $payload = is_array($data) ? ($data['payload'] ?? $data) : [];
+        $body = $payload['body'] ?? null;
+        if (! is_array($body) || (isset($payload['header']['tenantId']) && (string) $payload['header']['tenantId'] !== (string) $context->tenant_id) || (isset($payload['header']['id']) && (string) $payload['header']['id'] !== substr($ref, 4))) {
+            throw new RuntimeException('A aplicação retornou fora do contexto de publicação autorizado.');
+        }
+
+        return $body;
+    }
+
+    private function desk(array $body): ?int
+    {
+        $known = false;
+        $values = [];
+        foreach ([$body, is_array($body['_state'] ?? null) ? $body['_state'] : []] as $metadata) {
+            foreach (['deskId', 'desk_id'] as $key) {
+                if (array_key_exists($key, $metadata)) {
+                    $known = true;
+                    $value = $metadata[$key];
+                    if ($value !== null && (! is_numeric($value) || (int) $value < 1)) {
+                        throw new RuntimeException('A mesa atual da aplicação não pôde ser confirmada.');
+                    }
+                    $values[] = $value === null ? null : (int) $value;
+                }
+            }
+        }
+        if (! $known || count(array_unique($values, SORT_REGULAR)) !== 1) {
+            throw new RuntimeException('O estado atual da aplicação não pôde ser confirmado.');
+        }
+
+        return $values[0];
+    }
+
+    private function name(array $body): string
+    {
+        $name = $body['nome'] ?? $body['name'] ?? null;
+        if (! is_string($name) || trim($name) === '') {
+            throw new RuntimeException('O nome da aplicação não foi confirmado pelo BI.');
+        }
+
+        return $name;
+    }
+
+    private function digest(array $body): string
+    {
+        $sort = function (array $items) use (&$sort): array {
+            if (! array_is_list($items)) {
+                ksort($items);
+            }
+            foreach ($items as $key => $value) {
+                if (is_array($value)) {
+                    $items[$key] = $sort($value);
+                }
+            }
+
+            return $items;
+        };
+
+        return hash('sha256', json_encode($sort($body), JSON_THROW_ON_ERROR));
+    }
+}

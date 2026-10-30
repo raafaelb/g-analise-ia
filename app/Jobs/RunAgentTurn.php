@@ -34,6 +34,31 @@ class RunAgentTurn implements ShouldQueue
         if (! $run || ! in_array($run->status, ['queued', 'cancel_requested'], true)) {
             return;
         }
+        if ($run->status === 'cancel_requested') {
+            AgentRun::whereKey($run->id)->where('status', 'cancel_requested')->update(['status' => 'cancelled', 'finished_at' => now()]);
+
+            return;
+        }
+        $claimed = AgentRun::whereKey($run->id)->where('status', 'queued')->update(['status' => 'running', 'started_at' => now(), 'heartbeat_at' => now()]);
+        if (! $claimed) {
+            AgentRun::whereKey($run->id)->where('status', 'cancel_requested')->update(['status' => 'cancelled', 'finished_at' => now()]);
+
+            return;
+        }
+        $run->refresh();
+        $conversation = $run->conversation;
+        $project = $conversation?->project;
+        if (! $conversation || ! $project || $conversation->user_id !== $run->user_id || $project->user_id !== $run->user_id) {
+            $run->update(['status' => 'failed', 'error_code' => 'invalid_project_context', 'error_message' => 'O contexto desta tarefa não está mais disponível.', 'finished_at' => now()]);
+            Audit::record($run->user_id, 'agent.attention', 'Tarefa recusada por contexto de projeto inválido.');
+
+            return;
+        }
+        if ($project->status === 'archived') {
+            $this->failRun($run, 'Este projeto está arquivado. Reabra-o antes de iniciar outra tarefa.', 'project_archived');
+
+            return;
+        }
         $lock = Cache::lock('conversation:'.$run->conversation_id, 960);
         if (! $lock->get()) {
             $this->failRun($run, 'A conversa já está em execução. Tente novamente após a conclusão.', 'concurrent_execution');
@@ -48,27 +73,33 @@ class RunAgentTurn implements ShouldQueue
             return;
         }
         try {
-            if ($run->status === 'cancel_requested') {
+            $run->refresh();
+            $project->refresh();
+            if (in_array($run->status, ['cancel_requested', 'cancelled'], true)) {
                 $run->update(['status' => 'cancelled', 'finished_at' => now()]);
+
+                return;
+            }
+            if ($project->status === 'archived') {
+                $this->failRun($run, 'Este projeto está arquivado. Reabra-o antes de iniciar outra tarefa.', 'project_archived');
 
                 return;
             }
             if (User::find($run->user_id)?->role === 'viewer') {
                 throw new RuntimeException('Seu perfil atual permite somente leitura.');
             }
-            $run->update(['status' => 'running', 'started_at' => now(), 'heartbeat_at' => now()]);
             $runtime->run($run);
             $run->refresh();
             if ($run->status === 'awaiting_approval') {
                 Audit::record($run->user_id, 'agent.awaiting_approval', 'Alteração preparada para revisão.', $run->conversation->project_id);
             } else {
-                $cancelled = $run->status === 'cancel_requested';
+                $cancelled = in_array($run->status, ['cancel_requested', 'cancelled'], true);
                 $run->update(['status' => $cancelled ? 'cancelled' : 'completed', 'finished_at' => now()]);
                 Audit::record($run->user_id, $cancelled ? 'agent.cancelled' : 'agent.completed', $cancelled ? 'Tarefa interrompida pelo usuário.' : 'Tarefa do agente concluída.', $run->conversation->project_id);
             }
         } catch (Throwable $e) {
             $run->refresh();
-            if ($run->status === 'cancel_requested') {
+            if (in_array($run->status, ['cancel_requested', 'cancelled'], true)) {
                 $run->update(['status' => 'cancelled', 'finished_at' => now()]);
             } else {
                 $this->failRun($run, $e instanceof RuntimeException ? $e->getMessage() : 'Ocorreu uma falha na execução. Sua conversa e seus arquivos foram preservados.', 'execution_failed');

@@ -48,6 +48,16 @@ class ExecuteApprovedAction implements ShouldQueue
                 return;
             }
             $approval->refresh();
+            if ($approval->type === 'manual' && $approval->agent_run_id === null && ($approval->payload['origin'] ?? '') === 'manual') {
+                $result = $broker->performApproved($approval);
+                if (strlen(json_encode($result, JSON_THROW_ON_ERROR)) > 60000) {
+                    $result = ['managed_resource' => $result['managed_resource'] ?? null, 'management_warning' => $result['management_warning'] ?? null, 'summary' => 'Operação concluída; confira o recurso no catálogo.'];
+                }
+                $approval->update(['status' => 'completed', 'payload' => [...$approval->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => $result]]]);
+                Audit::record($approval->user_id, 'bi.manual_action.completed', 'Operação de BI concluída pela interface.', $approval->project_id, ['approval_id' => $approval->id, 'resource' => $approval->payload['action']['resource'] ?? null]);
+
+                return;
+            }
             $run = AgentRun::find($approval->agent_run_id);
             if (! $run || $run->user_id !== $approval->user_id || in_array($run->status, ['cancel_requested', 'cancelled', 'failed'], true)) {
                 throw new RuntimeException('A tarefa foi interrompida antes da execução autorizada.');
