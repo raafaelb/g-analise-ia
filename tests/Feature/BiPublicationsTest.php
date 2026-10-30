@@ -126,6 +126,7 @@ class BiPublicationsTest extends TestCase
         $this->execute($user, $approval);
         $this->assertSame('completed', $approval->fresh()->status);
         $this->assertTrue($approval->fresh()->payload['execution']['result']['publication']['verified']);
+        $this->assertSame($approval->id, $project->fresh()->preview_revision);
         $this->assertSame($before, $state->bodies[1]);
         $this->assertSame('app:2', $project->fresh()->source_ref);
         $this->assertContains(['app', 'publish', 'app:2', '--desk', '10', '--new'], $state->commands);
@@ -279,11 +280,13 @@ class BiPublicationsTest extends TestCase
         $endpoint = '/api/approvals/'.$approval->id.'/publication/verify';
         $this->postJson($endpoint)->assertUnprocessable()->assertJsonPath('errors.publication.0', 'O destino ou o conteúdo resumido retornado pelo BI não corresponde à revisão autorizada.');
         $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertNull(Project::findOrFail($approval->project_id)->preview_revision);
         $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
         $state->bodies[2]['_state']['deskId'] = 10;
         $this->postJson($endpoint)->assertOk()->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.execution.result.publication.verified', true)->assertJsonPath('approval.payload.reconciliation.remote_read_only', true);
         $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'published']);
         $this->assertDatabaseHas('audit_events', ['action' => 'bi.publication.reconciled', 'resource_id' => $approval->project_id]);
+        $this->assertSame($approval->id, Project::findOrFail($approval->project_id)->preview_revision);
         $commands = count($state->commands);
         $this->postJson($endpoint)->assertOk()->assertJsonPath('approval.status', 'completed');
         $this->assertSame($commands, count($state->commands), 'Conferir uma operação já confirmada é idempotente.');

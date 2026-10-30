@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {fitPreview} from '../../resources/js/lib/responsive-preview.ts';
+import {canStartPreviewSession,fitPreview} from '../../resources/js/lib/responsive-preview.ts';
 
 test('automatic preview occupies all available width and height', () => {
     assert.deepEqual(fitPreview('auto',683.5,712), {ready:true,viewportWidth:683.5,viewportHeight:712,displayWidth:683.5,displayHeight:712,scale:1});
@@ -42,4 +42,20 @@ test('an unmeasured or hidden panel waits for a valid size instead of rendering 
         assert.equal(preview.viewportWidth,390);
         assert.equal(preview.viewportHeight,844);
     }
+});
+
+const sessionContext=(changes={})=>({supported:true,active:true,responsive:true,measured:true,...changes});
+
+test('responsive sessions wait for both visible content and a measured viewport', () => {
+    assert.equal(canStartPreviewSession(sessionContext({active:false})),false);
+    assert.equal(canStartPreviewSession(sessionContext({measured:false})),false);
+    assert.equal(canStartPreviewSession(sessionContext()),true);
+});
+
+test('the ordinary catalog viewer remains available without responsive measurement', () => {
+    assert.equal(canStartPreviewSession(sessionContext({responsive:false,measured:false})),true);
+});
+
+test('unsupported browsers cannot start authenticated sessions in either viewer', () => {
+    for(const responsive of [true,false])assert.equal(canStartPreviewSession(sessionContext({supported:false,responsive})),false);
 });

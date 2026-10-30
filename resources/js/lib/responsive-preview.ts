@@ -18,3 +18,7 @@ export function fitPreview(device: PreviewDevice, availableWidth: number, availa
     const scale = preset.id === 'auto' ? 1 : Math.min(1, width / viewportWidth, height / viewportHeight);
     return {ready: true, viewportWidth, viewportHeight, displayWidth: viewportWidth * scale, displayHeight: viewportHeight * scale, scale};
 }
+
+export function canStartPreviewSession(context: {supported: boolean; active: boolean; responsive: boolean; measured: boolean}): boolean {
+    return context.supported && context.active && (!context.responsive || context.measured);
+}

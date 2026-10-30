@@ -124,6 +124,7 @@ class BiPublications
                     $this->recordVerified($currentProject, $arguments['resource'], $confirmation);
                     $previous = $current->payload['execution'] ?? [];
                     $current->update(['status' => 'completed', 'payload' => [...$current->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => ['publication' => $confirmation, 'published_resource' => $confirmation['resource'], 'confirmed_name' => $confirmation['name']]], 'reconciliation' => ['checked_at' => $confirmation['checked_at'], 'previous_status' => $approval->status, 'previous_message' => $previous['message'] ?? null, 'remote_read_only' => true]]]);
+                    app(ProjectPreviews::class)->recordCompletedChange($current);
                     Audit::record($approval->user_id, 'bi.publication.reconciled', 'Publicação confirmada por nova consulta, sem reenviar a operação.', $project->id, ['approval_id' => $approval->id, 'resource' => $confirmation['resource'], 'tenant_id' => $project->tenant_id]);
                 });
                 Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);

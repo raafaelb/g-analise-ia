@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {projectPreviews, choosePreview, dashboardPreviews} from '../../resources/js/lib/project-previews.ts';
+import {projectPreviews, choosePreview, dashboardPreviews, shouldFollowLivePreview} from '../../resources/js/lib/project-previews.ts';
 
 const artifact = (id, changes = {}) => ({id, project_id:'own-project', kind:'dashboard_export', mime:'image/png', created_at:'2026-10-30T05:00:00Z', metadata:{resource:'app:10'}, ...changes});
 
@@ -46,4 +46,39 @@ test('dashboard selection excludes other tabs and legacy default exports belong 
     const previews = projectPreviews([artifact('first',{metadata:{resource:'app:10',dashboard_id:1}}),artifact('second',{metadata:{resource:'app:10',dashboard_id:2}}),artifact('legacy')],'own-project');
     assert.deepEqual(dashboardPreviews(previews,'1','1').map(value=>value.id).sort(),['first','legacy']);
     assert.deepEqual(dashboardPreviews(previews,'2','1').map(value=>value.id),['second']);
+});
+
+const liveContext = (changes={}) => ({projectId:'project-one',resource:'app:10',revision:'confirmed-one',...changes});
+
+test('a confirmed app checkpoint refreshes without an exported image and repeated polling is stable', () => {
+    const first=liveContext();
+    const next=liveContext({revision:'confirmed-two'});
+    assert.equal(shouldFollowLivePreview(first,next,true,'interactive'),true);
+    assert.equal(shouldFollowLivePreview(next,{...next},true,'interactive'),false);
+    assert.equal(shouldFollowLivePreview(liveContext({revision:null}),next,true,'interactive'),true);
+});
+
+test('another project or app cannot refresh the current authenticated preview', () => {
+    for(const change of [{projectId:'another-project'},{resource:'app:20'},{resource:'flow:10'}]) {
+        assert.equal(shouldFollowLivePreview(liveContext(),liveContext({...change,revision:'confirmed-two'}),true,'interactive'),false);
+    }
+});
+
+test('paused following and a selected historical image stay stable after a new app checkpoint', () => {
+    const next=liveContext({revision:'confirmed-two'});
+    assert.equal(shouldFollowLivePreview(liveContext(),next,false,'interactive'),false);
+    assert.equal(shouldFollowLivePreview(liveContext(),next,true,'image'),false);
+});
+
+test('a missing confirmation or non-app context cannot trigger a live session', () => {
+    for(const revision of [null,''])assert.equal(shouldFollowLivePreview(liveContext(),liveContext({revision}),true,'interactive'),false);
+    for(const resource of [null,'app:0','table:10'])assert.equal(shouldFollowLivePreview(liveContext({resource}),liveContext({resource,revision:'confirmed-two'}),true,'interactive'),false);
+});
+
+test('hidden previews wait until they are visible before consuming a new login session', () => {
+    const before=liveContext();
+    const next=liveContext({revision:'confirmed-two'});
+    assert.equal(shouldFollowLivePreview(before,next,true,'interactive',false),false);
+    assert.equal(shouldFollowLivePreview(before,next,true,'interactive',true),true);
+    assert.equal(shouldFollowLivePreview(next,{...next},true,'interactive',true),false);
 });

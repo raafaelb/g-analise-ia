@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Events\WorkspaceChanged;
+use App\Models\Approval;
 use App\Models\Artifact;
 use App\Models\Project;
 use App\Models\User;
@@ -16,6 +17,32 @@ use Throwable;
 class ProjectPreviews
 {
     public function __construct(private BiCatalog $catalog, private LumoClient $lumo) {}
+
+    /** Mark only an app change whose authorized execution has completed. */
+    public function recordCompletedChange(Approval $approval): bool
+    {
+        $payload = $approval->payload ?? [];
+        if ($approval->status !== 'completed' || ($payload['execution']['status'] ?? null) !== 'completed' || ! $approval->project_id) {
+            return false;
+        }
+        $arguments = $payload['action'] ?? [];
+        $result = $payload['execution']['result'] ?? [];
+        $resource = match ($arguments['action'] ?? null) {
+            'push' => $arguments['resource'] ?? null,
+            'publish_app' => ($result['publication']['verified'] ?? false) === true ? ($result['published_resource'] ?? null) : null,
+            'clone_app' => $result['managed_resource'] ?? null,
+            default => null,
+        };
+        $tenant = $payload['revision']['tenant_id'] ?? null;
+        if (! is_string($resource) || ! preg_match('/^app:[1-9][0-9]*$/D', $resource) || (! is_string($tenant) && ! is_int($tenant))) {
+            return false;
+        }
+
+        return Project::whereKey($approval->project_id)->where('user_id', $approval->user_id)
+            ->where('tenant_id', (string) $tenant)->where('source_ref', $resource)
+            ->where(fn ($query) => $query->whereNull('preview_revision')->orWhere('preview_revision', '!=', $approval->id))
+            ->update(['preview_revision' => $approval->id, 'preview_changed_at' => now()]) === 1;
+    }
 
     /** @return array<string, mixed> */
     public function context(User $user, Project $project): array

@@ -83,10 +83,16 @@ class ApprovalExecutionTest extends TestCase
     public function test_successful_action_resumes_ai_with_a_confirmed_system_result_not_a_repeated_user_prompt(): void
     {
         [$user,$project,$conversation,$run] = $this->context();
+        $this->travelTo(new \DateTimeImmutable('2026-10-30T20:00:00Z'));
+        $project->update(['source_ref' => 'app:1']);
         $approval = $this->approval($user, $project, $run);
         $approval->update(['status' => 'approved']);
         $broker = \Mockery::mock(ActionBroker::class);
-        $broker->shouldReceive('performApproved')->once()->andReturn(['exit_code' => 0, 'data' => ['applied' => ['app:1']]]);
+        $broker->shouldReceive('performApproved')->once()->andReturnUsing(function () use ($project): array {
+            $this->assertNull($project->fresh()->preview_revision, 'A prévia não deve mudar enquanto a escrita ainda está em execução.');
+
+            return ['exit_code' => 0, 'data' => ['applied' => ['app:1']]];
+        });
         $job = new ExecuteApprovedAction($approval->id);
         $job->handle($broker);
         $job->handle($broker);
@@ -97,6 +103,10 @@ class ApprovalExecutionTest extends TestCase
         $this->assertSame('system', $input->role);
         $this->assertTrue($input->metadata['continuation']);
         $this->assertSame(0, $input->metadata['tool_result']['exit_code']);
+        $this->assertSame($approval->id, $project->fresh()->preview_revision);
+        $this->assertSame('2026-10-30T20:00:00.000000Z', $project->fresh()->preview_changed_at->toISOString());
+        $this->assertDatabaseCount('artifacts', 0);
+        $this->actingAs($user)->getJson('/api/bootstrap')->assertOk()->assertJsonPath('projects.0.preview_revision', $approval->id);
         Queue::assertPushed(RunAgentTurn::class, 1);
     }
 

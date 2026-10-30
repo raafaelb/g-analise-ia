@@ -14,6 +14,7 @@ use App\Services\BiBusy;
 use App\Services\BiCredentials;
 use App\Services\BiDesks;
 use App\Services\BiValidationFailure;
+use App\Services\ProjectPreviews;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -59,7 +60,10 @@ class ExecuteApprovedAction implements ShouldQueue
                 if (strlen(json_encode($result, JSON_THROW_ON_ERROR)) > 60000) {
                     $result = array_intersect_key($result, array_flip(['managed_resource', 'management_warning', 'publication', 'published_resource', 'confirmed_name'])) + ['summary' => 'Operação concluída; confira o recurso no catálogo.'];
                 }
-                $approval->update(['status' => 'completed', 'payload' => [...$approval->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => $result]]]);
+                DB::transaction(function () use ($approval, $result): void {
+                    $approval->update(['status' => 'completed', 'payload' => [...$approval->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => $result]]]);
+                    app(ProjectPreviews::class)->recordCompletedChange($approval);
+                });
                 Audit::record($approval->user_id, 'bi.manual_action.completed', 'Operação de BI concluída pela interface.', $approval->project_id, ['approval_id' => $approval->id, 'resource' => $approval->payload['action']['resource'] ?? null]);
 
                 return;
@@ -77,6 +81,7 @@ class ExecuteApprovedAction implements ShouldQueue
             $nextRun = DB::transaction(function () use ($approval, $run, $result) {
                 $run->conversation()->lockForUpdate()->firstOrFail();
                 $approval->update(['status' => 'completed', 'payload' => [...$approval->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => $result]]]);
+                app(ProjectPreviews::class)->recordCompletedChange($approval);
                 $cancelled = $run->fresh()->status === 'cancel_requested';
                 $run->update(['status' => $cancelled ? 'cancelled' : 'completed', 'finished_at' => now(), 'heartbeat_at' => now()]);
                 $message = Message::create(['conversation_id' => $run->conversation_id, 'role' => 'system', 'content' => ($approval->payload['action']['action'] === 'run_schedule' ? 'Solicitação de carga enviada ao BI; o resultado final ainda precisa ser correlacionado ao run_id. ' : 'Ação autorizada concluída: ').$approval->title.' ('.($approval->payload['action']['resource'] ?? 'recurso').').', 'status' => 'completed', 'metadata' => ['approval_id' => $approval->id, 'continuation' => true, 'tool_result' => $result, 'action' => $approval->payload['action']]]);

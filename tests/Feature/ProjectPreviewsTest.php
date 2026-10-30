@@ -3,17 +3,20 @@
 namespace Tests\Feature;
 
 use App\Events\WorkspaceChanged;
+use App\Models\Approval;
 use App\Models\Artifact;
 use App\Models\Connection;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\LumoClient;
+use App\Services\ProjectPreviews;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class ProjectPreviewsTest extends TestCase
@@ -126,5 +129,80 @@ class ProjectPreviewsTest extends TestCase
         $this->assertDatabaseCount('artifacts', 0);
         $this->assertDatabaseCount('agent_runs', 0);
         $this->actingAs(User::factory()->create())->getJson('/api/projects/'.$project->id.'/preview-context')->assertNotFound();
+    }
+
+    private function change(Project $project, string $action = 'push', array $result = [], string $status = 'completed', ?string $resource = null): Approval
+    {
+        return Approval::create(['user_id' => $project->user_id, 'project_id' => $project->id, 'title' => 'Revisão sintética', 'status' => $status, 'payload' => ['action' => ['action' => $action, 'resource' => $resource ?? 'app:10'], 'revision' => ['tenant_id' => '321'], 'execution' => ['status' => 'completed', 'result' => $result]], 'fingerprint' => str_repeat('a', 64), 'expires_at' => now()->addMinutes(10)]);
+    }
+
+    public static function previewChanges(): array
+    {
+        return [
+            'app push' => ['push', 'app:10', [], true],
+            'confirmed publication' => ['publish_app', 'app:9', ['publication' => ['verified' => true], 'published_resource' => 'app:10'], true],
+            'unconfirmed publication' => ['publish_app', 'app:10', ['published_resource' => 'app:10'], false],
+            'new app clone' => ['clone_app', 'app:9', ['managed_resource' => 'app:10'], true],
+            'another app' => ['push', 'app:9', [], false],
+            'flow authoring is not an app checkpoint' => ['push', 'flow:10', [], false],
+            'queued load is not a completed refresh' => ['run_schedule', 'schedule:10', ['execution_request' => ['verified' => false]], false],
+        ];
+    }
+
+    #[DataProvider('previewChanges')]
+    public function test_only_confirmed_changes_to_the_current_app_update_its_preview(string $action, string $resource, array $result, bool $expected): void
+    {
+        [$user, $project] = $this->context(expectExport: false);
+        $approval = $this->change($project, $action, $result, resource: $resource);
+
+        $changed = app(ProjectPreviews::class)->recordCompletedChange($approval);
+
+        $this->assertSame($expected, $changed);
+        $this->assertSame($expected ? $approval->id : null, $project->fresh()->preview_revision);
+        $this->assertDatabaseCount('artifacts', 0);
+    }
+
+    public function test_pending_in_progress_and_failed_actions_do_not_change_the_preview(): void
+    {
+        [, $project] = $this->context(expectExport: false);
+        foreach (['pending', 'approved', 'executing', 'failed', 'cancelled', 'rejected'] as $status) {
+            $approval = $this->change($project, status: $status);
+            $this->assertFalse(app(ProjectPreviews::class)->recordCompletedChange($approval));
+            $this->assertNull($project->fresh()->preview_revision);
+        }
+        $approval = $this->change($project);
+        $approval->update(['payload' => [...$approval->payload, 'execution' => ['status' => 'failed']]]);
+        $this->assertFalse(app(ProjectPreviews::class)->recordCompletedChange($approval));
+        $this->assertNull($project->fresh()->preview_revision);
+    }
+
+    public function test_a_checkpoint_cannot_cross_user_or_tenant_and_repeating_it_is_idempotent(): void
+    {
+        [, $project] = $this->context(expectExport: false);
+        $approval = $this->change($project);
+        $other = User::factory()->create();
+        $approval->update(['user_id' => $other->id]);
+        $this->assertFalse(app(ProjectPreviews::class)->recordCompletedChange($approval));
+        $this->assertNull($project->fresh()->preview_revision);
+        $approval->update(['user_id' => $project->user_id, 'payload' => [...$approval->payload, 'revision' => ['tenant_id' => 'other-tenant']]]);
+        $this->assertFalse(app(ProjectPreviews::class)->recordCompletedChange($approval));
+        $this->assertNull($project->fresh()->preview_revision);
+        $approval->update(['payload' => [...$approval->payload, 'revision' => ['tenant_id' => '321']]]);
+        $this->assertTrue(app(ProjectPreviews::class)->recordCompletedChange($approval));
+        $this->assertFalse(app(ProjectPreviews::class)->recordCompletedChange($approval));
+        $this->assertSame($approval->id, $project->fresh()->preview_revision);
+    }
+
+    public function test_project_settings_cannot_forge_a_confirmed_preview_revision(): void
+    {
+        [$user, $project] = $this->context(expectExport: false);
+        $revision = '11111111-1111-4111-8111-111111111111';
+        $project->update(['preview_revision' => $revision]);
+
+        $this->actingAs($user)->patchJson('/api/projects/'.$project->id, ['name' => 'Nome atualizado', 'preview_revision' => '22222222-2222-4222-8222-222222222222', 'preview_changed_at' => '2099-01-01T00:00:00Z'])
+            ->assertOk()->assertJsonPath('name', 'Nome atualizado')->assertJsonPath('preview_revision', $revision)->assertJsonPath('preview_changed_at', null);
+
+        $this->assertSame($revision, $project->fresh()->preview_revision);
+        $this->assertNull($project->fresh()->preview_changed_at);
     }
 }

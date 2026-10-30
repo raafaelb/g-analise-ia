@@ -26,6 +26,8 @@ docker compose exec -T app php artisan ganalise:backup-state
 
 `ganalise:health` retorna JSON/exit code: banco, cache, scheduler, workers e disco. O primeiro heartbeat chega após a próxima virada de minuto. Scheduler/documentos: tolerância 3 minutos; worker IA: 20 minutos, incluindo turno autorizado de até 15 minutos. A saída inclui tamanho das filas sem conteúdo das tarefas. Monitore exit code e crescimento das filas; `/up` verifica apenas o processo web.
 
+A migração `add_preview_revision_to_projects_table` acrescenta a revisão confirmada e sua data ao projeto. Aplique as migrações antes de iniciar os workers com o código atualizado. Registros anteriores continuam válidos com esses campos vazios; não é necessário exportar imagens ou recriar projetos.
+
 Os workers têm `restart: unless-stopped`. Alterações no código exigem reiniciar os workers; a fila é preservada. Em produção, use a nova imagem em todos os serviços. Timeout da fila é maior que o turno; ações remotas não têm repetição automática após resultado incerto. Não monte Docker socket no worker.
 
 ## Backup criptografado

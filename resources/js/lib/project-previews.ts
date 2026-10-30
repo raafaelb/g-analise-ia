@@ -30,3 +30,11 @@ export function dashboardPreviews(artifacts: readonly PreviewArtifact[], dashboa
     return artifacts.filter(artifact => !dashboard || String(artifact.metadata?.dashboard_id ?? '') === dashboard
         || (artifact.metadata?.dashboard_id == null && dashboard === firstDashboard));
 }
+
+export type LivePreviewContext = {projectId: string; resource: string | null; revision: string | null};
+
+export function shouldFollowLivePreview(before: LivePreviewContext, after: LivePreviewContext, follow: boolean, mode: string, visible = true): boolean {
+    return visible && follow && mode === 'interactive' && after.projectId === before.projectId
+        && after.resource === before.resource && /^app:[1-9][0-9]*$/.test(after.resource ?? '')
+        && Boolean(after.revision) && after.revision !== before.revision;
+}

@@ -16,7 +16,7 @@ class Project extends Model
 
     protected function casts(): array
     {
-        return ['is_example' => 'boolean'];
+        return ['is_example' => 'boolean', 'preview_changed_at' => 'datetime'];
     }
 
     public function conversations(): HasMany
