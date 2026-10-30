@@ -14,7 +14,7 @@ class BiViewer
     {
         abort_unless(config('horus.viewer.enabled'), 409, 'A visualização interativa ainda não foi habilitada nesta instalação. Use a prévia visual.');
         abort_if($user->role === 'viewer', 403, 'Seu perfil permite consultar a prévia visual e os dados. A sessão interativa não está disponível para este perfil.');
-        $detail = $this->catalog->detail($user, $tenant, 'app', $appId);
+        $detail = $this->catalog->detail($user, $tenant, 'app', $appId, includeRelations: false);
         abort_if($detail['tenant']['read_only'] ?? false, 403, 'Este tenant está protegido para consulta. Use a prévia visual e os dados.');
         if ($dashboard !== null) {
             abort_unless(collect($detail['resource']['dashboards'] ?? [])->contains(fn (array $item): bool => (string) ($item['id'] ?? '') === (string) $dashboard), 422, 'Este dashboard não pertence à aplicação selecionada.');

@@ -71,7 +71,7 @@ docker compose exec app php scripts/codex-smoke.php
 docker compose exec app php artisan ganalise:health
 ```
 
-A rodada local de 30/10/2026 passou com 374 testes PHP / 2.180 verificações, tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 32 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
+A rodada local de 30/10/2026 passou com 383 testes PHP / 2.232 verificações, tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 32 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
 
 Codex está fixado em 0.165.0 e Lumo em 3.44.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
 

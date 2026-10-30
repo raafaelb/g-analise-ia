@@ -156,7 +156,7 @@ class CatalogController extends Controller
         $data = $request->validate(['resource' => ['required', 'regex:/^(app|flow|table|schedule):[1-9][0-9]*$/D'], 'name' => ['nullable', 'string', 'max:100']]);
         [$kind,$id] = explode(':', $data['resource'], 2);
         try {
-            $detail = $catalog->detail($request->user(), $tenant, $kind, $id);
+            $detail = $catalog->detail($request->user(), $tenant, $kind, $id, includeRelations: false);
         } catch (HttpExceptionInterface $e) {
             throw $e;
         } catch (RuntimeException $e) {

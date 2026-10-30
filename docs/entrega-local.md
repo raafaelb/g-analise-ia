@@ -13,7 +13,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 30/1
 
 ## Evidências e uso
 
-374 testes PHP e 2.180 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 32 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+383 testes PHP e 2.232 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 32 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
@@ -76,3 +76,8 @@ O formulário de conexões possui revisão e protege os campos privados. Um ensa
 A proposta de alteração aparece no chat com tenant, recurso, destino, impacto e comparação. Um aviso junto ao campo de mensagem mantém a pendência visível. Autorizar e Recusar registram a decisão na própria conversa; a página Atividade conserva o histórico. Trocar de conversa não mistura revisões, e a atualização em segundo plano preserva a leitura enquanto há uma decisão pendente.
 
 A conferência visual foi realizada em desktop e celular com conta e propostas sintéticas, sem conexões reais de BI/IA. A recusa cancelou a solicitação e preservou as mensagens. A autorização gerou um único recibo; a execução de teste parou pela ausência deliberada de conexão BI e não foi apresentada como concluída. A conta de teste foi inativada e o projeto arquivado. As garantias de execução/publicação reais continuam cobertas pelos ensaios anteriores e pelos testes do broker.
+
+
+## Primeira rodada de desempenho
+
+A leitura específica de uma aplicação com identidade completa evita a nova listagem de todas as aplicações; cabeçalho incompleto conserva a validação de pertencimento. A amostra real no tenant Inovadora caiu de 4–5 segundos para cerca de 1,4 segundo, com catálogo quente. Prévias e consultas pontuais também dispensam vínculos não utilizados. A atualização completa do catálogo continua em torno de 17 segundos e permanece uma pendência. O ensaio foi somente de leitura; resultados e limites estão na [matriz de gestão](gestao-completa.md).

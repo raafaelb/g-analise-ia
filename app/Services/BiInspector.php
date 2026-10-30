@@ -22,7 +22,7 @@ class BiInspector
             default => null,
         };
         abort_unless($arguments, 422, 'Esta consulta não está disponível para este tipo de recurso.');
-        $detail = $this->catalog->detail($user, $tenant, $kind, $id);
+        $detail = $this->catalog->detail($user, $tenant, $kind, $id, includeRelations: false);
         [$connection, $item] = $this->catalog->access($user, $tenant);
         $project = $this->catalog->context($connection, $item);
         $result = $this->lumo->run($connection, $arguments, $project, 60)['data'];

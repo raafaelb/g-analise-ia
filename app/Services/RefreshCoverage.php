@@ -77,7 +77,7 @@ class RefreshCoverage
         }
         $catalog = app(BiCatalog::class);
         $snapshot = $catalog->snapshot($user, $tenant, true);
-        $detail = $catalog->detail($user, $tenant, 'app', $appId);
+        $detail = $catalog->detail($user, $tenant, 'app', $appId, includeRelations: false);
         [$connection,$item] = $catalog->access($user, $tenant);
         $context = $catalog->context($connection, $item);
         $documents = $catalog->workingMetadata($context);

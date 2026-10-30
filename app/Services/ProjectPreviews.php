@@ -22,7 +22,7 @@ class ProjectPreviews
     {
         abort_unless($project->user_id === $user->id, 404);
         abort_unless(preg_match('/^app:([1-9][0-9]*)$/D', (string) $project->source_ref, $match), 422, 'Vincule uma aplicação ao projeto para gerar sua prévia.');
-        $detail = $this->catalog->detail($user, (string) $project->tenant_id, 'app', $match[1]);
+        $detail = $this->catalog->detail($user, (string) $project->tenant_id, 'app', $match[1], includeRelations: false);
 
         return ['resource' => $project->source_ref, 'name' => $detail['resource']['name'], 'dashboards' => $detail['resource']['dashboards'] ?? [], 'dashboards_available' => is_array($detail['resource']['dashboards'] ?? null)];
     }

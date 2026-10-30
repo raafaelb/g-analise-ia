@@ -111,3 +111,12 @@ A interface das revisões foi conferida em navegador isolado no desktop e no cel
 A terceira distribuição foi comparada ao SHA-256 publicado e fixada após homologação. O CI passou a importar/exportar cache das camadas de ferramentas com as ações oficiais do Docker, carregando a imagem apenas no runner, com publicação desabilitada. As verificações de integridade e versão permanecem no build. O cache reduz a dependência do canal mutável nas recompilações compatíveis; um cache ausente ou invalidado ainda precisa do pacote oficial correspondente à pinagem. Não há substituição automática por uma versão diferente.
 
 Referência da configuração de cache: [documentação oficial do Docker](https://docs.docker.com/build/cache/backends/gha/). As duas ações Docker também estão fixadas por hash de commit correspondente às versões oficiais verificadas.
+
+
+## Consulta específica e desempenho — 30/10/2026
+
+A abertura de aplicação usa a identidade atual retornada por `info --full` quando tenant, tipo e ID estão completos e corretos. Respostas divergentes são recusadas; identidade incompleta exige a listagem autorizada. A atualização de estado e a listagem integral não são repetidas na abertura normal. As consultas de prévia, saúde/histórico e contexto de projeto evitam reconstruir dependências que não utilizam.
+
+Duas leituras por fase da aplicação de teste da Inovadora, com catálogo quente, passaram de 5,08/3,99 s para 1,46/1,43 s. O catálogo completo permaneceu em 16,6/17,9 s; esse trecho ainda precisa de otimização. O cache quente do catálogo levou aproximadamente 3 ms no serviço. A medição não inclui uma amostra suficiente para percentis nem comprova o tempo total percebido no navegador. As operações foram somente de leitura, sem BI alterado e sem IA.
+
+A suíte ampliada contém 383 testes PHP / 2.232 verificações. Os nove novos casos cobrem o caminho de leitura específico, formatos legados, divergências de identidade, imagem em cache e recusa atual de permissão.

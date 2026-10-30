@@ -207,7 +207,7 @@ class BiCatalog
         return ['id' => $id, 'ref' => $kind === 'variables' ? '{{'.$row['nome'].'}}' : $kind.':'.$id, 'kind' => $kind, 'name' => $body['nome'] ?? $body['name'] ?? $row['nome'] ?? $row['name'] ?? ($kind.' '.$id), 'description' => $body['descricao'] ?? $body['description'] ?? null, 'state' => $state, 'desk_id' => $desk === null ? null : (string) $desk, 'desk_known' => $deskKnown, 'tags' => array_values(array_filter($body['tags'] ?? [], is_string(...))), 'dashboard_count' => $dashboards === null ? null : count($dashboards), 'dashboards' => $dashboards, 'table_count' => isset($body['tables']) ? count($body['tables']) : null, 'active' => $body['ativo'] ?? null, 'online' => $body['online'] ?? null, 'metadata_available' => $body !== []];
     }
 
-    public function detail(User $user, string $tenant, string $kind, string $id): array
+    public function detail(User $user, string $tenant, string $kind, string $id, bool $includeRelations = true): array
     {
         if ($kind === 'variables') {
             return $this->variableDetail($user, $tenant, $id);
@@ -234,9 +234,12 @@ class BiCatalog
 
             return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $this->summary($kind, $row, $body), 'details' => $this->redact($body ?? ['id' => $id, 'nome' => $row['nome'] ?? $row['name'] ?? $id]), 'metadata_complete' => is_array($body), 'metadata_message' => is_array($body) ? null : 'O recurso está disponível, mas o servidor não forneceu sua configuração de autoria para esta sessão.', 'overview' => app(BiResourceOverview::class)->build($kind, $body ?? []), 'related' => []];
         }
-        $row = collect($this->rows($connection, $project, $kind))->first(fn (array $row): bool => (string) $row['id'] === $id);
-        abort_unless($row, 404, 'Recurso não disponível neste tenant para sua sessão.');
-        $this->lumo->run($connection, ['fetch', $kind.':'.$id], $project, 60);
+        $row = null;
+        if ($kind !== 'app') {
+            $row = collect($this->rows($connection, $project, $kind))->first(fn (array $row): bool => (string) $row['id'] === $id);
+            abort_unless($row, 404, 'Recurso não disponível neste tenant para sua sessão.');
+            $this->lumo->run($connection, ['fetch', $kind.':'.$id], $project, 60);
+        }
         $data = $this->lumo->run($connection, ['info', $kind.':'.$id, ...($kind === 'app' ? ['--full'] : [])], $project, 60)['data'];
         $payload = is_array($data) ? ($data['payload'] ?? $data) : null;
         if ($kind === 'credential') {
@@ -250,6 +253,18 @@ class BiCatalog
         $body = is_array($payload) ? ($payload['body'] ?? $payload) : null;
         if (! is_array($body)) {
             throw new RuntimeException('Os detalhes do recurso não retornaram um formato reconhecido.');
+        }
+        if ($kind === 'app') {
+            $header = is_array($payload['header'] ?? null) ? $payload['header'] : [];
+            foreach (['id' => $id, 'kind' => $kind] as $field => $expected) {
+                if (array_key_exists($field, $header) && ((! is_int($header[$field]) && ! is_string($header[$field])) || (string) $header[$field] !== $expected)) {
+                    throw new RuntimeException('O BI retornou detalhes de uma aplicação diferente da solicitada.');
+                }
+            }
+            // app info --full is a live read; its complete identity avoids another full tenant listing.
+            $confirmed = isset($header['tenantId'], $header['id'], $header['kind']) && (string) $header['tenantId'] === $tenant;
+            $row = $confirmed ? ['id' => $id] : collect($this->rows($connection, $project, $kind))->first(fn (array $row): bool => (string) $row['id'] === $id);
+            abort_unless($row, 404, 'Recurso não disponível neste tenant para sua sessão.');
         }
         $metadataComplete = true;
         if (in_array($kind, ['flow', 'table', 'schedule', 'agent', 'credential'], true)) {
@@ -281,7 +296,7 @@ class BiCatalog
 
         $overview = app(BiResourceOverview::class)->build($kind, $body);
         $related = [];
-        if (in_array($kind, ['app', 'flow', 'table', 'schedule', 'dw-desk', 'bi-desk', 'credential', 'agent'], true)) {
+        if ($includeRelations && in_array($kind, ['app', 'flow', 'table', 'schedule', 'dw-desk', 'bi-desk', 'credential', 'agent'], true)) {
             $snapshot = $this->snapshot($user, $tenant);
             $metadata = ($snapshot['metadata_fresh'] ?? false) ? $this->workingMetadata($project) : [];
             $metadata[$kind.':'.$id] = $body;
@@ -305,7 +320,7 @@ class BiCatalog
         }
 
         $management = null;
-        if ($kind === 'app' && $summary['state'] === 'draft' && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection)) {
+        if ($includeRelations && $kind === 'app' && $summary['state'] === 'draft' && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection)) {
             $managed = ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $tenant)->where('resource', 'app:'.$id)->where('status', 'draft')->whereIn('project_id', Project::where('user_id', $user->id)->where('tenant_id', $tenant)->select('id'))->first();
             if ($managed) {
                 $ownerProject = Project::find($managed->project_id);
@@ -346,7 +361,7 @@ class BiCatalog
 
     public function image(User $user, string $tenant, string $appId, ?int $dashboard = null): string
     {
-        $this->detail($user, $tenant, 'app', $appId);
+        $this->detail($user, $tenant, 'app', $appId, includeRelations: false);
         [$connection,$item] = $this->access($user, $tenant);
         $project = $this->context($connection, $item);
         $directory = app(WorkspaceFiles::class)->path($project).'/exports/previews';
