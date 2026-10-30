@@ -23,7 +23,7 @@ Análise de 30/10/2026. O objetivo passa a incluir a gestão cotidiana do BI por
 | Investigações | Capacidade consultada e erro de permissão apresentado como tal | Autoria, agenda e ocorrências quando uma conta autorizada estiver disponível. A conta testada não possui acesso; isto não significa ausência de investigações |
 | Templates e linhas de produto | Inventário de comandos oficiais confirmado; ainda sem interface própria | Listagem, versões, conteúdo e diff, changelog/documentação, seleção de versão corrente e aplicação por tenant com dry-run e revisão. O CLI não oferece arquivamento de linhas nem movimentação entre linhas; não prometer equivalência nesses pontos |
 | Variáveis | Nomes e referências; valores protegidos no navegador e nas ferramentas da IA | Formulário privado de gestão com validação de referências e tratamento de valores sensíveis |
-| Usuários do G-Analise IA | Login pela Suíte, colaboradores administradores, cadastro local, perfis, inativação e senha inicial com troca obrigatória; sessões e tarefas protegidas por revisão de acesso | Homologar uma conta real da Suíte e contas independentes de clientes; a API atual da Suíte não oferece encerramento global das sessões emitidas pelo portal |
+| Usuários do G-Analise IA | Login pela Suíte, colaboradores administradores, cadastro local, perfis, inativação e senha inicial com troca obrigatória; sessões e tarefas protegidas por revisão de acesso | Ampliar o piloto com contas independentes de clientes; a API atual da Suíte não oferece encerramento global das sessões emitidas pelo portal |
 | Usuários, grupos e administração de tenants | Sessão individual e permissões já existentes são respeitadas | O Lumo não substitui provisionamento administrativo. A [API oficial](https://docs.horusbi.com.br/api/) distingue Client Token de Tenant Token; é necessária configuração administrativa específica e escopo adequado. Não reutilizar o JWT do Lumo como se fosse esse token nem elevar os privilégios de um usuário comum |
 | Operação central | Docker, HTTPS/subpasta em ensaio isolado, canais privados, filas, saúde, backup/restauração e retenção | Infraestrutura pública, certificado, backup fora do host, monitoramento externo e piloto de capacidade, quando a implantação for autorizada |
 
@@ -142,3 +142,8 @@ O teste real de PostgreSQL confirmou conectividade e leitura de estrutura. A res
 
 
 No modo OSS local, as páginas de entrada e workspace são normalizadas para a origem de loopback do callback configurado. Iniciar o vínculo do ChatGPT a partir de um alias abre primeiro Conexões na origem correta, evitando iniciar OAuth na sessão errada. A mudança não afeta APIs, POSTs, callbacks, instalações hospedadas ou domínios externos, e não copia cookies entre hosts. A validação de `state`, PKCE e identidade continua obrigatória.
+
+
+O login real da Suíte foi concluído pelo titular em 30/10/2026 e confirmado no cadastro e na auditoria com perfil de administrador. A conta de um novo colaborador tem workspace próprio; projetos e conexões de demonstração não são copiados nem compartilhados automaticamente.
+
+A tela de entrada contém somente conta local e Suíte. O vínculo OAuth do ChatGPT exige uma sessão autenticada e uma transação vinculada ao mesmo usuário; um retorno anônimo ou de versão revogada não cria nem troca a sessão do portal. O botão de conexão permanece em Conexões.

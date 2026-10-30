@@ -238,8 +238,8 @@ class UserAccessTest extends TestCase
         $employee = User::factory()->create(['role' => 'admin', 'suite_issuer' => 'https://suite.example.invalid', 'suite_subject' => 'f38b1e22-3b0b-4b1d-92e0-643fbefb753e', 'local_login_enabled' => false]);
         $connection = Connection::create(['user_id' => $employee->id, 'provider' => 'openai', 'subject' => hash('sha256', 'https://auth.openai.com|synthetic-client|synthetic-subject'), 'status' => 'connected', 'credentials' => ['access_token' => 'old-synthetic-token']]);
         $identity = $this->mock(OpenAiIdentity::class);
-        $identity->shouldReceive('consume')->once()->with('synthetic-state')->andReturn(['user_id' => null]);
-        $identity->shouldReceive('exchange')->once()->andReturn(['identity' => ['iss' => 'https://auth.openai.com', 'sub' => 'synthetic-subject'], 'client_id' => 'synthetic-client', 'tokens' => ['access_token' => 'new-synthetic-token'], 'mode' => 'oss_local']);
+        $identity->shouldNotReceive('consume');
+        $identity->shouldNotReceive('exchange');
 
         $this->withSession(['openai_oauth_state' => 'synthetic-state'])->get('/auth/openai/callback?state=synthetic-state&code=synthetic-code')->assertRedirect('/login')->assertSessionHas('error');
 
@@ -389,5 +389,72 @@ class UserAccessTest extends TestCase
 
         $this->assertSame('editor', $author->fresh()->role);
         $this->assertTrue($author->fresh()->active);
+    }
+
+    public function test_portal_login_exposes_only_local_and_suite_authentication(): void
+    {
+        config(['suite.enabled' => true]);
+        $this->mock(OpenAiIdentity::class)->shouldNotReceive('configured');
+
+        $this->get('/login')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Auth', false)->where('suiteConfigured', true)->missing('openaiConfigured'));
+    }
+
+    public function test_guests_cannot_start_a_chatgpt_connection(): void
+    {
+        $this->mock(OpenAiIdentity::class)->shouldNotReceive('begin');
+
+        $this->get('/auth/openai')->assertRedirect('/login')->assertSessionHas('error');
+
+        $this->assertGuest();
+    }
+
+    public function test_authenticated_oauth_only_links_the_current_portal_account(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'local_login_enabled' => false, 'suite_issuer' => 'https://suite.example.invalid', 'suite_subject' => 'f38b1e22-3b0b-4b1d-92e0-643fbefb753e']);
+        $identity = $this->mock(OpenAiIdentity::class);
+        $identity->shouldReceive('begin')->once()->with($user->id)->andReturn(['state' => 'synthetic-state', 'url' => 'https://auth.openai.com/authorize?state=synthetic-state']);
+        $identity->shouldReceive('consume')->once()->with('synthetic-state')->andReturn(['user_id' => $user->id]);
+        $identity->shouldReceive('exchange')->once()->andReturn(['identity' => ['iss' => 'https://auth.openai.com', 'sub' => 'synthetic-subject'], 'client_id' => 'synthetic-client', 'tokens' => ['access_token' => 'new-synthetic-token', 'scope' => 'openid chatgpt.tokens.use.direct'], 'mode' => 'oss_local']);
+        $identity->shouldReceive('planAuthorized')->once()->andReturn(true);
+
+        $this->actingAs($user)->get('/auth/openai')->assertRedirect('https://auth.openai.com/authorize?state=synthetic-state')->assertSessionHas('openai_oauth_state', 'synthetic-state');
+        $this->get('/auth/openai/callback?state=synthetic-state&code=synthetic-code')->assertRedirect('/app/connections');
+
+        $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseHas('connections', ['user_id' => $user->id, 'provider' => 'openai', 'status' => 'connected']);
+        $this->assertSame('admin', $user->fresh()->role);
+        $this->assertFalse($user->fresh()->local_login_enabled);
+        $this->assertDatabaseHas('audit_events', ['user_id' => $user->id, 'action' => 'connection.openai.connected']);
+    }
+
+    public function test_an_old_anonymous_oauth_transaction_cannot_sign_in_or_switch_portal_users(): void
+    {
+        $user = User::factory()->create();
+        $identity = $this->mock(OpenAiIdentity::class);
+        $identity->shouldReceive('consume')->once()->with('synthetic-state')->andReturn(['user_id' => null]);
+        $identity->shouldNotReceive('exchange');
+
+        $this->actingAs($user)->withSession(['openai_oauth_state' => 'synthetic-state'])->get('/auth/openai/callback?state=synthetic-state&code=synthetic-code')->assertRedirect('/app/connections')->assertSessionHas('error');
+
+        $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseCount('connections', 0);
+    }
+
+    public function test_access_changed_during_oauth_exchange_cannot_issue_a_fresh_portal_session(): void
+    {
+        $user = User::factory()->create();
+        $identity = $this->mock(OpenAiIdentity::class);
+        $identity->shouldReceive('consume')->once()->with('synthetic-state')->andReturn(['user_id' => $user->id]);
+        $identity->shouldReceive('exchange')->once()->andReturnUsing(function () use ($user) {
+            User::whereKey($user->id)->update(['access_version' => 1]);
+
+            return ['identity' => ['iss' => 'https://auth.openai.com', 'sub' => 'synthetic-subject'], 'client_id' => 'synthetic-client', 'tokens' => ['access_token' => 'new-synthetic-token'], 'mode' => 'oss_local'];
+        });
+
+        $this->actingAs($user)->withSession(['openai_oauth_state' => 'synthetic-state', 'user_access_version' => 0])->get('/auth/openai/callback?state=synthetic-state&code=synthetic-code')->assertRedirect('/app/connections')->assertSessionHas('error');
+
+        $this->assertSame(0, session('user_access_version'));
+        $this->assertDatabaseCount('connections', 0);
+        $this->actingAs($user->fresh())->getJson('/api/bootstrap')->assertUnauthorized();
     }
 }

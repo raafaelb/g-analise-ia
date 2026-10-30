@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\LocalPreview;
-use App\Services\OpenAiIdentity;
 use App\Services\SuiteIdentity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +34,7 @@ class AuthController extends Controller
 
     public function form(): Response
     {
-        return Inertia::render('Auth', ['canRegister' => config('horus.registration') || (app()->environment('local') && User::count() === 0), 'openaiConfigured' => app(OpenAiIdentity::class)->configured(), 'suiteConfigured' => app(SuiteIdentity::class)->configured()]);
+        return Inertia::render('Auth', ['canRegister' => config('horus.registration') || (app()->environment('local') && User::count() === 0), 'suiteConfigured' => app(SuiteIdentity::class)->configured()]);
     }
 
     public function login(Request $request): RedirectResponse

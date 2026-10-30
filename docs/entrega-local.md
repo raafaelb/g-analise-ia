@@ -13,7 +13,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 30/1
 
 ## Evidências e uso
 
-365 testes PHP e 2.098 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 25 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+370 testes PHP e 2.148 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 25 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
@@ -33,7 +33,7 @@ Mesas agora exibem tabelas, ETLs, cadastros e aplicações vinculadas; detalhes 
 
 O painel de plano/limites está em Conexões e junto ao chat. A conta real em modo OSS não disponibilizou plano ou saldo pelos métodos oficiais consultados; a interface informa essa ausência e oferece acesso ao uso no ChatGPT. Respostas oficiais com plano, janelas, saldo e renovação possuem testes isolados, inclusive separação de cache por conta. Não há estimativa fictícia de franquia.
 
-O runtime local usa Lumo 3.42.0, depois da conferência em imagem separada, testes SQLite/PostgreSQL e consultas reais. Versão e SHA-256 permanecem fixados; o build recusa substituições silenciosas no canal oficial. A revisão ampliada é mantida na branch `feature/gestao-completa` do repositório público. Cada push tem sua própria execução de CI; confira o resultado vinculado ao hash da versão em avaliação. Nenhuma implantação pública foi feita.
+O runtime local usa Lumo 3.43.1, depois da conferência em imagem separada, testes SQLite/PostgreSQL e consultas reais. Versão e SHA-256 permanecem fixados; o build recusa substituições silenciosas no canal oficial. A revisão ampliada é mantida na branch `feature/gestao-completa` do repositório público. Cada push tem sua própria execução de CI; confira o resultado vinculado ao hash da versão em avaliação. Nenhuma implantação pública foi feita.
 
 A [análise de gestão completa](gestao-completa.md) distingue as funcionalidades implementadas, as possíveis pelo CLI, as dependentes de APIs/permissões adicionais e os limites de homologação do visualizador interativo e de Claude Code. O painel de prévias acompanha novas imagens sem recarregar a página; a navegação de projetos e o padrão global das barras de rolagem também foram corrigidos e conferidos no navegador.
 
@@ -64,7 +64,7 @@ Um cache antigo do catálogo mostrava o rascunho mesmo depois da publicação co
 
 ## Login da Suíte, acesso local e avisos de prévia — 30/10/2026
 
-O portal oferece login de colaborador pela Suíte e gestão administrativa de acessos locais, com troca obrigatória da senha inicial. O fluxo local foi conferido em navegador separado: cadastro, primeiro login restrito, troca de senha, entrada no workspace sem perfil administrativo e recusa após inativação. O login real da Suíte ainda deve ser concluído pelo titular; não foram lidas nem importadas senhas de outras aplicações.
+O portal oferece login de colaborador pela Suíte e gestão administrativa de acessos locais, com troca obrigatória da senha inicial. O fluxo local foi conferido em navegador separado: cadastro, primeiro login restrito, troca de senha, entrada no workspace sem perfil administrativo e recusa após inativação. O titular concluiu o login real da Suíte; a sessão, o perfil de administrador, a vinculação ao emissor oficial e a auditoria foram confirmados. Não foram lidas nem importadas senhas de outras aplicações. O primeiro login de um novo colaborador abre um workspace próprio, sem copiar projetos ou conexões da conta de demonstração.
 
 O aviso técnico de widget personalizado foi reproduzido em leitura e substituído por explicação em português com atalhos de visualização. O ensaio confirmou a navegação para a prévia interativa e a geração de um PNG real, sem enviar seus pixels à IA. A consulta tabular continua indisponível para esse formato; o portal não executa o código personalizado no servidor para tentar reconstruí-la.
 

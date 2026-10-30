@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Services\OpenAiIdentity;
 use Firebase\JWT\JWT;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -40,7 +41,8 @@ class OAuthSecurityTest extends TestCase
 
     public function test_invalid_callback_never_exchanges_a_code(): void
     {
-        $this->get('/auth/openai/callback?state=forged&code=forged')->assertRedirect('/login');
+        $user = User::factory()->create();
+        $this->actingAs($user)->get('/auth/openai/callback?state=forged&code=forged')->assertRedirect('/app/connections');
         Http::assertNothingSent();
     }
 

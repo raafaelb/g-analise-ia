@@ -14,7 +14,7 @@ O [guia do Codex app-server com SIWC](https://developers.openai.com/siwc/token-s
 
 ## Distinções necessárias
 
-1. Identidade: entrar com conta ChatGPT e verificar quem é a pessoa.
+1. Identidade OpenAI: depois de entrar no portal com conta local ou Suíte, verificar qual conta ChatGPT está sendo vinculada ao mesmo usuário. O ChatGPT não é uma opção de entrada no portal.
 2. Autorização de uso do plano: consentimento/escopos explicitamente concedidos para inferência. O ID token não é uma credencial de inferência.
 3. Orquestração: Codex app-server e ferramentas Lumo, executados pelo worker.
 4. Inferência: requisições autorizadas processadas pela OpenAI, sujeitas a limites e modelos da conta.

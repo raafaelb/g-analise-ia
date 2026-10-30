@@ -25,6 +25,9 @@ class ConnectionController extends Controller
 {
     public function redirect(Request $request, OpenAiIdentity $identity): RedirectResponse
     {
+        if (! $request->user()) {
+            return redirect()->route('login')->with('error', 'Entre no G-Analise IA antes de conectar sua conta ChatGPT.');
+        }
         try {
             $flow = $identity->begin($request->user()?->id);
             $request->session()->put('openai_oauth_state', $flow['state']);
@@ -37,6 +40,9 @@ class ConnectionController extends Controller
 
     public function callback(Request $request, OpenAiIdentity $identity): RedirectResponse
     {
+        if (! $request->user()) {
+            return redirect()->route('login')->with('error', 'Entre no G-Analise IA antes de conectar sua conta ChatGPT.');
+        }
         $expected = $request->session()->pull('openai_oauth_state');
         $returned = $request->query('state');
         if (! is_string($expected) || ! is_string($returned) || ! hash_equals($expected, $returned)) {
@@ -44,11 +50,11 @@ class ConnectionController extends Controller
                 $identity->consume($expected);
             }
 
-            return redirect('/login')->with('error', 'A autorização expirou ou não pôde ser verificada. Tente conectar novamente.');
+            return redirect('/app/connections')->with('error', 'A autorização expirou ou não pôde ser verificada. Tente conectar novamente.');
         }
         $transaction = $identity->consume($returned);
-        if (! $transaction || $request->has('error') || ! $request->filled('code') || ($transaction['user_id'] && $request->user()?->id !== $transaction['user_id'])) {
-            return redirect('/login')->with('error', 'Não foi possível concluir a autorização.');
+        if (! $transaction || $request->has('error') || ! $request->filled('code') || (! ($transaction['user_id'] ?? null) || $request->user()->id !== $transaction['user_id'])) {
+            return redirect('/app/connections')->with('error', 'Não foi possível concluir a autorização.');
         }
         try {
             $result = $identity->exchange($request->string('code')->toString(), $transaction, $request->query('client_id'));
@@ -56,12 +62,9 @@ class ConnectionController extends Controller
             $tokens = $result['tokens'];
             $subject = hash('sha256', $claims['iss'].'|'.$result['client_id'].'|'.$claims['sub']);
             $linked = Connection::where('provider', 'openai')->where('subject', $subject)->first();
-            $user = $transaction['user_id'] ? User::findOrFail($transaction['user_id']) : ($linked ? User::find($linked->user_id) : null);
-            if (! $user || ! $user->canStartWork()) {
+            $user = User::findOrFail($transaction['user_id']);
+            if (! $user->canStartWork() || (int) $request->session()->get('user_access_version', 0) !== $user->access_version) {
                 throw new \RuntimeException('Entre em uma conta ativa e finalize sua senha pessoal antes de vincular o ChatGPT.');
-            }
-            if (! $transaction['user_id'] && $user->suite_subject !== null) {
-                return redirect()->route('login')->with('error', 'Entre com a Suíte para acessar sua conta de colaborador. Depois, conecte o ChatGPT dentro do seu workspace.');
             }
             if ($linked && $linked->user_id !== $user->id) {
                 throw new \RuntimeException('Esta identidade já está vinculada a outra conta.');
@@ -70,14 +73,14 @@ class ConnectionController extends Controller
                 unset($tokens['id_token']);
             }
             Connection::updateOrCreate(['user_id' => $user->id, 'provider' => 'openai'], ['subject' => $subject, 'status' => 'connected', 'account_label' => $claims['email'] ?? $claims['name'] ?? 'Conta ChatGPT', 'credentials' => $tokens, 'scopes' => preg_split('/\s+/', trim($tokens['scope'] ?? '')), 'metadata' => ['issuer' => $claims['iss'], 'client_id' => $result['client_id'], 'auth_mode' => $result['mode'], 'plan_usage' => $identity->planAuthorized($tokens)], 'expires_at' => isset($tokens['expires_in']) ? now()->addSeconds((int) $tokens['expires_in']) : null]);
-            Auth::login($user);
+            Auth::setUser($user);
             $request->session()->regenerate();
             $request->session()->put('user_access_version', $user->access_version);
             Audit::record($user->id, 'connection.openai.connected', 'Conta ChatGPT conectada.');
 
             return redirect('/app/connections')->with('success', 'Sua conta ChatGPT foi conectada.');
         } catch (Throwable) {
-            return redirect($request->user() ? '/app/connections' : '/login')->with('error', 'Não foi possível verificar ou vincular a conta ChatGPT. Entre na conta local e tente novamente.');
+            return redirect($request->user() ? '/app/connections' : '/login')->with('error', 'Não foi possível verificar ou vincular a conta ChatGPT. Confira sua sessão do portal e tente conectar novamente.');
         }
     }
 
