@@ -211,3 +211,65 @@ Na conferência a 1.440 × 1.000, com menu fixo aberto, a área visível passou 
 O usuário pode recolher o menu para uma faixa de ícones de 72 pixels ou fixá-lo aberto. Ao passar o mouse sobre a faixa, o menu abre com sombra por cima do conteúdo, sem deslocar a página. A largura aberta é de 252 pixels, ou 226 em janelas intermediárias. O foco visível do teclado também o abre; Escape retorna ao controle do menu. Um clique de mouse não mantém a abertura temporária depois de sair da área.
 
 A preferência fica no próprio navegador, separada por usuário do portal, e é mantida na navegação e na recarga. Os itens têm nomes acessíveis mesmo quando só o ícone aparece. A rolagem dos itens é independente do rodapé para preservar acesso à conta e à ajuda. No celular permanece a abertura por botão sobre o conteúdo, com fechamento pelo fundo; a preferência de computador não cria uma margem vazia no celular. Foram conferidos mouse, teclado, persistência, navegação e layouts de 1.440 × 1.000, 1.024 × 768 e 390 × 844, além da compilação Vue/TypeScript e dos 41 testes de interface.
+
+
+## Fila: boas-vindas, tours por página e tira-dúvidas — 30/10/2026
+
+Solicitação do usuário: usar como referência [Driver.js](https://driverjs.com/) e seu [repositório](https://github.com/nilbuild/driver.js). Está na fila de desenvolvimento; a biblioteca não foi instalada e não há tour, tabelas de progresso ou atendimento de ajuda implementados nesta revisão. Antes da implementação, conferir a documentação e a licença da biblioteca e sua integração com Vue, acessibilidade e navegação do portal.
+
+### Boas-vindas e persistência
+
+Na primeira entrada, explicar o que é o G-Analise IA, suas principais funcionalidades e um caminho de início: entrar com conta local/Suíte, conectar as contas em Conexões, escolher um tenant e criar ou abrir um projeto. A troca inicial obrigatória de senha deve ocorrer antes dessa apresentação. As boas-vindas têm estado próprio por usuário.
+
+O tour automático é exibido uma vez por usuário e tipo de página. Salvar a visualização no banco, com chave única de usuário/página e informações de versão/data. Usar uma chave estável do tipo de página: abrir outro projeto ou dashboard não deve repetir o mesmo tour. Diferenciar visualização, fechamento e conclusão para medir dificuldades sem impedir o trabalho. Atualizar o conteúdo não reinicia automaticamente o tour já visto.
+
+Oferecer **Refazer tour desta página** na ajuda contextual, inclusive depois da primeira visualização. O usuário pode fechar ou pular o tour; o uso do sistema não depende de terminá-lo. Conferir navegação por teclado, foco, rolagem, redução de movimento, menu recolhido, computador, tablet e celular. Passos de administração só aparecem a quem possui essas ações. Os tours do portal orientam pelos controles do próprio portal; não dependem de acessar o DOM do BI externo.
+
+### Cobertura prevista
+
+| Página | Orientações principais |
+|---|---|
+| Criar com IA | O que o sistema faz, conexões necessárias, escolha de projeto e primeiros pedidos em linguagem de negócio |
+| Meus projetos | Para que serve um projeto, diferença entre projeto/conversa/dashboard, criar, localizar e organizar o trabalho |
+| Conversa do projeto | Pedir criações e manutenções, anexos, revisão na conversa, prévia interativa, opções, expansão, divisão 50/50 e visualizações de computador, tablet e celular |
+| Catálogo BI | Tenant, aplicações, Minha Mesa, mesas de aplicações/dados, tabelas, fontes, conexões e ações realmente disponíveis |
+| Conexões | Diferença entre entrar no portal, vincular ChatGPT/BI e cadastrar conexões de dados; estado da conta e limites de IA quando fornecidos |
+| Atualização de dados | Fontes, agendas, frequência, permissões e diferença entre enfileirar uma carga e confirmar seu sucesso |
+| Atividade | Histórico, situações das tarefas e revisões, falhas e como retomar com contexto |
+| Segurança da conta | Ações disponíveis conforme a origem da conta, senha inicial e gestão pela Suíte |
+| Usuários e acessos | Cadastro local, colaboradores da Suíte, perfis e inativação, somente para administradores autorizados |
+
+A regra de manutenção está em `AGENTS.md`. O menu recolhível e as novas opções de prévia precisam fazer parte dos passos e dos exemplos da ajuda quando esses módulos forem implementados.
+
+### Atendimento de ajuda com IA
+
+O atendimento deve responder dúvidas sobre o **próprio G-Analise IA**, usando documentação versionada das funcionalidades e o contexto da página/perfil. Exemplos obrigatórios: “Para que servem os projetos aqui dentro do G-Analise IA?”, “Onde encontro minhas dashboards?”, “Como crio uma dashboard com dados financeiros?”, “Como conecto minha conta?” e “Por que a IA está aguardando uma autorização?”. Deve apresentar orientações curtas e links/botões para o local correto do portal, sem exigir SQL ou nomes técnicos.
+
+Usar a integração de IA do próprio usuário e os limites disponíveis dessa conta; explicar a indisponibilidade e oferecer artigos/tours quando ela não estiver conectada. Perguntas de ajuda não iniciam silenciosamente uma criação ou alteração BI. Para transformar uma orientação em trabalho, oferecer a entrada em Criar com IA com o pedido do usuário e manter as revisões normais. Respeitar isolamento de histórico, permissões, retenção e proteção de dados já existentes. As respostas devem indicar os limites reais da versão e não inventar botões ou operações.
+
+
+## Prévia por dispositivo e compatibilidade de incorporação — 30/10/2026
+
+Os botões da prévia oferecem **Computador (1280 × 800)**, **Tablet (768 × 1024)** e **Celular (390 × 844)**, além de **Ajustar à área disponível**, que usa a largura e toda a altura livre. O iframe recebe as dimensões lógicas do dispositivo; somente seu enquadramento é reduzido para caber no painel. Assim, o layout responsivo é calculado para o tamanho selecionado, em vez de apenas encolher o desenho do computador. Trata-se de uma prévia de tamanho/layout, sem emulação de sistema operacional ou navegador.
+
+A troca de dispositivo preserva o iframe e sua sessão, sem usar novamente o ticket de autenticação. A seleção do dispositivo fica no painel do projeto e é mantida quando o visualizador é recriado para uma nova prévia. A validação real conferiu os três tamanhos e a interação com um filtro: a seleção foi preservada ao trocar de computador para celular, e a limpeza restaurou o total anterior. As dimensões e o enquadramento também possuem testes isolados; são 47 testes de interface nesta revisão.
+
+Impacto no futuro tour/tira-dúvidas: ensinar o ajuste automático, os três botões de dispositivo, a expansão e o retorno à conversa. As âncoras `chat-preview`, `chat-preview-devices`, `chat-preview-expand` e `chat-preview-options` identificam esses controles sem depender de posições ou nomes de projetos. As boas-vindas, os tours e o atendimento com IA permanecem na fila descrita acima; essas âncoras não constituem um tour já implementado.
+
+### Correção de perda de sessão durante redimensionamento
+
+O usuário relatou rolagem intermitente ao alternar celular, tablet e computador. A análise reproduziu uma falha concreta: reduzir temporariamente a altura útil do painel a zero removia o iframe; restaurar a área criava outro iframe com o mesmo link de login, já consumido. O BI exibia “Este link expirou ou já foi usado”.
+
+O visualizador agora espera uma primeira medição válida para abrir o dashboard e mantém o iframe autenticado com a última geometria válida durante reduções temporárias a zero. Recarregar deliberadamente continua solicitando uma nova sessão. As camadas de enquadramento usam `overflow: clip`, sem criar áreas extras de rolagem; a rolagem do conteúdo permanece no próprio BI. Nenhuma recarga automática por troca de dispositivo foi introduzida.
+
+A conferência no Chrome reproduziu a falha antes da correção e repetiu o mesmo ciclo depois dela: com altura útil zero, o iframe permaneceu presente; ao restaurar o painel, o dashboard estava autenticado com a mesma sessão. Um filtro ativo também foi preservado ao trocar de dispositivo e reduzir/restaurar a altura; a limpeza restaurou o resultado completo. A rolagem de celular, tablet e computador foi conferida por entrada de roda do mouse e deslocamento real do documento. Esta correção não declara eliminadas todas as possíveis falhas de rolagem do conteúdo externo. A ocorrência original permanece no acompanhamento de compatibilidade para novos testes em outros dashboards, Safari/Firefox e dispositivos de toque.
+
+Impacto no tour e tira-dúvidas: a troca de dispositivo ajusta o layout sem exigir recarga nem perder os filtros. Explicar a diferença entre ajuste de tamanho e **Recarregar**, que inicia uma nova sessão. Manter **Abrir no BI** como alternativa para explorar a aplicação completa.
+
+### Mostrar somente o dashboard: dependência ainda aberta
+
+A [documentação de login transparente](https://docs.horusbi.com.br/whitelabel/embed/login) descreve `showMenu=0` e `showDesksIcon=0`. A [visão geral de incorporação](https://docs.horusbi.com.br/whitelabel/embed/) vincula esse fluxo ao login SSO emitido pela API com Tenant Token administrativo. Esse token não é o token da sessão individual do Lumo, e a integração não deve assumir que sejam intercambiáveis.
+
+A homologação com Lumo 3.44 e a sessão temporária atual mostrou que acrescentar essas opções ao link `/auth/cli/...` não removeu a navegação. Carregar a rota do app diretamente depois desse login mostrou a página de entrada, sem preservar aquela sessão. A tentativa foi retirada e o visualizador autenticado original foi restaurado e conferido. A seleção de dispositivos e a divisão 50/50 funcionam com esse visualizador; o menu e o cabeçalho nativos ainda permanecem visíveis.
+
+Para concluir o modo que mostra somente o dashboard, será necessário integrar e homologar o SSO de incorporação com configuração administrativa autorizada e vínculo seguro ao usuário/tenant, ou obter suporte explícito de incorporação no fluxo do Lumo. A navegação completa continua acessível em **Abrir no BI**. A visualização incorporada deve manter as permissões individuais e o isolamento da sessão; a preferência de exibição não pode ser apresentada como uma restrição de autorização.

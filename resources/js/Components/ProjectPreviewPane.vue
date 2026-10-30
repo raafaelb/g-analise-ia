@@ -2,12 +2,13 @@
 import {computed,onUnmounted,ref,watch} from 'vue';
 import {Image,RefreshCw,Download,X,LoaderCircle,Maximize2,AlertCircle,MousePointer2,ExternalLink,Minimize2,SlidersHorizontal,ChevronDown} from 'lucide-vue-next';
 import BiLiveViewer from './BiLiveViewer.vue';
+import type {PreviewDevice} from '../lib/responsive-preview';
 import {appUrl} from '../lib/urls';
 import {choosePreview,dashboardPreviews,projectPreviews} from '../lib/project-previews';
 type Item=Record<string,any>;
 const props=defineProps<{project:Item;artifacts:Item[];expanded?:boolean;request:(path:string,method?:string,data?:unknown)=>Promise<any>}>();
 const emit=defineEmits<{close:[];expand:[expanded:boolean];inspect:[artifact:Item];generated:[artifact:Item]}>();
-const mode=ref<'interactive'|'image'>('interactive');const interactiveAvailable=ref(false);const nativeUrl=ref('');const liveVersion=ref(0);const requestedDashboard=ref<string|null>(new URLSearchParams(window.location.search).get('dashboard'));
+const device=ref<PreviewDevice>('auto');const mode=ref<'interactive'|'image'>('interactive');const interactiveAvailable=ref(false);const nativeUrl=ref('');const liveVersion=ref(0);const requestedDashboard=ref<string|null>(new URLSearchParams(window.location.search).get('dashboard'));
 function openInteractive(id?:string|null){mode.value='interactive';if(id){requestedDashboard.value=id;if(dashboards.value.some(item=>String(item.id)===id)){dashboard.value=id;choseDashboard.value=true;}}liveVersion.value++;}
 defineExpose({openInteractive});
 const sourceAvailable=computed(()=>/^app:[1-9][0-9]*$/.test(props.project.source_ref??''));
@@ -31,12 +32,12 @@ watch(()=>allChoices.value[0]?.id,()=>{if(follow.value&&mode.value==='interactiv
 onUnmounted(()=>{disposed=true;version++;contextVersion++;clear();});
 </script>
 <template>
- <aside class="project-preview-pane" :class="{'is-interactive':mode==='interactive','is-expanded':expanded}" aria-label="Acompanhamento visual do dashboard">
+ <aside data-tour="chat-preview" class="project-preview-pane" :class="{'is-interactive':mode==='interactive','is-expanded':expanded}" aria-label="Acompanhamento visual do dashboard">
   <header class="project-preview-header">
    <div><Image :size="17"/><strong>Prévia do dashboard</strong></div>
    <div class="project-preview-header-actions">
     <a v-if="nativeUrl" :href="nativeUrl" target="_blank" rel="noopener noreferrer" class="preview-native-link" aria-label="Abrir dashboard no BI em outra aba"><ExternalLink :size="14"/><span>Abrir no BI</span></a>
-    <button type="button" class="preview-expand-button" :aria-pressed="!!expanded" :aria-label="expanded?'Restaurar conversa e prévia lado a lado':'Ampliar área do dashboard'" @click="emit('expand',!expanded)"><Minimize2 v-if="expanded" :size="15"/><Maximize2 v-else :size="15"/><span>{{expanded?'Ver conversa':'Ampliar'}}</span></button>
+    <button type="button" class="preview-expand-button" data-tour="chat-preview-expand" :aria-pressed="!!expanded" :aria-label="expanded?'Restaurar conversa e prévia lado a lado':'Ampliar área do dashboard'" @click="emit('expand',!expanded)"><Minimize2 v-if="expanded" :size="15"/><Maximize2 v-else :size="15"/><span>{{expanded?'Ver conversa':'Ampliar'}}</span></button>
     <button type="button" class="preview-close-button" aria-label="Fechar acompanhamento visual" @click="emit('close')"><X :size="17"/><span>Conversa</span></button>
    </div>
   </header>
@@ -47,7 +48,7 @@ onUnmounted(()=>{disposed=true;version++;contextVersion++;clear();});
    </div>
    <label v-if="dashboards.length" class="project-preview-dashboard"><span class="sr-only">Dashboard da prévia</span><select :value="dashboard" aria-label="Dashboard da prévia" :disabled="contextLoading||rendering" @change="selectDashboard"><option v-for="item in dashboards" :key="item.id" :value="String(item.id)">{{item.name}}</option></select></label>
    <details class="project-preview-options">
-    <summary><SlidersHorizontal :size="15"/><span>Opções</span><ChevronDown :size="12"/></summary>
+    <summary data-tour="chat-preview-options"><SlidersHorizontal :size="15"/><span>Opções</span><ChevronDown :size="12"/></summary>
     <div class="project-preview-options-content">
      <strong>Opções da prévia</strong>
      <label class="preview-follow"><input :checked="follow" type="checkbox" @change="toggleFollow"> Acompanhar alterações</label>
@@ -61,7 +62,7 @@ onUnmounted(()=>{disposed=true;version++;contextVersion++;clear();});
   <p v-if="contextError" class="form-error" role="alert">{{contextError}}</p>
   <div v-if="contextLoading&&!contextReady" class="project-preview-loading" role="status"><LoaderCircle :size="23" class="spin"/><span>Abrindo seu dashboard…</span></div>
   <div v-if="!sourceAvailable&&mode==='interactive'" class="project-preview-empty"><Image :size="34"/><h3>Seu dashboard vai aparecer aqui</h3><p>Descreva na conversa o que deseja criar. Assim que a IA preparar a primeira versão, você poderá acompanhá-la neste espaço.</p></div>
-  <BiLiveViewer v-if="mode==='interactive'&&interactiveAvailable&&contextReady" :key="project.source_ref+':'+dashboard+':'+liveVersion" compact :tenant="String(project.tenant_id)" :app-id="project.source_ref.slice(4)" :dashboard="dashboard||undefined" :request="request" @fallback="mode='image'"/>
+  <BiLiveViewer v-if="mode==='interactive'&&interactiveAvailable&&contextReady" :key="project.source_ref+':'+dashboard+':'+liveVersion" compact device-controls v-model:device="device" :tenant="String(project.tenant_id)" :app-id="project.source_ref.slice(4)" :dashboard="dashboard||undefined" :request="request" @fallback="mode='image'"/>
   <div v-if="mode==='image'" class="project-preview-image-body">
    <div v-if="choices.length>1" class="project-preview-version"><label for="preview-image-version">Versão da imagem</label><select id="preview-image-version" :value="selected?.id" aria-label="Versão da prévia" @change="select"><option v-for="artifact in choices" :key="artifact.id" :value="artifact.id">{{date(artifact.metadata?.generated_at??artifact.created_at)}}</option></select></div>
    <button v-if="selected&&choices[0]?.id!==selected.id" class="preview-latest" @click="follow=true">Ver a prévia mais recente</button>
@@ -89,6 +90,7 @@ onUnmounted(()=>{disposed=true;version++;contextVersion++;clear();});
 .project-preview-canvas{padding:14px;flex:1}.project-preview-enlarge{display:block;width:100%;padding:0;background:#fff;border:1px solid #dce5f1;border-radius:8px;overflow:hidden}.project-preview-enlarge>img{display:block;width:100%;height:auto}.project-preview-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;padding:26px;color:#a0b5d0;text-align:center}.project-preview-empty h3{font-size:15px;color:#5c779b}.project-preview-empty p{font-size:11px!important;line-height:1.8!important;max-width:340px;color:#899db8!important}.project-preview-empty .secondary-button{font-size:11px}
 .project-preview-image-body>footer{padding:12px 14px;border-top:1px solid #dfe7f2;background:#fbfdff}.project-preview-image-body>footer>span{font-size:9px;color:#7f95b2}.project-preview-image-body>footer>div{display:flex;gap:8px;justify-content:flex-end;margin-top:9px}.project-preview-image-body>footer .secondary-button{font-size:10px;padding:8px 10px}.project-preview-image-body>footer p{font-size:9px!important;line-height:1.7!important;color:#8a9db6!important;margin-top:9px}
 .project-preview-pane button:focus-visible,.project-preview-pane a:focus-visible,.project-preview-pane summary:focus-visible,.project-preview-pane select:focus-visible{outline:2px solid #0861ee;outline-offset:2px}
+.project-preview-pane :deep(.bi-live-viewer.is-compact.has-device-controls>header){padding-top:3px;padding-bottom:3px}
 @media(max-width:1100px){.project-preview-pane{width:100%;min-width:0;flex:1;border-left:0}.project-preview-header-actions .preview-expand-button{display:none}.preview-close-button span{display:inline}.project-preview-header-actions .preview-close-button{background:#eef5ff;border-color:#d8e6fb;color:#326cae}.project-preview-header-actions .preview-native-link span{display:none}}
 @media(max-width:540px){.project-preview-header{padding:7px 9px;gap:5px}.project-preview-header strong{font-size:11px}.project-preview-header-actions{gap:2px!important}.project-preview-toolbar{gap:6px;padding:7px 9px;flex-wrap:wrap}.project-preview-modes{order:1}.project-preview-options{order:2}.project-preview-dashboard{order:3;flex-basis:100%}.project-preview-options-content{width:270px}.project-preview-pane :deep(.bi-live-viewer.is-compact>header){padding:6px 9px}.project-preview-pane :deep(.bi-live-viewer.is-compact>header strong){display:none}.project-preview-canvas{padding:8px}.project-preview-version{padding:9px;flex-wrap:wrap}.project-preview-version select{flex-basis:100%}}
 </style>

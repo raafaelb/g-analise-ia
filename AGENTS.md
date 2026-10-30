@@ -159,3 +159,16 @@ Vue components must have a single root element.
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>
+
+
+# Tours guiados e ajuda do G-Analise IA
+
+Regra solicitada pelo usuário em 30/10/2026:
+
+- Toda alteração de interface, rota, fluxo, permissão ou funcionalidade deve revisar e atualizar o tour guiado e a ajuda correspondentes. Novas funcionalidades devem entrar no tour da página e na documentação usada pelo tira-dúvidas. Remoções e mudanças de nomes devem retirar ou corrigir passos, links e exemplos antigos.
+- Enquanto o tour e o tira-dúvidas estiverem na fila, registrar o impacto e os passos previstos em `docs/gestao-completa.md`; não declarar esses módulos implementados. Não instalar a biblioteca apenas para registrar o planejamento.
+- Usar identificadores estáveis para páginas e passos. Preferir âncoras `data-tour` da própria interface; não depender de posições de menus, textos traduzidos ou IDs de um recurso específico. Respeitar os controles que existem para cada perfil e tamanho de tela.
+- A primeira exibição automática é uma vez por usuário e tipo de página, com estado salvo no banco e unicidade por usuário/página. A versão vista pode ser registrada para rastreabilidade, mas uma atualização do tour não deve reiniciar automaticamente um tour já visto. Manter um comando acessível para o próprio usuário refazê-lo quando quiser.
+- A primeira entrada deve incluir boas-vindas, explicação do produto, principais funcionalidades e um caminho claro para começar. Respeitar o primeiro acesso e a troca obrigatória de senha antes do onboarding.
+- O tira-dúvidas deve explicar o próprio G-Analise IA e seus conceitos, como projetos, conversas, catálogo, conexões, prévias, dispositivos, permissões e atualização de dados. Suas respostas devem acompanhar a documentação da versão atual. Perguntas de ajuda não autorizam criação, publicação, exclusão ou execução de recursos BI.
+- Antes de concluir a revisão, conferir passos, âncoras, perfis e navegação afetados em computador e celular. Registrar a validação relevante na descrição da mudança. A ajuda e o tour não devem ensinar ações indisponíveis, revelar credenciais nem contornar as revisões de autorização.
