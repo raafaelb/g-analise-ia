@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiCredentialController;
+use App\Http\Controllers\BiDeskController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ConnectionController;
 use App\Http\Controllers\SuiteAuthController;
 use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\WorkspaceController;
+use App\Services\BiDesks;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
@@ -27,6 +29,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/users', [UserAccessController::class, 'store'])->middleware('throttle:bi-actions')->name('users.store');
         Route::patch('/users/{user}', [UserAccessController::class, 'update'])->whereNumber('user')->middleware('throttle:bi-actions')->name('users.update');
         Route::patch('/account/password', [UserAccessController::class, 'password'])->middleware('throttle:login')->name('account.password');
+        Route::get('/catalog/{tenant}/desks/{kind}/{id}/configuration', [BiDeskController::class, 'describe'])->whereNumber(['tenant', 'id'])->whereIn('kind', BiDesks::KINDS)->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/desks/{kind}/actions', [BiDeskController::class, 'prepare'])->whereNumber('tenant')->whereIn('kind', BiDesks::KINDS)->middleware('throttle:bi-actions');
         Route::get('/catalog/{tenant}/credentials/options', [BiCredentialController::class, 'options'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/credentials/{id}/configuration', [BiCredentialController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/credentials/actions', [BiCredentialController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');

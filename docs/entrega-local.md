@@ -13,7 +13,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 30/1
 
 ## Evidências e uso
 
-383 testes PHP e 2.232 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 32 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+403 testes PHP e 2.362 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 32 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
@@ -81,3 +81,8 @@ A conferência visual foi realizada em desktop e celular com conta e propostas s
 ## Primeira rodada de desempenho
 
 A leitura específica de uma aplicação com identidade completa evita a nova listagem de todas as aplicações; cabeçalho incompleto conserva a validação de pertencimento. A amostra real no tenant Inovadora caiu de 4–5 segundos para cerca de 1,4 segundo, com catálogo quente. Prévias e consultas pontuais também dispensam vínculos não utilizados. A atualização completa do catálogo continua em torno de 17 segundos e permanece uma pendência. O ensaio foi somente de leitura; resultados e limites estão na [matriz de gestão](gestao-completa.md).
+
+
+## Criar e editar mesas pelo catálogo
+
+As mesas de aplicações e de dados possuem formulário de criação e de nome/descrição, com revisão, decisão e resultado na própria interface. Criação e edição dos dois tipos foram confirmadas no BI em mesas descartáveis da Inovadora; a limpeza sem cascata preservou as mesas preexistentes. O acesso de membros e as opções avançadas continuam fora do formulário. A rodada passou com 403 testes PHP / 2.362 verificações em SQLite/PostgreSQL, 32 testes de frontend, build Vue/TypeScript e Pint.

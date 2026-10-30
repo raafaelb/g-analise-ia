@@ -15,6 +15,7 @@ use App\Services\Audit;
 use App\Services\BiCatalog;
 use App\Services\BiCloneNames;
 use App\Services\BiCredentials;
+use App\Services\BiDesks;
 use App\Services\BiPublications;
 use App\Services\BiWorkspaceSync;
 use App\Services\LumoClient;
@@ -188,6 +189,9 @@ class ActionBroker
         }
         if ($approval->status !== 'executing' || $approval->expires_at->isPast()) {
             throw new RuntimeException('A autorização não está válida para execução.');
+        }
+        if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
+            return app(BiDesks::class)->executeApproved($approval);
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
             return app(BiCredentials::class)->executeApproved($approval);

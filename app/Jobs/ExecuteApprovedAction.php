@@ -9,6 +9,7 @@ use App\Models\Message;
 use App\Services\Agent\ActionBroker;
 use App\Services\Audit;
 use App\Services\BiCredentials;
+use App\Services\BiDesks;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -89,6 +90,9 @@ class ExecuteApprovedAction implements ShouldQueue
             if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
                 app(BiCredentials::class)->cleanup($approval);
             }
+            if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
+                app(BiDesks::class)->cleanup($approval);
+            }
             $lock->release();
             try {
                 event(new WorkspaceChanged($approval->user_id, $approval->agent_run_id));
@@ -118,6 +122,9 @@ class ExecuteApprovedAction implements ShouldQueue
             $this->failAction($approval, 'O worker foi interrompido. Confira o estado do recurso no BI antes de repetir a ação; ela não será executada novamente automaticamente.');
             if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
                 app(BiCredentials::class)->cleanup($approval);
+            }
+            if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
+                app(BiDesks::class)->cleanup($approval);
             }
         }
     }

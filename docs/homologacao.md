@@ -120,3 +120,12 @@ A abertura de aplicação usa a identidade atual retornada por `info --full` qua
 Duas leituras por fase da aplicação de teste da Inovadora, com catálogo quente, passaram de 5,08/3,99 s para 1,46/1,43 s. O catálogo completo permaneceu em 16,6/17,9 s; esse trecho ainda precisa de otimização. O cache quente do catálogo levou aproximadamente 3 ms no serviço. A medição não inclui uma amostra suficiente para percentis nem comprova o tempo total percebido no navegador. As operações foram somente de leitura, sem BI alterado e sem IA.
 
 A suíte ampliada contém 383 testes PHP / 2.232 verificações. Os nove novos casos cobrem o caminho de leitura específico, formatos legados, divergências de identidade, imagem em cache e recusa atual de permissão.
+
+
+## Mesas de aplicações e de dados — 30/10/2026
+
+Os formulários usam `lumo new bi-desk` / `new dw-desk`, autoria canônica, lint do arquivo selecionado e push com controle nativo de conflito. A revisão e o resultado são próprios do tenant e da sessão; não exigem projeto ou conta IA. Testes cobrem preparação sem escrita, idempotência, propriedade/perfil, validação de campos, identidade do arquivo, conflito, troca de sessão, rebaixamento de acesso antes do envio, criação parcial e ausência de confirmação após aceite.
+
+A homologação real criou e editou uma mesa vazia de cada tipo, pela interface, no tenant Inovadora. A comparação e as decisões foram apresentadas no formulário; a edição da mesa de dados foi conferida em viewport móvel. Uma revisão adicional recusada não criou outra mesa. Depois da conferência, somente as mesas descartáveis desta rodada foram removidas, sem cascata, e o inventário de IDs preexistentes foi preservado. Não houve publicação ou execução de fontes. Um erro de userscript de uma extensão do Chrome foi observado no console; a origem é externa ao aplicativo e não impediu o ciclo.
+
+A revisão ampliada passou com **403 testes PHP / 2.362 verificações** em SQLite e PostgreSQL descartável, **32 testes de frontend**, Pint e build Vue/TypeScript. As opções avançadas de acesso e a administração de membros ainda não são alteradas pelo formulário.

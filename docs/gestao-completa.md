@@ -9,8 +9,8 @@ Análise de 30/10/2026. O objetivo passa a incluir a gestão cotidiana do BI por
 | Conta e tenants | Login individual, renovação de sessão, seleção entre os tenants autorizados, separação por usuário/sessão/tenant | Homologar contas independentes, 2FA e revogação real de permissões |
 | Catálogo | 13 tipos Lumo; busca por nome, referência, dashboard e etiqueta; filtros de mesa e situação; paginação | Favoritos e recentes do portal; visões de lista/grade; organização pessoal; categorias adicionais somente após confirmar API própria |
 | Minha Mesa | Identificação por `deskId: null`; duplicação com nome confirmado, publicação com destino/efeito explícitos e exclusão apenas de rascunhos registrados pelo portal, com revisão e acompanhamento em Atividade | Renomear outros rascunhos, comparar versões e ampliar a homologação de substituição de versões; estado desconhecido quando o servidor não fornece metadados |
-| Mesas de aplicações | Aplicações vinculadas, dashboards e contagens; navegação aos recursos | Criação/configuração de mesas e seleção de destino em formulários acessíveis |
-| Mesas de dados | Tabelas, ETLs e cadastros vinculados; contagens e navegação | Gestão de mesas, dependências e permissões conforme contratos oficiais disponíveis |
+| Mesas de aplicações | Aplicações vinculadas, dashboards e contagens; navegação; criação e edição de nome/descrição por formulário com revisão | Gestão de membros, opções avançadas de acesso e exclusão com dependências exigem evolução própria; seleção do destino de publicação já existe |
+| Mesas de dados | Tabelas, ETLs e cadastros vinculados; contagens; criação e edição de nome/descrição por formulário com revisão | Gestão de membros, exclusão com dependências e permissões conforme contratos oficiais disponíveis |
 | Aplicações e dashboards | Estrutura, fontes, PNG real, valores/resumos dos widgets; visualizador nativo isolado no Chrome compatível; seleção de dashboard; painel de prévias no projeto com histórico e acompanhamento de novas versões; criação/manutenção por IA com revisão | Assistente de criação e edição visual; ampliar a homologação de filtros e navegadores; o visualizador nativo continua sujeito às permissões e opções do provedor |
 | Indicadores | Expressões e widgets acessíveis no fluxo de autoria; validações e consultas pelo broker | Biblioteca de métricas, explicação de fórmulas, testes de reconciliação e reutilização entre projetos |
 | Tabelas | Colunas físicas e metadados de apresentação; amostra limitada; ETL de origem, aplicações dependentes e agendas quando disponíveis | Formulários de rótulos/máscaras/descrições, qualidade dos dados e comparação de schema. Alteração física pertence ao ETL; não editar o overlay como se fosse DDL |
@@ -160,3 +160,23 @@ A consulta inclui apenas revisões do usuário, projeto e conversa selecionados,
 Os controles bloqueiam envio duplo e decisões expiradas/incompletas. Uma resposta de rede incerta exige nova leitura antes de oferecer outra tentativa; não há repetição automática de autorização. A decisão continua usando o endpoint existente, propriedade, fingerprint, prazo, versão de acesso, auditoria e execução única. A página Atividade permanece disponível como histórico.
 
 Foram conferidos os cartões em desktop (1.440 × 1.000) e celular (390 × 844), a troca de conversa, a recusa e o registro de autorização no próprio chat, sem navegação para Atividade. O teste de interface usou somente dados sintéticos e uma conta sem conexões BI/IA; a execução aprovada parou nesse bloqueio e foi mostrada como falha, sem reivindicar alteração no BI. A conta foi inativada e o projeto de interface arquivado depois da conferência.
+
+
+## Formulários de mesas — 30/10/2026
+
+As áreas Mesas de aplicações e Mesas de dados oferecem **Nova mesa**. Nos detalhes, **Editar nome e descrição** carrega a configuração atual. A revisão mostra tenant, tipo, valores atuais/propostos e impacto. Autorizar/Recusar e o acompanhamento permanecem no formulário; não há inferência de IA. A criação produz uma mesa vazia, sem publicar aplicações ou fontes. O formulário não muda membros nem opções avançadas de acesso.
+
+A execução compara a versão atual, a sessão BI e o acesso local com a revisão, usa o conflito nativo do Lumo sem sobrescrita forçada e confirma nome/descrição por nova leitura. A autoria acontece em diretório descartável próprio, preservando os demais campos do documento. A tentativa e a referência criada são registradas antes de continuar a configuração. Uma falha parcial mantém esse ID disponível para conferência e não repete a criação. A recusa e a expiração não autorizam escrita.
+
+Criação e edição dos dois tipos foram conferidas no tenant Inovadora pelo formulário, incluindo a edição móvel. As mesas vazias descartáveis foram removidas sem cascata; os IDs preexistentes permaneceram presentes. Não houve publicação, carga de dados, alteração em Novo Hamburgo ou tarefa de IA. O formulário foi inspecionado a 390 × 844 pixels, sem transbordamento horizontal; o viewport foi restaurado. Membros/permissões avançadas e exclusão cotidiana ainda não possuem interface neste módulo.
+
+
+## Fila de análise: API, MCP e recursos de IA — solicitação de 30/10/2026
+
+O usuário enviou as referências abaixo e solicitou apenas seu registro na fila de melhorias, sem iniciar esta nova análise agora. Esta seção não declara contratos lidos, compatibilidade validada ou integração MCP já implementada.
+
+- [API oficial](https://docs.horusbi.com.br/api/): inventariar recursos, operações, autenticação, escopos e permissões; comparar com o Lumo e o portal e priorizar lacunas importantes de gestão. Conferir especialmente usuários/grupos/tenants, aplicações, mesas, conexões, ETLs, tabelas, agendas e publicação, conforme o que a documentação efetivamente oferecer.
+- [MCP oficial](https://docs.horusbi.com.br/ia/mcp): avaliar a integração para consultas de dados, ferramentas semânticas e descoberta de recursos; confirmar transporte, autenticação e limitações. Projetar seleção de tenant, respeito aos acessos individuais, isolamento entre contas, controle de envio de dados à IA, erros e rastreabilidade. Não presumir que as credenciais do Lumo possam ser reutilizadas como tokens de outra integração.
+- [Recursos de IA](https://docs.horusbi.com.br/ia/): mapear capacidades adicionais e orientações oficiais, identificar sobreposição com os recursos existentes e propor melhorias de consulta e gestão para usuários não técnicos.
+
+A entrega dessa análise deve distinguir disponibilidade documental, capacidade implementada e homologação real, com prioridades e dependências. Nenhum token administrativo, conector MCP ou permissão adicional será ativado apenas pelo registro desses links.
