@@ -147,3 +147,14 @@ No modo OSS local, as páginas de entrada e workspace são normalizadas para a o
 O login real da Suíte foi concluído pelo titular em 30/10/2026 e confirmado no cadastro e na auditoria com perfil de administrador. A conta de um novo colaborador tem workspace próprio; projetos e conexões de demonstração não são copiados nem compartilhados automaticamente.
 
 A tela de entrada contém somente conta local e Suíte. O vínculo OAuth do ChatGPT exige uma sessão autenticada e uma transação vinculada ao mesmo usuário; um retorno anônimo ou de versão revogada não cria nem troca a sessão do portal. O botão de conexão permanece em Conexões.
+
+
+## Revisões diretamente na conversa — 30/10/2026
+
+A solicitação agora é exibida no fluxo da conversa como um cartão destacado, com a proposta existente e botões **Autorizar** e **Recusar**. O aviso junto ao campo de mensagem permanece visível e leva ao cartão sem trocar de página. Cada revisão mostra seu estado: aguardando decisão, autorizada, em execução, concluída, recusada, expirada, cancelada ou com falha. Autorizar não é apresentado como comprovação de sucesso.
+
+A consulta inclui apenas revisões do usuário, projeto e conversa selecionados, inclusive as mais antigas que a janela de dez runs recentes. Novas respostas da IA identificam o run da mensagem; revisões antigas usam a mensagem de entrada e, quando não há uma âncora conhecida, continuam disponíveis no fim da conversa. O retorno de uma seleção antiga é descartado. A atualização em segundo plano não força a rolagem durante a leitura da proposta.
+
+Os controles bloqueiam envio duplo e decisões expiradas/incompletas. Uma resposta de rede incerta exige nova leitura antes de oferecer outra tentativa; não há repetição automática de autorização. A decisão continua usando o endpoint existente, propriedade, fingerprint, prazo, versão de acesso, auditoria e execução única. A página Atividade permanece disponível como histórico.
+
+Foram conferidos os cartões em desktop (1.440 × 1.000) e celular (390 × 844), a troca de conversa, a recusa e o registro de autorização no próprio chat, sem navegação para Atividade. O teste de interface usou somente dados sintéticos e uma conta sem conexões BI/IA; a execução aprovada parou nesse bloqueio e foi mostrada como falha, sem reivindicar alteração no BI. A conta foi inativada e o projeto de interface arquivado depois da conferência.

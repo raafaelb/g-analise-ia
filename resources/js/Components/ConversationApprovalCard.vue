@@ -1,0 +1,49 @@
+<script setup lang="ts">
+import {computed,onMounted,onUnmounted,ref,watch} from 'vue';
+import {AlertCircle,Check,CheckCircle2,ChevronDown,Clock3,LoaderCircle,RefreshCw,ShieldCheck,X} from 'lucide-vue-next';
+import ApprovalReview from './ApprovalReview.vue';
+import {createRequestGuard} from '../lib/async-response';
+import {conversationReviewAction,conversationReviewState} from '../lib/conversation-approvals';
+type Item=Record<string,any>;
+const props=defineProps<{approval:Item;tenants:Item[];request:(path:string,method?:string,data?:unknown)=>Promise<any>}>();
+const emit=defineEmits<{decided:[approval:Item];refresh:[]}>();
+const clock=ref(Date.now());const busy=ref('');const error=ref('');const uncertain=ref(false);const expanded=ref(false);const guard=createRequestGuard();let timer:ReturnType<typeof setInterval>|undefined;
+const state=computed(()=>conversationReviewState(props.approval,clock.value));
+const pending=computed(()=>state.value==='pending');
+const action=computed(()=>conversationReviewAction(props.approval));
+const working=computed(()=>['approved','executing'].includes(state.value));
+const detailsVisible=computed(()=>pending.value||expanded.value);
+const titleId=computed(()=>'chat-review-title-'+props.approval.id);
+const label=computed(()=>({pending:'Sua autorização é necessária',approved:'Autorização registrada',executing:'Executando a ação autorizada',completed:'Ação concluída',rejected:'Solicitação recusada',expired:'Revisão expirada',cancelled:'Solicitação cancelada',failed:'A execução precisa de atenção',unavailable:'Atualize esta revisão'} as Record<string,string>)[state.value]);
+const explanation=computed(()=>({pending:'Confira a proposta abaixo. A IA aguarda sua decisão para continuar.',approved:'A ação está na fila. O resultado será acompanhado nesta conversa.',executing:'A operação está em andamento. Aguarde a confirmação do resultado.',completed:'O resultado foi registrado. A IA pode continuar a conferência nesta conversa.',rejected:'Esta ação não foi autorizada. Você pode enviar outra orientação no chat.',expired:'Esta revisão não pode mais ser autorizada. Peça à IA para preparar uma nova proposta.',cancelled:'Esta solicitação não está mais ativa.',failed:props.approval.payload?.execution?.message??'Confira o resultado e peça uma nova revisão antes de tentar novamente.',unavailable:'Não foi possível conferir os dados desta solicitação. Atualize a revisão antes de decidir.'} as Record<string,string>)[state.value]);
+function date(value:string){const parsed=new Date(value);return Number.isFinite(parsed.getTime())?parsed.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}):'';}
+async function decide(decision:'approved'|'rejected') {
+    if(busy.value||uncertain.value||conversationReviewState(props.approval)!=='pending')return;
+    const current=guard.current();const review=props.approval;busy.value=decision;error.value='';
+    try {
+        const result=await props.request(`/approvals/${review.id}/decide`,'POST',{decision,fingerprint:review.fingerprint});
+        if(current())emit('decided',{...result,conversation_id:review.conversation_id});
+    } catch(e) {
+        if(current()){error.value=(e as Error).message;uncertain.value=true;emit('refresh');}
+    } finally {if(current())busy.value='';}
+}
+watch(()=>props.approval,(after,before)=>{uncertain.value=false;if(after.status!==before.status)error.value='';});
+function updateClock(){clock.value=Date.now();if(timer){clearInterval(timer);timer=undefined;}if(props.approval.status==='pending')timer=setInterval(()=>clock.value=Date.now(),1000);}
+watch(()=>props.approval.status,updateClock);
+onMounted(updateClock);
+onUnmounted(()=>{guard.invalidate();if(timer)clearInterval(timer);});
+</script>
+<template>
+ <article class="conversation-review" :class="[state,{destructive:action.destructive&&pending}]" :data-conversation-approval="approval.id" :aria-labelledby="titleId" tabindex="-1">
+  <div class="conversation-review-header"><span class="conversation-review-icon"><LoaderCircle v-if="working||busy" :size="22" class="spin"/><CheckCircle2 v-else-if="state==='completed'" :size="22"/><X v-else-if="state==='rejected'||state==='cancelled'" :size="21"/><Clock3 v-else-if="state==='expired'" :size="21"/><AlertCircle v-else-if="state==='failed'||state==='unavailable'" :size="22"/><ShieldCheck v-else :size="22"/></span><div><span class="conversation-review-label">{{label}}</span><h3 :id="titleId">{{approval.title}}</h3></div><button v-if="!pending" type="button" class="conversation-review-toggle" :aria-expanded="expanded" @click="expanded=!expanded"><ChevronDown :size="17" :class="{rotated:expanded}"/><span>{{expanded?'Recolher':'Ver detalhes'}}</span></button></div>
+  <p class="conversation-review-description" :role="working?'status':undefined">{{explanation}}</p>
+  <p v-if="pending&&approval.description" class="conversation-review-context">{{approval.description}}</p>
+  <ApprovalReview v-if="detailsVisible" :approval="approval" :tenants="tenants"/>
+  <div v-if="error" class="conversation-review-error" role="alert"><AlertCircle :size="17"/><p>{{error}}</p><button type="button" :disabled="!!busy" @click="emit('refresh')"><RefreshCw :size="14"/>Atualizar revisão</button></div>
+  <div v-if="pending" class="conversation-review-footer"><span><Clock3 :size="14"/>Válida até {{date(approval.expires_at)}} · Brasília</span><div><button type="button" class="secondary-button" :disabled="!!busy||uncertain" @click="decide('rejected')"><LoaderCircle v-if="busy==='rejected'" :size="16" class="spin"/><X v-else :size="16"/>Recusar</button><button type="button" class="primary-button" :class="{'conversation-review-delete':action.destructive}" :disabled="!!busy||uncertain" @click="decide('approved')"><LoaderCircle v-if="busy==='approved'" :size="16" class="spin"/><Check v-else :size="17"/>{{action.label}}</button></div></div>
+  <button v-else-if="state==='unavailable'" type="button" class="secondary-button" @click="emit('refresh')"><RefreshCw :size="15"/>Atualizar revisão</button>
+ </article>
+</template>
+<style scoped>
+.conversation-review{max-width:850px;width:100%;align-self:center;flex-shrink:0;margin:12px auto 24px;padding:22px;border:1px solid #dce5f2;border-radius:14px;background:#fff;box-shadow:0 3px 14px #152d5510;scroll-margin-block:20px}.conversation-review.pending{border-color:#91b6f2;box-shadow:0 0 0 3px #eaf2ff,0 7px 22px #1c58a30b;background:linear-gradient(145deg,#f5f9ff 0,#fff 58%)}.conversation-review:focus-visible{outline:3px solid #246ce4;outline-offset:4px}.conversation-review-header{display:flex;align-items:center;gap:12px}.conversation-review-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:#edf4ff;color:#2066cf;flex-shrink:0}.conversation-review-header>div{flex:1;min-width:0}.conversation-review-label{display:block;font-size:11px;font-weight:700;color:#345f99;letter-spacing:.035em;margin-bottom:5px}.conversation-review h3{font-size:15px;line-height:1.5;color:#243b60;margin:0;overflow-wrap:anywhere}.conversation-review-description{font-size:12px;line-height:1.8;color:#526d91;margin:14px 0 0}.conversation-review-context{font-size:12px;line-height:1.8;color:#60748f;margin:9px 0 0;overflow-wrap:anywhere}.conversation-review :deep(.approval-review){margin:17px 0;background:#fff;border-color:#dce6f5}.conversation-review :deep(.approval-review dl){grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px}.conversation-review :deep(.approval-review dd){overflow-wrap:anywhere}.conversation-review-footer{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding-top:3px}.conversation-review-footer>span{display:flex;align-items:center;gap:6px;font-size:11px;color:#627996}.conversation-review-footer>div{display:flex;gap:9px;flex-wrap:wrap;margin-left:auto}.conversation-review-footer .primary-button,.conversation-review-footer .secondary-button{font-size:12px;padding:11px 16px}.conversation-review-toggle{display:flex;align-items:center;gap:5px;font-size:10px;color:#748aa8;flex-shrink:0}.conversation-review-toggle svg{transition:transform .15s}.conversation-review-toggle .rotated{transform:rotate(180deg)}.conversation-review.completed .conversation-review-icon{background:#eaf7ef;color:#37805b}.conversation-review.rejected .conversation-review-icon,.conversation-review.cancelled .conversation-review-icon,.conversation-review.expired .conversation-review-icon{background:#f0f3f8;color:#7c8ca2}.conversation-review.failed .conversation-review-icon,.conversation-review.unavailable .conversation-review-icon{background:#fff5e8;color:#a57129}.conversation-review.destructive{border-color:#e6bfc5}.conversation-review-delete{background:#ae3f50;border-color:#ae3f50}.conversation-review-delete:hover{background:#933445}.conversation-review-error{display:flex;gap:9px;align-items:flex-start;flex-wrap:wrap;margin:14px 0;padding:12px;border:1px solid #f0d6cf;border-radius:8px;background:#fff6f3;color:#9a4f44;font-size:12px;line-height:1.7}.conversation-review-error>svg{flex-shrink:0;margin-top:2px}.conversation-review-error p{flex:1;min-width:150px;margin:0}.conversation-review-error button{display:flex;gap:5px;align-items:center;font-size:11px}.conversation-review-error button:disabled{opacity:.5}@media(max-width:640px){.conversation-review{padding:16px;border-radius:11px;margin:12px auto 20px}.conversation-review-header{gap:9px;flex-wrap:wrap}.conversation-review h3{font-size:14px}.conversation-review-icon{width:38px;height:38px;border-radius:10px}.conversation-review-toggle{margin-left:47px}.conversation-review-footer>div{width:100%;margin-left:0}.conversation-review-footer>div>button{flex:1;justify-content:center}.conversation-review-footer>span{font-size:9px}}@media(prefers-reduced-motion:reduce){.conversation-review-toggle svg{transition:none}}
+</style>

@@ -16,7 +16,7 @@ Produto gratuito e aberto da Inovadora, complementar ao G-Analise BI. PHP 8.5/La
 - Prévia PNG com histórico por projeto/dashboard e acompanhamento de novas versões. Visualizador nativo isolado no Chrome compatível, com alternativa PNG.
 - Atualização da autoria com **Atualizar do BI**, preservando edições locais e revisões pendentes. Conferência de publicações com resultado incerto por leitura remota, sem repetir a operação.
 - Painel de plano/limites informa somente o que o provedor disponibiliza; o fluxo OSS testado não retornou saldo. A interface oferece acesso ao uso no ChatGPT.
-- Revisão humana assíncrona: o worker é liberado enquanto aguarda decisão; a ação aprovada executa uma vez e a IA retoma com o resultado confirmado. Publicação depende da revisão concreta e das fontes verificadas.
+- Revisão humana dentro da conversa, com cartão destacado, aviso fixo, proposta e botões Autorizar/Recusar. No fluxo assíncrono, o worker é liberado enquanto aguarda decisão; a ação aprovada executa uma vez e a IA retoma com o resultado confirmado. Publicação depende da revisão concreta e das fontes verificadas.
 - Anexos privados: texto/CSV/JSON/YAML/Markdown, XLSX, PDF com texto e PNG/JPEG. Limites explícitos; PDFs digitalizados ainda exigem OCR ou envio de imagem.
 - Cobertura das fontes, preservação de agendas mais frequentes e identificação de carga concluída. A ativação de uma segunda agenda para uma fonte já agendada é bloqueada no servidor. A solicitação/enfileiramento não é sucesso. Nova publicação de aplicação gerenciada é bloqueada enquanto faltar a verificação das cargas.
 - Imagens imutáveis PHP-FPM/Nginx, caminho `/ia-ganalise`, HTTPS/WebSocket testados localmente, backup criptografado com restauração isolada, retenção e monitoramento por heartbeat.
@@ -71,9 +71,9 @@ docker compose exec app php scripts/codex-smoke.php
 docker compose exec app php artisan ganalise:health
 ```
 
-A rodada local de 30/10/2026 passou com 370 testes PHP / 2.148 verificações, tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 25 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
+A rodada local de 30/10/2026 passou com 374 testes PHP / 2.180 verificações, tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 32 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
 
-Codex está fixado em 0.165.0 e Lumo em 3.43.1. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
+Codex está fixado em 0.165.0 e Lumo em 3.44.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
 
 Licença do código: MIT. OpenAI, Lumo e dependências mantêm seus termos e licenças.
 
@@ -86,3 +86,5 @@ docker compose -f compose.yaml -f compose.tests.yaml rm -sf postgres-test
 ```
 
 O runner fixa `postgres-test / ganalise_test`, força os parâmetros de teste e elimina o XML temporário. Ele não aceita uma URL de banco de produção.
+
+O CI mantém cache das camadas de ferramentas homologadas e carrega a imagem somente no runner para executar os testes. O checksum e a versão continuam fixados; o cache não autoriza aceitar um pacote novo do canal oficial. Sem cache compatível, uma mudança do fornecedor exige nova homologação.

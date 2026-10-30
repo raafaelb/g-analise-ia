@@ -3,8 +3,8 @@ ARG CODEX_VERSION=0.165.0
 RUN npm install --global @openai/codex@${CODEX_VERSION} && find /usr/local/lib/node_modules/@openai -type f -name codex -exec cp {} /codex \; && test -x /codex && find /usr/local/lib/node_modules/@openai -type f -name codex-code-mode-host -exec cp {} /codex-code-mode-host \; && test -x /codex-code-mode-host
 
 FROM alpine:3.22 AS lumo-tools
-ARG LUMO_VERSION=3.43.1
-ARG LUMO_SHA256=21b2407121d89da2d03520b577b5b83bc68ad955e011f1d44e327c3298df65a5
+ARG LUMO_VERSION=3.44.0
+ARG LUMO_SHA256=9059a159e927b72b827f0ea2ac370ccc3d0f78808dc5c9157cccd8b86c2c2f4e
 RUN apk add --no-cache curl tar && cd /tmp && curl -fsSLo LumoCLI-linux-amd64.tar.gz https://storage.horusbi.com.br/download/lumo/LumoCLI-linux-amd64.tar.gz && curl -fsSLo checksums.txt https://storage.horusbi.com.br/download/lumo/checksums.txt && awk '$2 == "LumoCLI-linux-amd64.tar.gz" || $2 == "*LumoCLI-linux-amd64.tar.gz"' checksums.txt > checksum.verify && test -s checksum.verify && sha256sum -c checksum.verify && echo "${LUMO_SHA256}  LumoCLI-linux-amd64.tar.gz" | sha256sum -c - && mkdir extracted && tar -xzf LumoCLI-linux-amd64.tar.gz -C extracted && find extracted -type f -name lumo -exec cp {} /lumo \; && chmod +x /lumo && /lumo version 2>&1 | tee /tmp/lumo-version.txt && grep -F "lumo ${LUMO_VERSION} " /tmp/lumo-version.txt
 
 FROM php:8.5-fpm-alpine AS runtime

@@ -100,3 +100,14 @@ O CI da revisão de autenticação parou antes dos testes porque o pacote oficia
 A versão e o hash foram atualizados após essa conferência. Não foi desativada nenhuma verificação de integridade, não houve atualização automática do CLI em execução e nenhum binário de terceiros foi incluído no repositório. O canal documentado de download permanece mutável; novas alterações incompatíveis com a pinagem continuam interrompendo o build até uma nova revisão.
 
 A opção ChatGPT foi retirada da tela de entrada por determinação do usuário. O início e o retorno do vínculo exigem uma conta já autenticada; transação anônima antiga, troca de usuário e versão revogada são recusadas antes de vincular. O fluxo positivo para a conta autenticada tem regressão própria. Depois dessa alteração, a suíte completa passou novamente com **370 testes / 2.148 verificações** em SQLite e PostgreSQL na imagem Lumo 3.43.1; a tela sem ChatGPT foi conferida em navegador isolado.
+
+
+## Revisões no chat e distribuição das ferramentas — 30/10/2026
+
+A ampliação passou com **374 testes PHP / 2.180 verificações**, **32 testes de frontend**, build Vue/TypeScript e Pint. O PostgreSQL descartável e o smoke Codex também passaram na imagem candidata Lumo **3.44.0**, recebida após nova substituição do pacote oficial. Os 13 tipos do catálogo, quatro indicadores de prévia e teste/estrutura PostgreSQL foram novamente conferidos somente em leitura. A imagem local foi atualizada após essa validação, preservando a versão anterior.
+
+A interface das revisões foi conferida em navegador isolado no desktop e no celular. O aviso fixo e o cartão foram visíveis; uma atualização em segundo plano preservou a leitura. Ao trocar de conversa, somente a revisão correspondente foi mostrada. A recusa e a autorização foram registradas no chat e não navegaram para Atividade. A conta sintética não tinha conexão BI ou IA: a execução autorizada parou pela ausência deliberada dessa conexão e apareceu como falha. Não houve inferência nem alteração de recursos reais nesse ensaio. O projeto foi arquivado, a conta inativada e a conexão desconectada de exemplo removida.
+
+A terceira distribuição foi comparada ao SHA-256 publicado e fixada após homologação. O CI passou a importar/exportar cache das camadas de ferramentas com as ações oficiais do Docker, carregando a imagem apenas no runner, com publicação desabilitada. As verificações de integridade e versão permanecem no build. O cache reduz a dependência do canal mutável nas recompilações compatíveis; um cache ausente ou invalidado ainda precisa do pacote oficial correspondente à pinagem. Não há substituição automática por uma versão diferente.
+
+Referência da configuração de cache: [documentação oficial do Docker](https://docs.docker.com/build/cache/backends/gha/). As duas ações Docker também estão fixadas por hash de commit correspondente às versões oficiais verificadas.

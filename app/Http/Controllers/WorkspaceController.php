@@ -152,7 +152,10 @@ class WorkspaceController extends Controller
     {
         $conversation = Conversation::where('user_id', $request->user()->id)->findOrFail($id);
 
-        return response()->json(['conversation' => $conversation, 'messages' => $conversation->messages()->oldest()->get(), 'runs' => $conversation->runs()->latest()->limit(10)->get(), 'approvals' => Approval::where('user_id', $request->user()->id)->whereIn('agent_run_id', $conversation->runs()->pluck('id'))->latest()->get()]);
+        $inputs = $conversation->runs()->pluck('input_message_id', 'id');
+        $approvals = Approval::where('user_id', $request->user()->id)->where('project_id', $conversation->project_id)->whereIn('agent_run_id', $inputs->keys())->oldest()->get()->map(fn (Approval $approval): array => [...$approval->toArray(), 'conversation_id' => $conversation->id, 'input_message_id' => $inputs[$approval->agent_run_id]]);
+
+        return response()->json(['conversation' => $conversation, 'messages' => $conversation->messages()->oldest()->get(), 'runs' => $conversation->runs()->latest()->limit(10)->get(), 'approvals' => $approvals]);
     }
 
     public function message(Request $request, string $id): JsonResponse

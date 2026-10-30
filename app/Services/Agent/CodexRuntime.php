@@ -81,7 +81,7 @@ class CodexRuntime
         $process->setInput($input);
         $process->setTimeout(config('horus.codex.timeout') + 30);
         $send = fn (array $message) => $input->write(json_encode($message, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)."\n");
-        $assistant = Message::create(['conversation_id' => $conversation->id, 'role' => 'assistant', 'content' => '', 'status' => 'streaming']);
+        $assistant = Message::create(['conversation_id' => $conversation->id, 'role' => 'assistant', 'content' => '', 'status' => 'streaming', 'metadata' => ['run_id' => $run->id]]);
         $buffer = new JsonRpcBuffer;
         $finished = false;
         $lastSave = 0;
