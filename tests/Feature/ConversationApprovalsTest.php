@@ -82,4 +82,39 @@ class ConversationApprovalsTest extends TestCase
         $this->postJson('/api/approvals/'.$approval->id.'/decide', ['decision' => 'approved', 'fingerprint' => $approval->fingerprint])->assertConflict();
         Queue::assertPushed(ExecuteApprovedAction::class, 1);
     }
+
+    public function test_messages_with_the_same_timestamp_keep_their_stable_creation_order(): void
+    {
+        $this->travelTo(new \DateTimeImmutable('2026-10-30T20:00:00Z'));
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Ordem da conversa']);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        $inputId = '019b0000-0000-7000-8000-000000000001';
+        $resultId = '019b0000-0000-7000-8000-000000000002';
+        $replyId = '019b0000-0000-7000-8000-000000000003';
+        Message::create(['id' => $replyId, 'conversation_id' => $conversation->id, 'role' => 'assistant', 'content' => 'Resultado conferido.']);
+        Message::create(['id' => $resultId, 'conversation_id' => $conversation->id, 'role' => 'system', 'content' => 'Execução concluída.']);
+        Message::create(['id' => $inputId, 'conversation_id' => $conversation->id, 'role' => 'user', 'content' => 'Confira esta alteração.']);
+
+        $this->actingAs($user)->getJson('/api/conversations/'.$conversation->id)->assertOk()->assertJsonCount(3, 'messages')
+            ->assertJsonPath('messages.0.id', $inputId)->assertJsonPath('messages.1.id', $resultId)->assertJsonPath('messages.2.id', $replyId);
+    }
+
+    public function test_a_new_pending_run_is_not_hidden_by_completed_runs_from_the_same_second(): void
+    {
+        $this->travelTo(new \DateTimeImmutable('2026-10-30T20:00:00Z'));
+        $user = User::factory()->create();
+        $project = Project::create(['user_id' => $user->id, 'name' => 'Tarefa atual']);
+        $conversation = Conversation::create(['user_id' => $user->id, 'project_id' => $project->id]);
+        for ($index = 1; $index <= 32; $index++) {
+            AgentRun::create(['id' => sprintf('019b1111-0000-7000-8000-%012x', $index), 'user_id' => $user->id, 'conversation_id' => $conversation->id, 'status' => $index === 32 ? 'queued' : 'completed']);
+        }
+
+        $this->actingAs($user)->getJson('/api/conversations/'.$conversation->id)->assertOk()->assertJsonCount(10, 'runs')
+            ->assertJsonPath('runs.0.id', '019b1111-0000-7000-8000-000000000020')->assertJsonPath('runs.0.status', 'queued')
+            ->assertJsonPath('runs.9.id', '019b1111-0000-7000-8000-000000000017');
+        $this->getJson('/api/bootstrap')->assertOk()->assertJsonCount(30, 'runs')
+            ->assertJsonPath('runs.0.id', '019b1111-0000-7000-8000-000000000020')->assertJsonPath('runs.0.status', 'queued')
+            ->assertJsonPath('runs.29.id', '019b1111-0000-7000-8000-000000000003');
+    }
 }
