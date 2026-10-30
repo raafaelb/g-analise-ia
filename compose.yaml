@@ -89,6 +89,8 @@ services:
     image: node:24-alpine
     user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     working_dir: /app
+    environment:
+      NPM_CONFIG_CACHE: /tmp/npm-cache
     volumes: [".:/app"]
     ports: ["127.0.0.1:5173:5173"]
     command: ["npm","run","dev"]
