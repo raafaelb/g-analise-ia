@@ -15,3 +15,16 @@ export function chatPreviewTarget(href: string, location: string, basePath: stri
     if (!artifact) return null;
     return {artifactId: artifact.id, mode: artifact.metadata.resource === project.source_ref ? 'interactive' : 'image', dashboard: artifact.metadata.dashboard_id == null ? null : String(artifact.metadata.dashboard_id)};
 }
+
+export function interactivePreviewTarget(href: string, location: string, basePath: string, project: Item | undefined): {path: string; dashboard: string | null} | null {
+    if (!project?.id) return null;
+    let url: URL;
+    let current: URL;
+    try { url = new URL(href, location); current = new URL(location); } catch { return null; }
+    const loopbacks = new Set(['localhost', '127.0.0.1', '[::1]']);
+    const localAlias = loopbacks.has(url.hostname) && loopbacks.has(current.hostname) && url.protocol === current.protocol && url.port === current.port;
+    const path = basePath.replace(/\/$/, '') + '/app/project/' + project.id;
+    const dashboard = url.searchParams.get('dashboard');
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || (url.origin !== current.origin && !localAlias) || url.pathname !== path || url.searchParams.get('preview') !== 'interactive' || (dashboard !== null && !/^[1-9][0-9]*$/.test(dashboard))) return null;
+    return {path: path + '?preview=interactive' + (dashboard ? '&dashboard=' + dashboard : ''), dashboard};
+}

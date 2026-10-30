@@ -13,7 +13,7 @@ import ConversationApprovalCard from '../Components/ConversationApprovalCard.vue
 import {conversationApprovalTimeline,conversationReviewState} from '../lib/conversation-approvals';
 import RefreshInspector from '../Components/RefreshInspector.vue';
 import ProjectPreviewPane from '../Components/ProjectPreviewPane.vue';
-import {chatPreviewTarget} from '../lib/chat-preview-links';
+import {chatPreviewTarget,interactivePreviewTarget} from '../lib/chat-preview-links';
 import {appUrl,localPath,basePath} from '../lib/urls';
 import {createRequestGuard} from '../lib/async-response';
 import {createProjectDrafts} from '../lib/project-drafts';
@@ -150,15 +150,15 @@ function chooseSuggestion(text:string){prompt.value=text;nextTick(()=>composer.v
 function markdown(text:string):string{
  const html=DOMPurify.sanitize(marked.parse(text,{async:false}) as string,{FORBID_TAGS:['img','svg','iframe','object','embed','video','audio','style','form'],FORBID_ATTR:['style']});
  const template=document.createElement('template');template.innerHTML=html;
- for(const link of template.content.querySelectorAll<HTMLAnchorElement>('a[href]')){const target=chatPreviewTarget(link.href,window.location.href,basePath(),state.value.artifacts,currentProject.value);if(target?.mode==='interactive')link.href=appUrl('/app/project/'+currentProject.value!.id)+'?preview=interactive'+(target.dashboard?'&dashboard='+encodeURIComponent(target.dashboard):'');}
+ for(const link of template.content.querySelectorAll<HTMLAnchorElement>('a[href]')){const target=chatPreviewTarget(link.href,window.location.href,basePath(),state.value.artifacts,currentProject.value);if(target?.mode==='interactive')link.href=appUrl('/app/project/'+currentProject.value!.id)+'?preview=interactive'+(target.dashboard?'&dashboard='+encodeURIComponent(target.dashboard):'');else{const preview=interactivePreviewTarget(link.href,window.location.href,basePath(),currentProject.value);if(preview)link.href=preview.path;}}
  return template.innerHTML;
 }
 async function openChatPreview(event:MouseEvent){
  const link=(event.target as Element|null)?.closest<HTMLAnchorElement>('a[href]');if(!link||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
  const target=chatPreviewTarget(link.href,window.location.href,basePath(),state.value.artifacts,currentProject.value);
  if(target?.mode==='image'){const artifact=projectArtifacts.value.find(item=>item.id===target.artifactId);if(artifact){event.preventDefault();openArtifact(artifact);}return;}
- const url=new URL(link.href,window.location.href);if(url.origin!==window.location.origin||url.pathname!==appUrl('/app/project/'+currentProject.value?.id)||url.searchParams.get('preview')!=='interactive')return;
- event.preventDefault();projectPreviewOpen.value=true;contextOpen.value=false;await nextTick();previewPane.value?.openInteractive(url.searchParams.get('dashboard'));
+ const preview=interactivePreviewTarget(link.href,window.location.href,basePath(),currentProject.value);if(!preview)return;
+ event.preventDefault();projectPreviewOpen.value=true;contextOpen.value=false;await nextTick();previewPane.value?.openInteractive(preview.dashboard);
 }
 function date(value:string){return new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'}).format(new Date(value));}
 function shortDate(value:string){return new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short'}).format(new Date(value));}

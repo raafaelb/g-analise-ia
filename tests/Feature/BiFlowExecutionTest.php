@@ -18,6 +18,7 @@ use App\Services\BiViewer;
 use App\Services\LumoClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -297,5 +298,28 @@ class BiFlowExecutionTest extends TestCase
         $this->assertSame('table:501', $result['managed_resource']);
         $this->assertSame('app:10', $project->fresh()->source_ref);
         $this->assertDatabaseHas('managed_bi_resources', ['user_id' => $user->id, 'resource' => 'table:501', 'status' => 'draft']);
+    }
+
+    #[DataProvider('portalPrefixes')]
+    public function test_ai_preview_links_keep_the_current_browser_origin_and_the_configured_portal_path(string $prefix): void
+    {
+        [$user, $project, $run] = $this->context();
+        URL::forceRootUrl('http://localhost:8088'.$prefix);
+        config(['horus.viewer.allowed_origins' => ['https://bi.example.test']]);
+        $catalog = $this->partialMock(BiCatalog::class);
+        $catalog->shouldReceive('detail')->once()->withArgs(fn ($actor, $tenant, $kind, $id, $relations) => $actor->id === $user->id && $tenant === '100' && $kind === 'app' && $id === '10' && $relations === false)->andReturn(['resource' => ['id' => '10', 'state' => 'draft', 'dashboards' => [['id' => 99]]]]);
+        $lumo = $this->cli();
+        $lumo->shouldReceive('run')->once()->withArgs(fn ($connection, $arguments) => $arguments === ['app', 'open', 'app:10', '--no-browser', '--dashboard', '99'])->andReturn(['data' => ['url' => 'https://bi.example.test/app/10?ds=99']]);
+
+        $result = app(ActionBroker::class)->execute($run, 'horus_action', ['action' => 'app_link', 'resource' => 'app:10', 'dashboard' => 99]);
+
+        $this->assertSame($prefix.'/app/project/'.$project->id.'?preview=interactive&dashboard=99', $result['preview_path']);
+        $this->assertSame('https://bi.example.test/app/10?ds=99', $result['url']);
+        $this->assertDatabaseCount('approvals', 0);
+    }
+
+    public static function portalPrefixes(): array
+    {
+        return ['root' => [''], 'suite subpath' => ['/ia-ganalise']];
     }
 }

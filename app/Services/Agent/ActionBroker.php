@@ -322,7 +322,7 @@ class ActionBroker
 
             Audit::record($user->id, 'horus.app_link', 'Link comum da aplicação consultado.', $project->id, ['resource' => $arguments['resource']]);
 
-            return ['resource' => $arguments['resource'], 'url' => $url, 'desk_id' => $detail['resource']['desk_id'] ?? null, 'state' => $detail['resource']['state'] ?? null, 'preview_path' => $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id]).'?preview=interactive'.(isset($arguments['dashboard']) ? '&dashboard='.$arguments['dashboard'] : '') : null, 'message' => 'URL oficial sem credenciais. Quem abrir usará o próprio login BI. Para a prévia dentro da conversa, use preview_path.'];
+            return ['resource' => $arguments['resource'], 'url' => $url, 'desk_id' => $detail['resource']['desk_id'] ?? null, 'state' => $detail['resource']['state'] ?? null, 'preview_path' => $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id], absolute: false).'?preview=interactive'.(isset($arguments['dashboard']) ? '&dashboard='.$arguments['dashboard'] : '') : null, 'message' => 'URL oficial sem credenciais. Quem abrir usará o próprio login BI. Para a prévia dentro da conversa, use preview_path.'];
         }
         $this->assertRefreshBeforePublish($user, $project, $arguments);
         if ($action === 'publish_app' && (! $approval || ! is_array($publication) || ($publication['source']['resource'] ?? null) !== $arguments['resource'] || ($publication['destination']['id'] ?? null) !== $arguments['desk'] || ($publication['mode'] ?? null) !== ($arguments['publish_mode'] ?? 'new'))) {
@@ -434,7 +434,7 @@ class ActionBroker
                 $artifact = Artifact::create(['user_id' => $user->id, 'project_id' => $project->id, 'name' => $project->name.' - '.str_replace(':', '-', $arguments['resource']).' - '.now()->format('Y-m-d_H-i-s').'.png', 'kind' => 'dashboard_export', 'mime' => 'image/png', 'path' => $stored, 'metadata' => ['resource' => $arguments['resource'], 'dashboard_id' => $arguments['dashboard'] ?? null, 'width' => $size[0], 'height' => $size[1], 'generated_at' => now()->toIso8601String()]]);
                 $result['artifact_id'] = $artifact->id;
                 $result['download_path'] = rtrim((string) parse_url(config('app.url'), PHP_URL_PATH), '/').'/api/artifacts/'.$artifact->id.'/download';
-                $result['preview_path'] = $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id]).'?preview=interactive' : null;
+                $result['preview_path'] = $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id], absolute: false).'?preview=interactive' : null;
                 $result['visual_review'] = 'Abra a prévia no portal para autorizar o envio deste arquivo à OpenAI; depois use project_image com artifact_id.';
             }
         }

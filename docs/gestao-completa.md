@@ -192,11 +192,13 @@ O acompanhamento do projeto oferece a prévia interativa, escolha de dashboard, 
 
 A validação de autoria passa a tratar somente o YAML do recurso escolhido e devolver os erros ao agente. Um arquivo inválido deve ser corrigido antes de preparar uma revisão de sincronização. Falhas de validação após uma aprovação podem retomar a IA para corrigir o arquivo, com limite de tentativas e nova revisão obrigatória; isso não autoriza repetir operações de resultado incerto.
 
+Os links novos de prévia usam o caminho do portal, preservando o host e a sessão atual do navegador. Links antigos entre localhost e 127.0.0.1 também abrem o painel da mesma conversa, somente no mesmo protocolo/porta e para o próprio projeto. Outros hosts/projetos não são interceptados; o subdiretório da Suíte é preservado.
+
 As consultas de contexto da prévia agora acompanham mudanças reais de projeto/recurso, em vez de reiniciar a cada atualização do chat. A disputa pela sessão BI é distinguida de uma operação já iniciada: etapas simples ainda não iniciadas podem aguardar com a mesma autorização; operações de resultado incerto não são repetidas. Cancelamentos continuam sendo respeitados. A execução longa de ETL mantém o sinal de atividade para não ser interrompida pelo monitor da fila.
 
 A homologação real confirmou descoberta da estrutura da demonstração, extração e transformação, criação/carga de tabela privada, correção de YAML pela própria IA e inclusão do mapa em uma cópia privada. A prévia interativa foi aberta no portal; selecionar e limpar um responsável atualizou mapa e indicador. O componente de mapa nativo usa pins de cor fixa, com identificação e filtro por responsável. A exportação PNG falhou no renderizador nativo e permanece uma limitação a investigar; ela não é requisito para abrir o visualizador interativo. A fonte nova permanece privada, sem agenda diária ativa: sua publicação e o destino de dados ainda precisam de autorização para concluir essa cobertura. A aplicação publicada e os demais recursos preexistentes foram preservados.
 
-A regressão passou em SQLite e PostgreSQL (451 testes em cada banco, 2.532 asserções), mais 38 testes de interface e compilação com verificação TypeScript. Esses resultados cobrem esta revisão e não declaram concluídas as integrações ainda listadas como pendentes.
+A regressão passou em SQLite e PostgreSQL (453 testes em cada banco, 2.542 asserções), mais 41 testes de interface e compilação com verificação TypeScript. Esses resultados cobrem esta revisão e não declaram concluídas as integrações ainda listadas como pendentes.
 
 ### Melhoria de espaço da prévia — registrada em 30/10/2026
 
