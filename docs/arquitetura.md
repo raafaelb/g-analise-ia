@@ -49,7 +49,7 @@ Atualizações do conjunto de ferramentas iniciam uma nova thread nativa com his
 ## Pendências externas
 
 - Enquadramento/configuração oficial OpenAI para hospedagem remota.
-- Primeira publicação do código e execução de CI em https://github.com/raafaelb/g-analise-ia.
+- Confirmação do CI para o commit escolhido em https://github.com/raafaelb/g-analise-ia.
 - Instalação no servidor, certificado público, backup fora do host e piloto com usuários reais.
 - Homologação adicional com uma conta BI restrita/2FA e revogação real de acesso, sem alterar permissões de clientes ativos.
 

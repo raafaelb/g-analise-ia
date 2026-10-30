@@ -60,6 +60,6 @@ docker compose exec app php artisan ganalise:health
 
 Os testes PHP usam SQLite em memória e fakes HTTP, sem alterar o PostgreSQL nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
 
-Codex está fixado em 0.165.0 e Lumo em 3.40.0. O build confere checksum e versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
+Codex está fixado em 0.165.0 e Lumo em 3.41.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
 
 Licença do código: MIT. OpenAI, Lumo e dependências mantêm seus termos e licenças.

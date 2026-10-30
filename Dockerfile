@@ -3,8 +3,9 @@ ARG CODEX_VERSION=0.165.0
 RUN npm install --global @openai/codex@${CODEX_VERSION} && find /usr/local/lib/node_modules/@openai -type f -name codex -exec cp {} /codex \; && test -x /codex && find /usr/local/lib/node_modules/@openai -type f -name codex-code-mode-host -exec cp {} /codex-code-mode-host \; && test -x /codex-code-mode-host
 
 FROM alpine:3.22 AS lumo-tools
-ARG LUMO_VERSION=3.40.0
-RUN apk add --no-cache curl tar && cd /tmp && curl -fsSLo LumoCLI-linux-amd64.tar.gz https://storage.horusbi.com.br/download/lumo/LumoCLI-linux-amd64.tar.gz && curl -fsSLo checksums.txt https://storage.horusbi.com.br/download/lumo/checksums.txt && awk '$2 == "LumoCLI-linux-amd64.tar.gz" || $2 == "*LumoCLI-linux-amd64.tar.gz"' checksums.txt > checksum.verify && test -s checksum.verify && sha256sum -c checksum.verify && mkdir extracted && tar -xzf LumoCLI-linux-amd64.tar.gz -C extracted && find extracted -type f -name lumo -exec cp {} /lumo \; && chmod +x /lumo && /lumo version 2>&1 | grep "lumo ${LUMO_VERSION} "
+ARG LUMO_VERSION=3.41.0
+ARG LUMO_SHA256=4ab27b61334bf6dcb7a01a029f7e03ba940f1e95ff55d15fe920066f6d95a9b1
+RUN apk add --no-cache curl tar && cd /tmp && curl -fsSLo LumoCLI-linux-amd64.tar.gz https://storage.horusbi.com.br/download/lumo/LumoCLI-linux-amd64.tar.gz && curl -fsSLo checksums.txt https://storage.horusbi.com.br/download/lumo/checksums.txt && awk '$2 == "LumoCLI-linux-amd64.tar.gz" || $2 == "*LumoCLI-linux-amd64.tar.gz"' checksums.txt > checksum.verify && test -s checksum.verify && sha256sum -c checksum.verify && echo "${LUMO_SHA256}  LumoCLI-linux-amd64.tar.gz" | sha256sum -c - && mkdir extracted && tar -xzf LumoCLI-linux-amd64.tar.gz -C extracted && find extracted -type f -name lumo -exec cp {} /lumo \; && chmod +x /lumo && /lumo version 2>&1 | tee /tmp/lumo-version.txt && grep -F "lumo ${LUMO_VERSION} " /tmp/lumo-version.txt
 
 FROM php:8.5-fpm-alpine AS runtime
 RUN apk add --no-cache libpq git curl libstdc++ libgcc tini poppler-utils libzip && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS postgresql-dev linux-headers libzip-dev && docker-php-ext-install pdo_pgsql pcntl zip && apk del .build-deps
