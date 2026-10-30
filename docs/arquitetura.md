@@ -3,6 +3,7 @@
 ```mermaid
 flowchart LR
  U[Navegador] --> W[Nginx e Laravel/PHP]
+ W --> S[Suíte: validação de colaborador por HTTPS]
  W --> P[(PostgreSQL)]
  W --> R[(Redis)]
  R --> Q[Worker PHP]
@@ -82,3 +83,9 @@ A reivindicação de tarefas de IA é condicional e atômica antes de iniciar o 
 Antes do envio de uma publicação, a revisão recebe um comprovante de tentativa ligado ao hash do plano. Se a resposta for interrompida ou a leitura posterior falhar, o usuário pode solicitar uma conferência por leitura. O endpoint valida propriedade, decisão, revisão e registro de envio, usa os acessos atuais e confirma a estabilidade da sessão. A atualização dos comprovantes/vínculos locais é transacional e usa o mutex do projeto. Não há novo publish ou tarefa de IA na reconciliação.
 
 `BiWorkspaceSync` recebe recursos atuais somente quando o diff oficial confirma autoria limpa ou arquivo ausente. A operação mantém as proteções do pull nativo e verifica o resultado por outra consulta; não descarta alterações locais. O cache de catálogo usa IDs reservados, não persistidos como projetos, e pode ser reconstruído com descarte apenas desses snapshots. Em falha, os snapshots antigos não enriquecem a resposta atual.
+
+## Identidade e administração do portal
+
+A Suíte confirma a identidade de colaboradores, e o portal emite sua própria sessão. Emissor/UUID vinculam a identidade; senha da Suíte e headers de credencial não são persistidos. O administrador da instalação também pode cadastrar usuários locais com senha inicial obrigatoriamente substituída. O perfil administrativo do portal não concede acesso direto aos projetos privados de outra pessoa nem amplia a autorização do BI.
+
+Uma versão de acesso invalida sessões antigas, e uma revisão de cadastro impede salvar alterações sobre um registro que mudou. Contas inativas ou com senha inicial pendente recusam novas operações do broker/Lumo e novas assinaturas privadas. A fronteira de sessão do portal continua distinta da autorização e das sessões emitidas por OpenAI e pelo BI.

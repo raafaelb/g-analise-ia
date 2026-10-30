@@ -6,6 +6,7 @@ use App\Events\WorkspaceChanged;
 use App\Models\AgentRun;
 use App\Models\Connection;
 use App\Models\Message;
+use App\Models\User;
 use App\Services\ArtifactImages;
 use App\Services\AttachmentContext;
 use App\Services\Audit;
@@ -26,6 +27,9 @@ class CodexRuntime
 
     public function run(AgentRun $run): void
     {
+        if (! User::find($run->user_id)?->canStartWork()) {
+            throw new RuntimeException('O acesso do usuário está inativo ou requer atualização da senha.');
+        }
         $conversation = $run->conversation;
         $project = $conversation->project;
         $connection = Connection::where('user_id', $run->user_id)->where('provider', 'openai')->where('status', 'connected')->first();

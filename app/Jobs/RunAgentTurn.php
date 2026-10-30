@@ -85,7 +85,7 @@ class RunAgentTurn implements ShouldQueue
 
                 return;
             }
-            if (User::find($run->user_id)?->role === 'viewer') {
+            if (! User::find($run->user_id)?->canStartWork() || User::find($run->user_id)?->role === 'viewer') {
                 throw new RuntimeException('Seu perfil atual permite somente leitura.');
             }
             $runtime->run($run);

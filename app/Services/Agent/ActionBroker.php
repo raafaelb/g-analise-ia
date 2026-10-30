@@ -14,6 +14,7 @@ use App\Services\ArtifactImages;
 use App\Services\Audit;
 use App\Services\BiCatalog;
 use App\Services\BiCloneNames;
+use App\Services\BiCredentials;
 use App\Services\BiPublications;
 use App\Services\BiWorkspaceSync;
 use App\Services\LumoClient;
@@ -118,7 +119,7 @@ class ActionBroker
             return ['status' => 'awaiting_approval', 'message' => 'Há uma revisão pendente. Encerre o turno; a tarefa será retomada pelo portal após a decisão.'];
         }
         $user = User::findOrFail($run->user_id);
-        if ($user->role === 'viewer') {
+        if (! $user->canStartWork() || $user->role === 'viewer') {
             throw new RuntimeException('O perfil atual permite somente leitura.');
         }
         $project = $run->conversation->project;
@@ -178,12 +179,22 @@ class ActionBroker
 
     public function performApproved(Approval $approval): array
     {
+        $actor = User::find($approval->user_id);
+        if (! $actor?->canStartWork()) {
+            throw new RuntimeException('O acesso do usuário está inativo ou requer atualização da senha.');
+        }
+        if (! $approval->permitsUserAccess($actor)) {
+            throw new RuntimeException('A autorização pertence a uma versão anterior do seu acesso. Prepare uma nova revisão.');
+        }
         if ($approval->status !== 'executing' || $approval->expires_at->isPast()) {
             throw new RuntimeException('A autorização não está válida para execução.');
         }
+        if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
+            return app(BiCredentials::class)->executeApproved($approval);
+        }
         $user = User::findOrFail($approval->user_id);
         $project = Project::where('user_id', $user->id)->findOrFail($approval->project_id);
-        if ($user->role === 'viewer') {
+        if (! $user->canStartWork() || $user->role === 'viewer') {
             throw new RuntimeException('O perfil atual permite somente leitura.');
         }
         $arguments = $approval->payload['action'] ?? [];

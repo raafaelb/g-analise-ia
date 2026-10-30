@@ -16,10 +16,12 @@ use App\Models\Project;
 use App\Models\RefreshSchedule;
 use App\Services\ArtifactImages;
 use App\Services\Audit;
+use App\Services\BiCredentials;
 use App\Services\LocalPreview;
 use App\Services\OpenAiIdentity;
 use App\Services\ProjectPreviews;
 use App\Services\RefreshCoverage;
+use App\Services\SuiteIdentity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -52,7 +54,14 @@ class WorkspaceController extends Controller
         $projects = Project::where('user_id', $uid)->where('status', '!=', 'archived')->withCount('conversations')->latest('updated_at')->get();
         $connections = Connection::where('user_id', $uid)->get();
 
-        return ['user' => $request->user()->only('id', 'name', 'email', 'role'), 'projects' => $projects, 'conversations' => Conversation::where('user_id', $uid)->latest('updated_at')->get(), 'connections' => $connections, 'approvals' => Approval::where('user_id', $uid)->latest()->limit(100)->get(), 'schedules' => RefreshSchedule::where('user_id', $uid)->latest()->get(), 'activity' => AuditEvent::where('user_id', $uid)->latest()->limit(100)->get(), 'artifacts' => Artifact::where('user_id', $uid)->latest()->orderByDesc('id')->get(), 'runs' => AgentRun::where('user_id', $uid)->latest()->limit(30)->get(), 'preview' => app(LocalPreview::class)->enabled(), 'integration' => ['openai_configured' => app(OpenAiIdentity::class)->configured(), 'plan_usage_enabled' => config('horus.openai.plan_enabled'), 'auth_mode' => config('horus.openai.mode'), 'lumo_login_enabled' => config('horus.lumo.login_enabled'), 'timezone' => 'America/Sao_Paulo']];
+        $data = ['user' => [...$request->user()->only('id', 'name', 'email', 'role', 'active', 'local_login_enabled', 'must_change_password'), 'auth_provider' => $request->user()->suite_subject !== null ? 'suite' : 'local', 'can_manage_users' => $request->user()->canAdministerUsers()], 'projects' => $projects, 'conversations' => Conversation::where('user_id', $uid)->latest('updated_at')->get(), 'connections' => $connections, 'approvals' => Approval::where('user_id', $uid)->latest()->limit(100)->get(), 'schedules' => RefreshSchedule::where('user_id', $uid)->latest()->get(), 'activity' => AuditEvent::where('user_id', $uid)->latest()->limit(100)->get(), 'artifacts' => Artifact::where('user_id', $uid)->latest()->orderByDesc('id')->get(), 'runs' => AgentRun::where('user_id', $uid)->latest()->limit(30)->get(), 'preview' => app(LocalPreview::class)->enabled(), 'integration' => ['openai_configured' => app(OpenAiIdentity::class)->configured(), 'plan_usage_enabled' => config('horus.openai.plan_enabled'), 'auth_mode' => config('horus.openai.mode'), 'lumo_login_enabled' => config('horus.lumo.login_enabled'), 'timezone' => 'America/Sao_Paulo', 'suite_url' => app(SuiteIdentity::class)->configured() ? app(SuiteIdentity::class)->issuer() : null]];
+        if ($request->user()->must_change_password) {
+            foreach (['projects', 'conversations', 'connections', 'approvals', 'schedules', 'activity', 'artifacts', 'runs'] as $key) {
+                $data[$key] = [];
+            }
+        }
+
+        return $data;
     }
 
     private function author(Request $request): void
@@ -207,6 +216,9 @@ class WorkspaceController extends Controller
         });
         Audit::record($request->user()->id, 'approval.'.$data['decision'], $data['decision'] === 'approved' ? 'Execução revisada e autorizada.' : 'Execução recusada.', $approval->project_id, ['approval_id' => $approval->id]);
 
+        if ($approval->status === 'rejected' && in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
+            app(BiCredentials::class)->cleanup($approval);
+        }
         if ($approval->status === 'approved') {
             ExecuteApprovedAction::dispatch($approval->id)->onQueue('actions');
         } elseif ($approval->agent_run_id) {
@@ -306,7 +318,8 @@ class WorkspaceController extends Controller
     public function profile(Request $request): JsonResponse
     {
         $data = $request->validate(['name' => ['required', 'string', 'max:100']]);
-        $request->user()->update($data);
+        abort_if($request->user()->suite_subject !== null, 422, 'Seu nome é gerenciado pela Suíte.');
+        $request->user()->forceFill([...$data, 'access_revision' => $request->user()->access_revision + 1])->save();
 
         return response()->json(['message' => 'Nome atualizado.']);
     }

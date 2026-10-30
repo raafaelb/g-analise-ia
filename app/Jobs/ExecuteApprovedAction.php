@@ -8,6 +8,7 @@ use App\Models\Approval;
 use App\Models\Message;
 use App\Services\Agent\ActionBroker;
 use App\Services\Audit;
+use App\Services\BiCredentials;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -35,7 +36,7 @@ class ExecuteApprovedAction implements ShouldQueue
         if (! $approval || $approval->status !== 'approved') {
             return;
         }
-        $lock = Cache::lock('project:'.$approval->project_id, 630);
+        $lock = Cache::lock($approval->project_id === null ? 'bi-operation:'.$approval->id : 'project:'.$approval->project_id, 630);
         if (! $lock->get()) {
             $this->release(3);
 
@@ -85,6 +86,9 @@ class ExecuteApprovedAction implements ShouldQueue
         } catch (Throwable $e) {
             $this->failAction($approval, $e instanceof RuntimeException ? $e->getMessage() : 'Não foi possível confirmar o resultado da ação. Confira o recurso no BI antes de repetir.');
         } finally {
+            if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
+                app(BiCredentials::class)->cleanup($approval);
+            }
             $lock->release();
             try {
                 event(new WorkspaceChanged($approval->user_id, $approval->agent_run_id));
@@ -112,6 +116,9 @@ class ExecuteApprovedAction implements ShouldQueue
         $approval = Approval::find($this->approvalId);
         if ($approval && in_array($approval->status, ['approved', 'executing'], true)) {
             $this->failAction($approval, 'O worker foi interrompido. Confira o estado do recurso no BI antes de repetir a ação; ela não será executada novamente automaticamente.');
+            if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
+                app(BiCredentials::class)->cleanup($approval);
+            }
         }
     }
 }

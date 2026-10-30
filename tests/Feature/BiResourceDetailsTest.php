@@ -35,7 +35,7 @@ class BiResourceDetailsTest extends TestCase
     {
         $user = User::factory()->create();
         Connection::create(['user_id' => $user->id, 'provider' => 'horus', 'status' => 'connected', 'credentials' => ['auth' => ['token' => 'test']], 'metadata' => ['tenants' => [['id' => '321', 'name' => 'Homologação']]]]);
-        $folders = ['dw-desk' => 'dw-desks', 'bi-desk' => 'bi-desks', 'app' => 'apps', 'table' => 'tables', 'flow' => 'flows', 'schedule' => 'schedules', 'agent' => 'agents'];
+        $folders = ['dw-desk' => 'dw-desks', 'bi-desk' => 'bi-desks', 'app' => 'apps', 'table' => 'tables', 'flow' => 'flows', 'schedule' => 'schedules', 'agent' => 'agents', 'credential' => 'credentials'];
         foreach ($bodies as $reference => $body) {
             [$kind, $id] = explode(':', $reference);
             if (! isset($folders[$kind])) {
@@ -139,5 +139,15 @@ class BiResourceDetailsTest extends TestCase
     {
         $user = $this->connect(['flow:20' => ['nome' => 'Carga', 'nodes' => ['Processors' => [['options' => ['Credential' => 'var-DATABASES_CS']]]]]]);
         $this->actingAs($user)->getJson('/api/catalog/321/resources/flow/20')->assertOk()->assertJsonPath('related.2.complete', false)->assertJsonCount(0, 'related.2.items');
+    }
+
+    public function test_credential_metadata_without_a_native_type_uses_its_current_authoring_document(): void
+    {
+        $user = $this->connect(['credential:5' => ['nome' => 'Banco de teste', 'type' => 'postgresql', 'agentId' => 7, 'config' => ['hostname' => 'source.example.invalid', 'password' => 'SYNTHETIC-CATALOG-PRIVATE'], 'key' => 'SYNTHETIC-CATALOG-PRIVATE']], summaries: ['credential:5' => ['id' => 5, 'nome' => 'Banco de teste', 'kindId' => 3, 'tokenId' => 7]]);
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/credential/5')->assertOk()->assertJsonPath('details.type', 'postgresql')->assertJsonPath('credential_management.can_edit', true)->assertJsonPath('metadata_complete', true);
+
+        $this->assertStringNotContainsString('SYNTHETIC-CATALOG-PRIVATE', $response->getContent());
+        $this->assertStringNotContainsString('source.example.invalid', $response->getContent());
     }
 }

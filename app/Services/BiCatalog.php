@@ -15,7 +15,7 @@ class BiCatalog
 {
     public const KINDS = ['app', 'bi-desk', 'dw-desk', 'table', 'flow', 'schedule', 'agent', 'writeback', 'deck', 'presentation', 'investigation', 'credential', 'variables'];
 
-    private const FOLDERS = ['app' => 'apps', 'bi-desk' => 'bi-desks', 'dw-desk' => 'dw-desks', 'table' => 'tables', 'flow' => 'flows', 'schedule' => 'schedules', 'agent' => 'agents', 'writeback' => 'writebacks', 'deck' => 'decks', 'presentation' => 'presentations', 'investigation' => 'investigations'];
+    private const FOLDERS = ['app' => 'apps', 'bi-desk' => 'bi-desks', 'dw-desk' => 'dw-desks', 'table' => 'tables', 'flow' => 'flows', 'schedule' => 'schedules', 'agent' => 'agents', 'writeback' => 'writebacks', 'deck' => 'decks', 'presentation' => 'presentations', 'investigation' => 'investigations', 'credential' => 'credentials'];
 
     public function __construct(private LumoClient $lumo, private TenantPolicy $policy) {}
 
@@ -23,6 +23,8 @@ class BiCatalog
     {
         $connection = Connection::where('user_id', $user->id)->where('provider', 'horus')->where('status', 'connected')->first();
         abort_unless($connection, 422, 'Conecte sua conta G-Analise BI para abrir o catálogo.');
+
+        $connection->operationAccessVersion = $user->access_version;
 
         return $connection;
     }
@@ -237,6 +239,11 @@ class BiCatalog
         $this->lumo->run($connection, ['fetch', $kind.':'.$id], $project, 60);
         $data = $this->lumo->run($connection, ['info', $kind.':'.$id, ...($kind === 'app' ? ['--full'] : [])], $project, 60)['data'];
         $payload = is_array($data) ? ($data['payload'] ?? $data) : null;
+        if ($kind === 'credential') {
+            for ($depth = 0; $depth < 3 && is_array($payload) && ! array_key_exists('body', $payload) && is_array($payload['payload'] ?? null); $depth++) {
+                $payload = $payload['payload'];
+            }
+        }
         if (is_array($payload) && isset($payload['header']['tenantId']) && (string) $payload['header']['tenantId'] !== $tenant) {
             throw new RuntimeException('O recurso retornou fora do tenant autorizado.');
         }
@@ -245,7 +252,7 @@ class BiCatalog
             throw new RuntimeException('Os detalhes do recurso não retornaram um formato reconhecido.');
         }
         $metadataComplete = true;
-        if (in_array($kind, ['flow', 'table', 'schedule', 'agent'], true)) {
+        if (in_array($kind, ['flow', 'table', 'schedule', 'agent', 'credential'], true)) {
             try {
                 $this->refreshSnapshotFiles($connection, $project, $kind.':'.$id);
                 $working = $this->workingMetadata($project)[$kind.':'.$id] ?? null;
@@ -262,6 +269,12 @@ class BiCatalog
             }
         }
         $summary = $this->summary($kind, $row, $body);
+        $credentialManagement = null;
+        if ($kind === 'credential') {
+            $driver = app(BiCredentialTypes::class)->driver((string) ($body['type'] ?? ''));
+            $rawSqlServer = $driver === 'sqlserver' && filter_var($body['config']['useconnectionstring'] ?? false, FILTER_VALIDATE_BOOL);
+            $credentialManagement = ['can_edit' => $driver !== null && ! $rawSqlServer && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection), 'message' => $rawSqlServer ? 'Conexão SQL Server em formato avançado; o teste e a consulta de estrutura estão disponíveis.' : ($driver === null ? 'O formulário de edição ainda não está disponível para este tipo. Use as consultas para conferir a fonte.' : null)];
+        }
         if ($kind === 'credential') {
             $body = array_intersect_key($body, array_flip(['id', 'nome', 'name', 'type', 'ativo', 'descricao']));
         }
@@ -306,7 +319,7 @@ class BiCatalog
             }
         }
 
-        return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $summary, 'management' => $management, 'details' => $this->redact($body), 'overview' => $this->redact($overview), 'related' => $related, 'viewer_available' => $kind === 'app' && config('horus.viewer.enabled') && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection), 'metadata_complete' => $metadataComplete, 'metadata_message' => $metadataComplete ? null : 'O resumo atual está disponível, mas os metadados de autoria não foram fornecidos nesta consulta. Alguns vínculos e configurações podem não aparecer.'];
+        return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $summary, 'management' => $management, 'credential_management' => $credentialManagement, 'details' => $this->redact($body), 'overview' => $this->redact($overview), 'related' => $related, 'viewer_available' => $kind === 'app' && config('horus.viewer.enabled') && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection), 'metadata_complete' => $metadataComplete, 'metadata_message' => $metadataComplete ? null : 'O resumo atual está disponível, mas os metadados de autoria não foram fornecidos nesta consulta. Alguns vínculos e configurações podem não aparecer.'];
     }
 
     private function variableDetail(User $user, string $tenant, string $id): array
@@ -365,7 +378,7 @@ class BiCatalog
         if (! is_array($value)) {
             return $value;
         }
-        $sensitive = ['password', 'senha', 'pass', 'accesstoken', 'refreshtoken', 'authorization', 'apikey', 'clientsecret', 'connectionstring', 'dsn', 'token', 'secret', 'privatekey', 'bearertoken', 'authtoken', 'tokenkey', 'credentialkey', 'credential'];
+        $sensitive = ['password', 'senha', 'pass', 'accesstoken', 'refreshtoken', 'authorization', 'apikey', 'clientsecret', 'connectionstring', 'dsn', 'token', 'secret', 'privatekey', 'jsonkey', 'odbcconnection', 'bearertoken', 'authtoken', 'tokenkey', 'credentialkey', 'credential'];
         foreach ($value as $key => $item) {
             $value[$key] = in_array(str_replace(['_', '-'], '', strtolower((string) $key)), $sensitive, true) ? '[protegido]' : $this->redact($item);
         }

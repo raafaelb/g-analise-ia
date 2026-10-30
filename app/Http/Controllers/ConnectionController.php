@@ -7,6 +7,7 @@ use App\Models\Approval;
 use App\Models\Connection;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\BiCredentials;
 use App\Services\ChatGptUsage;
 use App\Services\ChatGptVerifier;
 use App\Services\LumoClient;
@@ -56,8 +57,11 @@ class ConnectionController extends Controller
             $subject = hash('sha256', $claims['iss'].'|'.$result['client_id'].'|'.$claims['sub']);
             $linked = Connection::where('provider', 'openai')->where('subject', $subject)->first();
             $user = $transaction['user_id'] ? User::findOrFail($transaction['user_id']) : ($linked ? User::find($linked->user_id) : null);
-            if (! $user) {
-                throw new \RuntimeException('Entre na sua conta local para vincular o ChatGPT.');
+            if (! $user || ! $user->canStartWork()) {
+                throw new \RuntimeException('Entre em uma conta ativa e finalize sua senha pessoal antes de vincular o ChatGPT.');
+            }
+            if (! $transaction['user_id'] && $user->suite_subject !== null) {
+                return redirect()->route('login')->with('error', 'Entre com a Suíte para acessar sua conta de colaborador. Depois, conecte o ChatGPT dentro do seu workspace.');
             }
             if ($linked && $linked->user_id !== $user->id) {
                 throw new \RuntimeException('Esta identidade já está vinculada a outra conta.');
@@ -68,6 +72,7 @@ class ConnectionController extends Controller
             Connection::updateOrCreate(['user_id' => $user->id, 'provider' => 'openai'], ['subject' => $subject, 'status' => 'connected', 'account_label' => $claims['email'] ?? $claims['name'] ?? 'Conta ChatGPT', 'credentials' => $tokens, 'scopes' => preg_split('/\s+/', trim($tokens['scope'] ?? '')), 'metadata' => ['issuer' => $claims['iss'], 'client_id' => $result['client_id'], 'auth_mode' => $result['mode'], 'plan_usage' => $identity->planAuthorized($tokens)], 'expires_at' => isset($tokens['expires_in']) ? now()->addSeconds((int) $tokens['expires_in']) : null]);
             Auth::login($user);
             $request->session()->regenerate();
+            $request->session()->put('user_access_version', $user->access_version);
             Audit::record($user->id, 'connection.openai.connected', 'Conta ChatGPT conectada.');
 
             return redirect('/app/connections')->with('success', 'Sua conta ChatGPT foi conectada.');
@@ -166,6 +171,13 @@ class ConnectionController extends Controller
             AgentRun::where('user_id', $request->user()->id)->where('status', 'running')->update(['status' => 'cancel_requested']);
             $connection->update(['status' => 'disconnected', 'credentials' => null, 'scopes' => [], 'metadata' => $provider === 'openai' ? array_merge(array_intersect_key($connection->metadata ?? [], array_flip(['issuer', 'client_id', 'auth_mode'])), ['plan_usage' => false]) : [], 'expires_at' => null]);
         });
+        if ($provider === 'horus') {
+            foreach (Approval::where('user_id', $request->user()->id)->where('type', 'manual')->where('status', 'cancelled')->whereNull('project_id')->cursor() as $approval) {
+                if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
+                    app(BiCredentials::class)->cleanup($approval);
+                }
+            }
+        }
         Audit::record($request->user()->id, 'connection.'.$provider.'.disconnected', 'Conta desconectada.', null, ['remote_revocation_confirmed' => $revoked]);
 
         return response()->json(['message' => $revoked ? 'Conta desconectada.' : 'Conta desconectada localmente. Confirme a revogação nas configurações do ChatGPT.', 'remote_revocation_confirmed' => $revoked]);

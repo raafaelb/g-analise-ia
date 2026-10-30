@@ -4,38 +4,69 @@ use App\Jobs\OperationsHeartbeat;
 use App\Models\AgentRun;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\UserAccessRevocation;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Str;
 
-Artisan::command('horus:user {email} {--name=} {--role=author}', function () {
-    $role = $this->option('role');
-    if (! in_array($role, ['owner', 'author', 'viewer'], true)) {
+Artisan::command('horus:user {email} {--name=} {--role=editor}', function () {
+    $role = $this->option('role') === 'author' ? 'editor' : $this->option('role');
+    if (! in_array($role, ['owner', 'admin', 'editor', 'viewer'], true)) {
         $this->error('Perfil inválido.');
 
         return 1;
     }
-    if (! filter_var($this->argument('email'), FILTER_VALIDATE_EMAIL)) {
+    $email = strtolower(trim($this->argument('email')));
+    if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $this->error('E-mail inválido.');
 
         return 1;
     }
-    $password = $this->secret('Senha (mínimo de 12 caracteres)');
-    if (! is_string($password) || strlen($password) < 12) {
-        $this->error('A senha precisa de pelo menos 12 caracteres.');
+    $matches = User::whereRaw('LOWER(email) = ?', [$email])->get();
+    if ($matches->count() > 1 || $matches->contains(fn (User $user) => $user->suite_subject !== null)) {
+        $this->error('Este cadastro deve ser gerenciado pela Suíte ou conferido pelo administrador.');
 
         return 1;
     }
-    $user = User::firstOrNew(['email' => $this->argument('email')]);
-    $user->name = $this->option('name') ?: $this->argument('email');
-    $user->password = Hash::make($password);
-    $user->role = $role;
-    $user->save();
-    $this->info('Usuário configurado.');
+    $password = $this->secret('Senha (mínimo de 12 caracteres)');
+    if (! is_string($password) || mb_strlen($password) < 12 || mb_strlen($password) > 64 || strlen($password) > 72 || str_contains($password, "\0") || ! preg_match('/[a-z]/', $password) || ! preg_match('/[A-Z]/', $password) || ! preg_match('/[0-9]/', $password)) {
+        $this->error('Use de 12 a 64 caracteres com maiúsculas, minúsculas e números; reduza a senha se contiver muitos caracteres especiais.');
+
+        return 1;
+    }
+    $saved = DB::transaction(function () use ($email, $role, $password): bool {
+        $user = User::whereRaw('LOWER(email) = ?', [$email])->lockForUpdate()->first();
+        if ($user?->suite_subject !== null) {
+            return false;
+        }
+        $user ??= new User(['email' => $email]);
+        if ($user->exists) {
+            $user->access_version++;
+            $user->remember_token = Str::random(60);
+            app(UserAccessRevocation::class)->revoke($user);
+        }
+        $user->name = $this->option('name') ?: $email;
+        $user->password = Hash::make($password);
+        $user->role = $role;
+        $user->local_login_enabled = true;
+        $user->must_change_password = true;
+        $user->access_revision++;
+        $user->save();
+
+        return true;
+    });
+    if (! $saved) {
+        $this->error('Este cadastro deve ser gerenciado pela Suíte.');
+
+        return 1;
+    }
+    $this->info('Usuário configurado. A senha deverá ser trocada no próximo acesso.');
 
     return 0;
-})->purpose('Cria ou atualiza um acesso local sem expor a senha nos argumentos.');
+})->purpose('Cria ou redefine um acesso local sem expor a senha nos argumentos.');
 Schedule::call(function () {
     Artisan::call('ganalise:expire-reviews');
     AgentRun::whereIn('status', ['running'])->where('heartbeat_at', '<', now()->subMinutes(5))->each(function ($run) {

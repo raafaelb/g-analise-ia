@@ -13,6 +13,8 @@ class Connection extends Model
 
     protected $table = 'connections';
 
+    public ?int $operationAccessVersion = null;
+
     protected function casts(): array
     {
         return ['credentials' => 'encrypted:array', 'scopes' => 'array', 'metadata' => 'array', 'expires_at' => 'datetime'];

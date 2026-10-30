@@ -20,5 +20,7 @@ jobs:
       - run: docker compose run --rm frontend npm run test:frontend
       - run: docker compose run --rm frontend npm run build:local
       - run: docker compose run --rm --no-deps app php artisan test --compact
+      - run: docker compose -f compose.yaml -f compose.tests.yaml up -d --wait postgres-test
+      - run: docker compose -f compose.yaml -f compose.tests.yaml run --rm --no-deps app php scripts/test-postgres.php
       - run: docker compose run --rm --no-deps app vendor/bin/pint --test
       - run: docker compose run --rm --no-deps app php scripts/codex-smoke.php

@@ -1,14 +1,18 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BiCredentialController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ConnectionController;
+use App\Http\Controllers\SuiteAuthController;
+use App\Http\Controllers\UserAccessController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [AuthController::class, 'home'])->name('home');
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'form'])->name('login');
+    Route::post('/auth/suite', [SuiteAuthController::class, 'login'])->middleware('throttle:login')->name('suite.login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:registration');
 });
@@ -19,6 +23,14 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/app/{section?}', [WorkspaceController::class, 'page'])->where('section', '.*')->name('workspace');
     Route::prefix('api')->middleware('throttle:workspace')->group(function () {
+        Route::get('/users', [UserAccessController::class, 'index'])->name('users.index');
+        Route::post('/users', [UserAccessController::class, 'store'])->middleware('throttle:bi-actions')->name('users.store');
+        Route::patch('/users/{user}', [UserAccessController::class, 'update'])->whereNumber('user')->middleware('throttle:bi-actions')->name('users.update');
+        Route::patch('/account/password', [UserAccessController::class, 'password'])->middleware('throttle:login')->name('account.password');
+        Route::get('/catalog/{tenant}/credentials/options', [BiCredentialController::class, 'options'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/credentials/{id}/configuration', [BiCredentialController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/credentials/actions', [BiCredentialController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
+        Route::post('/catalog/{tenant}/credentials/{id}/inspect/{action}', [BiCredentialController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['test', 'schema'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/{id}/actions', [CatalogController::class, 'prepareAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
         Route::post('/approvals/{id}/publication/verify', [CatalogController::class, 'reconcilePublication'])->whereUuid('id')->middleware('throttle:bi-inspect');

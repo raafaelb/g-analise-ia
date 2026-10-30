@@ -13,7 +13,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 30/1
 
 ## Evidências e uso
 
-265 testes PHP e 1.415 verificações aprovados na revisão local ampliada; 19 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+365 testes PHP e 2.098 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 25 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
@@ -33,7 +33,7 @@ Mesas agora exibem tabelas, ETLs, cadastros e aplicações vinculadas; detalhes 
 
 O painel de plano/limites está em Conexões e junto ao chat. A conta real em modo OSS não disponibilizou plano ou saldo pelos métodos oficiais consultados; a interface informa essa ausência e oferece acesso ao uso no ChatGPT. Respostas oficiais com plano, janelas, saldo e renovação possuem testes isolados, inclusive separação de cache por conta. Não há estimativa fictícia de franquia.
 
-O runtime local foi atualizado para Lumo 3.41.0 com a imagem já homologada; a imagem anterior foi preservada para reversão. A revisão ampliada é mantida na branch `feature/gestao-completa` do repositório público. Cada push tem sua própria execução de CI; confira o resultado vinculado ao hash da versão em avaliação. Nenhuma implantação pública foi feita.
+O runtime local usa Lumo 3.42.0, depois da conferência em imagem separada, testes SQLite/PostgreSQL e consultas reais. Versão e SHA-256 permanecem fixados; o build recusa substituições silenciosas no canal oficial. A revisão ampliada é mantida na branch `feature/gestao-completa` do repositório público. Cada push tem sua própria execução de CI; confira o resultado vinculado ao hash da versão em avaliação. Nenhuma implantação pública foi feita.
 
 A [análise de gestão completa](gestao-completa.md) distingue as funcionalidades implementadas, as possíveis pelo CLI, as dependentes de APIs/permissões adicionais e os limites de homologação do visualizador interativo e de Claude Code. O painel de prévias acompanha novas imagens sem recarregar a página; a navegação de projetos e o padrão global das barras de rolagem também foram corrigidos e conferidos no navegador.
 
@@ -61,3 +61,11 @@ Consultas indisponíveis, incompletas ou com estado de publicação desconhecido
 A homologação real em projeto local separado confirmou o recebimento da versão publicada, o reconhecimento de uma versão já atual e a preservação de uma edição temporária. A mensagem de conflito foi observada no navegador, o hash permaneceu intacto e o arquivo foi restaurado ao conteúdo exato anterior. Não houve tarefas de IA, aprovações ou recursos remotos criados. O projeto descartável foi arquivado, preservando o histórico.
 
 Um cache antigo do catálogo mostrava o rascunho mesmo depois da publicação confirmada. O cache de consulta agora é reconstruído separadamente da autoria; em falha, metadados antigos não são apresentados como atuais. O navegador confirmou a aplicação publicada na mesa correta e a contagem atual de Minha Mesa.
+
+## Login da Suíte, acesso local e avisos de prévia — 30/10/2026
+
+O portal oferece login de colaborador pela Suíte e gestão administrativa de acessos locais, com troca obrigatória da senha inicial. O fluxo local foi conferido em navegador separado: cadastro, primeiro login restrito, troca de senha, entrada no workspace sem perfil administrativo e recusa após inativação. O login real da Suíte ainda deve ser concluído pelo titular; não foram lidas nem importadas senhas de outras aplicações.
+
+O aviso técnico de widget personalizado foi reproduzido em leitura e substituído por explicação em português com atalhos de visualização. O ensaio confirmou a navegação para a prévia interativa e a geração de um PNG real, sem enviar seus pixels à IA. A consulta tabular continua indisponível para esse formato; o portal não executa o código personalizado no servidor para tentar reconstruí-la.
+
+O formulário de conexões possui revisão e protege os campos privados. Um ensaio real encontrou e corrigiu limite de coluna no PostgreSQL e validação indevida de todo o inventário local. A configuração de uma conexão de teste já criada foi retomada e conferida no BI, preservando sua referência. Uma nova criação completa pelo formulário também foi confirmada, incluindo o agente selecionado. As três conexões descartáveis desta rodada foram removidas; os IDs das 31 conexões preexistentes permaneceram iguais. As limitações restantes estão na [matriz de gestão](gestao-completa.md).

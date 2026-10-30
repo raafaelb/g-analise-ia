@@ -263,4 +263,24 @@ class CatalogTest extends TestCase
         });
         $this->actingAs($user)->getJson('/api/catalog/321')->assertOk()->assertJsonPath('resources.app.0.name', 'Nome atual autorizado')->assertJsonPath('resources.app.0.state', null)->assertJsonPath('resources.app.0.dashboard_count', null)->assertJsonPath('resources.app.0.metadata_available', false)->assertJsonPath('warnings.0', 'Os metadados locais não foram atualizados; alguns detalhes serão carregados ao abrir o recurso.');
     }
+
+    public function test_nested_native_credential_payload_preserves_its_type_without_disclosing_configuration(): void
+    {
+        $user = User::factory()->create();
+        $this->connect($user);
+        $mock = $this->mock(LumoClient::class);
+        $mock->shouldReceive('initialize')->andReturnNull();
+        $mock->shouldReceive('run')->andReturnUsing(function ($connection, array $args): array {
+            if ($args[0] === 'info') {
+                return ['data' => ['payload' => ['dependents' => [], 'payload' => ['header' => ['id' => 1, 'kind' => 'credential', 'tenantId' => 321], 'body' => ['nome' => 'Conexão PostgreSQL', 'type' => 'postgresql', 'config' => ['hostname' => 'source.example.invalid', 'JsonKey' => 'SYNTHETIC-NESTED-SECRET'], 'password' => 'SYNTHETIC-NESTED-SECRET']]]]];
+            }
+            if (($args[1] ?? '') === 'variables') {
+                return ['data' => ['count' => 0, 'variables' => []]];
+            }
+
+            return ['data' => ['matched' => ($args[1] ?? '') === 'credential' ? 1 : 0, 'results' => ($args[1] ?? '') === 'credential' ? [['id' => 1, 'nome' => 'Conexão PostgreSQL']] : []]];
+        });
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/credential/1')->assertOk()->assertJsonPath('details.type', 'postgresql')->assertJsonPath('credential_management.can_edit', true)->assertJsonMissingPath('details.config');
+        $this->assertStringNotContainsString('SYNTHETIC-NESTED-SECRET', $response->getContent());
+    }
 }

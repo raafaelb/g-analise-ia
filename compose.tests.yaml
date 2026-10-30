@@ -1,0 +1,13 @@
+# Banco descartável, sem portas públicas e sem volume persistente.
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ganalise_test
+      POSTGRES_USER: ganalise_test
+      POSTGRES_PASSWORD: ganalise_test_local_only
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ganalise_test -d ganalise_test"]
+      interval: 2s
+      retries: 20

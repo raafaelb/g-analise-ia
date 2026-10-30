@@ -7,7 +7,9 @@ Produto gratuito e aberto da Inovadora, complementar ao G-Analise BI. PHP 8.5/La
 ## Estado atual
 
 - Login ChatGPT OSS **homologado localmente**: identidade, autorização do plano, catálogo de modelos, resposta completa, conversa Codex, ferramentas e análise de imagem autorizada.
+- Login de colaboradores pela Suíte e cadastro administrativo de acessos locais, com senha inicial obrigatoriamente substituída e revogação de sessões. A resposta positiva real da Suíte ainda depende do teste do titular.
 - Login G-Analise BI, descoberta de todos os tenants e renovação nativa da sessão homologados. Senha não é armazenada; tokens ficam criptografados.
+- Formulários de criação/edição de conexões para oito tipos de banco, revisão protegida, teste de conectividade e consulta limitada de estrutura. Criação/retomada/limpeza real de conexões descartáveis homologadas na Inovadora.
 - Catálogo por tenant: aplicações, Minha Mesa, dashboards, mesas BI/DW, tabelas, ETL, agendas, agentes, apresentações, variáveis protegidas e tags. Falta de permissão é diferente de lista vazia. Credenciais são exibidas apenas com dados seguros, sem valores secretos.
 - Criação/clone de rascunhos, edição YAML, revisão, sincronização, consultas e PNG real. Exclusão limitada aos rascunhos registrados como criados pelo próprio projeto. A aplicação original não é excluída.
 - Gestão manual de aplicações: duplicar com nome confirmado, excluir somente rascunhos registrados e publicar com mesa nomeada e efeito explícito. Publicação como nova já homologada na conta real; substituição ainda depende do ciclo real correspondente.
@@ -32,7 +34,7 @@ cd g-analise-ia
 docker compose exec app php artisan horus:user seu@email.com --name="Seu nome" --role=owner
 ```
 
-O comando solicita uma senha de pelo menos 12 caracteres sem exibi-la. Perfis: owner, author e viewer. Cadastro público vem desabilitado. Abra **http://127.0.0.1:8088** para testar ChatGPT local; `localhost` também atende ao portal, mas o callback OSS exige `127.0.0.1`.
+O comando solicita uma senha de pelo menos 12 caracteres, com maiúsculas, minúsculas e números, sem exibi-la. A troca é obrigatória no próximo acesso. Perfis: owner, admin, editor e viewer (`author` antigo é aceito como alias de editor). O comando preserva identidades gerenciadas pela Suíte; redefinir um acesso local encerra sessões e tarefas anteriores. Cadastro público vem desabilitado. Abra **http://127.0.0.1:8088** para testar ChatGPT local. No ambiente local OSS, páginas abertas em `localhost` redirecionam para a origem de loopback configurada no callback; cookies não são transferidos entre os endereços.
 
 O modo de demonstração `LOCAL_PREVIEW=true` abre uma conta de exemplo somente em ambiente local. Desative para validar contas independentes. Nunca exponha esse modo publicamente.
 
@@ -52,19 +54,35 @@ ChatGPT local: use `APP_ENV=local`, `OPENAI_AUTH_MODE=oss_local`, `OPENAI_SIGN_I
 
 Para hospedagem central, mantenha `OPENAI_AUTH_MODE=hosted` e a integração desabilitada até receber a configuração oficial compatível com uso do plano. O [formulário e os dados necessários](docs/solicitacao-openai.md) estão documentados.
 
+## Acesso pela Suíte e cadastros locais
+
+A tela de login oferece **Entrar com a Suíte** para colaboradores da Inovadora. O backend valida a senha diretamente na API HTTPS configurada em `SUITE_BASE_URL`, sem persistir a senha da Suíte. Uma resposta positiva e a identidade canônica criam/vinculam a conta local com perfil de administrador. Cada pessoa continua conectando suas próprias contas ChatGPT e G-Analise BI; o perfil do portal não concede novas permissões no BI.
+
+Em **Usuários e acessos**, administradores cadastram acessos locais, atribuem perfil, ativam/inativam e redefinem uma senha inicial. A primeira entrada exige troca da senha antes de liberar projetos e conexões. Inativação e mudanças de acesso revogam sessões locais e tarefas pendentes. O ensaio real com uma conta Suíte ainda depende da senha digitada pelo titular; o contrato está coberto com respostas simuladas. Consulte [os detalhes da integração](docs/gestao-completa.md).
+
 ## Validação
 
 ```sh
 docker compose exec app php artisan test --compact
-docker compose exec app vendor/bin/pint --test
+docker compose exec app vendor/bin/pint --dirty --format agent
 docker compose run --rm --no-deps frontend npm run test:frontend
 docker compose run --rm frontend npm run build:local
 docker compose exec app php scripts/codex-smoke.php
 docker compose exec app php artisan ganalise:health
 ```
 
-A rodada local de 30/10/2026 passou com 265 testes PHP / 1.415 verificações e 19 testes de frontend. Os testes PHP usam SQLite em memória e fakes HTTP, sem alterar o PostgreSQL nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
+A rodada local de 30/10/2026 passou com 365 testes PHP / 2.098 verificações, tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 25 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
 
-Codex está fixado em 0.165.0 e Lumo em 3.41.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
+Codex está fixado em 0.165.0 e Lumo em 3.42.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
 
 Licença do código: MIT. OpenAI, Lumo e dependências mantêm seus termos e licenças.
+
+Para repetir no PostgreSQL descartável (sem portas públicas ou volume persistente):
+
+```sh
+docker compose -f compose.yaml -f compose.tests.yaml up -d --wait postgres-test
+docker compose -f compose.yaml -f compose.tests.yaml run --rm --no-deps app php scripts/test-postgres.php
+docker compose -f compose.yaml -f compose.tests.yaml rm -sf postgres-test
+```
+
+O runner fixa `postgres-test / ganalise_test`, força os parâmetros de teste e elimina o XML temporário. Ele não aceita uma URL de banco de produção.

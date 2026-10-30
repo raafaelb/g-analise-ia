@@ -85,11 +85,11 @@ class BiManualActions
         }
     }
 
-    /** @return array{project: Project, approval: Approval} */
+    /** @return array{project: ?Project, approval: Approval} */
     public function status(User $user, string $id): array
     {
         $approval = Approval::where('user_id', $user->id)->where('type', 'manual')->findOrFail($id);
 
-        return ['approval' => $approval, 'project' => Project::where('user_id', $user->id)->findOrFail($approval->project_id)];
+        return ['approval' => $approval, 'project' => $approval->project_id === null ? null : Project::where('user_id', $user->id)->findOrFail($approval->project_id)];
     }
 }

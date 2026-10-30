@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Connection;
 use App\Models\Project;
+use App\Models\User;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -33,6 +34,11 @@ class LumoClient
         if (! config('horus.lumo.login_enabled')) {
             throw new RuntimeException('O administrador ainda não habilitou a autenticação G-Analise nesta instalação.');
         }
+        $actor = User::find($userId);
+        if (! $actor?->canStartWork()) {
+            throw new RuntimeException('O acesso do usuário está inativo ou requer atualização da senha.');
+        }
+        $accessVersion = $actor->access_version;
         $home = $this->sessionHome($userId);
         try {
             $command = [config('horus.lumo.binary'), 'auth', 'login', '--server', config('horus.lumo.server'), '--no-input'];
@@ -41,6 +47,10 @@ class LumoClient
             $p->run();
             if (! $p->isSuccessful()) {
                 throw new RuntimeException('O G-Analise não concluiu o login. Confira e-mail, senha, 2FA e a permissão Uso do Lumo CLI.');
+            }
+            $currentActor = $actor->fresh();
+            if (! $currentActor?->canStartWork() || $currentActor->access_version !== $accessVersion) {
+                throw new RuntimeException('Seu acesso mudou durante o login. Entre novamente no portal antes de conectar o BI.');
             }
             $authPath = $home.'/.lumo/auth.json';
             if (! is_file($authPath)) {
@@ -61,9 +71,21 @@ class LumoClient
     {
         try {
             return Cache::lock('lumo-session:'.$connection->id, $timeout + 20)->block(10, function () use ($connection, $arguments, $project, $timeout) {
+                $user = User::find($connection->user_id);
+                if (! $user?->canStartWork()) {
+                    throw new RuntimeException('O acesso do usuário está inativo ou requer atualização da senha.');
+                }
+                $connection->operationAccessVersion ??= $user->access_version;
+                if ($connection->operationAccessVersion !== $user->access_version) {
+                    throw new RuntimeException('Seu acesso ao portal foi alterado. Confira o recurso antes de iniciar outra operação.');
+                }
                 $connection->refresh();
                 $generation = $connection->metadata['session_generation'] ?? null;
                 $result = $this->execute($connection, $arguments, $project, $timeout);
+                $currentUser = $user->fresh();
+                if (! $currentUser?->canStartWork() || $currentUser->access_version !== $connection->operationAccessVersion) {
+                    throw new RuntimeException('Seu acesso ao portal mudou durante a operação. Confira o resultado antes de repetir.');
+                }
                 $latest = $connection->fresh();
                 if (! $latest || $latest->status !== 'connected' || ($latest->metadata['session_generation'] ?? null) !== $generation) {
                     throw new RuntimeException('A sessão G-Analise mudou durante a operação. Confira o recurso antes de repetir.');

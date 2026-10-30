@@ -27,6 +27,7 @@ class LocalPreview
         }
         Auth::login($user);
         request()->session()->regenerate();
+        request()->session()->put('user_access_version', $user->access_version);
         if (! Project::where('user_id', $user->id)->exists()) {
             $this->seed($user);
         }
