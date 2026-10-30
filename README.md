@@ -10,6 +10,9 @@ Produto gratuito e aberto da Inovadora, complementar ao G-Analise BI. PHP 8.5/La
 - Login G-Analise BI, descoberta de todos os tenants e renovação nativa da sessão homologados. Senha não é armazenada; tokens ficam criptografados.
 - Catálogo por tenant: aplicações, Minha Mesa, dashboards, mesas BI/DW, tabelas, ETL, agendas, agentes, apresentações, variáveis protegidas e tags. Falta de permissão é diferente de lista vazia. Credenciais são exibidas apenas com dados seguros, sem valores secretos.
 - Criação/clone de rascunhos, edição YAML, revisão, sincronização, consultas e PNG real. Exclusão limitada aos rascunhos registrados como criados pelo próprio projeto. A aplicação original não é excluída.
+- Gestão manual de aplicações: duplicar com nome confirmado, excluir somente rascunhos registrados e publicar com mesa nomeada e efeito explícito. Publicação como nova já homologada na conta real; substituição ainda depende do ciclo real correspondente.
+- Prévia PNG com histórico por projeto/dashboard e acompanhamento de novas versões. Visualizador nativo isolado no Chrome compatível, com alternativa PNG.
+- Painel de plano/limites informa somente o que o provedor disponibiliza; o fluxo OSS testado não retornou saldo. A interface oferece acesso ao uso no ChatGPT.
 - Revisão humana assíncrona: o worker é liberado enquanto aguarda decisão; a ação aprovada executa uma vez e a IA retoma com o resultado confirmado. Publicação depende da revisão concreta e das fontes verificadas.
 - Anexos privados: texto/CSV/JSON/YAML/Markdown, XLSX, PDF com texto e PNG/JPEG. Limites explícitos; PDFs digitalizados ainda exigem OCR ou envio de imagem.
 - Cobertura das fontes, preservação de agendas mais frequentes e identificação de carga concluída. A ativação de uma segunda agenda para uma fonte já agendada é bloqueada no servidor. A solicitação/enfileiramento não é sucesso. Nova publicação de aplicação gerenciada é bloqueada enquanto faltar a verificação das cargas.
@@ -53,12 +56,13 @@ Para hospedagem central, mantenha `OPENAI_AUTH_MODE=hosted` e a integração des
 ```sh
 docker compose exec app php artisan test --compact
 docker compose exec app vendor/bin/pint --test
+docker compose run --rm --no-deps frontend npm run test:frontend
 docker compose run --rm frontend npm run build:local
 docker compose exec app php scripts/codex-smoke.php
 docker compose exec app php artisan ganalise:health
 ```
 
-Os testes PHP usam SQLite em memória e fakes HTTP, sem alterar o PostgreSQL nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
+A rodada local de 30/10/2026 passou com 233 testes PHP / 1.163 verificações e 19 testes de frontend. Os testes PHP usam SQLite em memória e fakes HTTP, sem alterar o PostgreSQL nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
 
 Codex está fixado em 0.165.0 e Lumo em 3.41.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
 
