@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
@@ -190,20 +191,32 @@ class BiCredentials
     public function inspect(User $user, string $tenant, string $id, string $action, ?string $schema = null, ?string $search = null, int $offset = 0): array
     {
         [$connection, $item] = $this->access($user, $tenant);
-        abort_unless(in_array($action, ['test', 'schema'], true), 422);
+        abort_unless(in_array($action, ['test', 'schema', 'relationships'], true), 422);
         if ($schema !== null && ! preg_match('/^[\pL\pN_][\pL\pN_. -]{0,127}$/uD', $schema)) {
             throw ValidationException::withMessages(['schema' => 'Escolha um nome de schema válido.']);
         }
-        if (($search !== null && ! preg_match('/^[\pL\pN_ .-]{1,100}$/uD', $search)) || $offset < 0 || $offset > 1000000 || ($action !== 'schema' && ($search !== null || $offset !== 0))) {
+        if (($search !== null && ! preg_match('/^[\pL\pN_ .-]{1,100}$/uD', $search)) || $offset < 0 || $offset > 1000000 || (! in_array($action, ['schema', 'relationships'], true) && ($search !== null || $offset !== 0))) {
             throw ValidationException::withMessages(['search' => 'Use um termo de estrutura válido e uma posição de consulta permitida.']);
         }
-        $this->policy->assertCommandAllowed($tenant, ['credential', $action, 'credential:'.$id], $connection);
+        $this->policy->assertCommandAllowed($tenant, ['credential', $action === 'relationships' ? 'schema' : $action, 'credential:'.$id], $connection);
 
         return $this->withContext($connection, $item, function (Project $context) use ($connection, $id, $action, $schema, $search, $offset): array {
             $ref = 'credential:'.$id;
             $this->assertListed($connection, $context, $ref);
             $generation = $connection->metadata['session_generation'] ?? null;
             try {
+                if ($action === 'relationships') {
+                    [, $document] = $this->document($connection, $context, $ref);
+                    $report = app(BiSourceRelationships::class)->inspect($connection, $context, $ref, $this->types->driver((string) ($document['type'] ?? '')), $schema, $search, $offset);
+                    $this->assertGeneration($connection, $generation);
+                    [$current] = $this->catalog->access(User::findOrFail($connection->user_id), (string) $context->tenant_id);
+                    if ($current->id !== $connection->id || ($current->metadata['session_generation'] ?? null) !== $generation) {
+                        throw new RuntimeException('O acesso mudou durante a consulta de relacionamentos.');
+                    }
+                    Audit::record($connection->user_id, 'bi.credential.relationships_read', 'Relacionamentos declarados consultados sem leitura de linhas de negócio.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $report['verified'], 'relationship_count' => count($report['relationships'] ?? []), 'truncated' => $report['truncated'] ?? null]);
+
+                    return $report;
+                }
                 if ($action === 'schema' && ($search !== null || $offset > 0)) {
                     [, $document] = $this->document($connection, $context, $ref);
                     if ($this->types->driver((string) ($document['type'] ?? '')) !== 'postgres') {
@@ -239,7 +252,7 @@ class BiCredentials
 
                 return [...$report, 'method' => $method];
             } catch (RuntimeException $e) {
-                if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected' || $e->getCode() === 6) {
+                if ($e instanceof BiBusy || $e instanceof HttpExceptionInterface || $connection->fresh()->status !== 'connected' || $e->getCode() === 6) {
                     throw $e;
                 }
                 $this->assertGeneration($connection, $generation);
@@ -317,7 +330,8 @@ class BiCredentials
     private function assertGeneration(Connection $connection, ?string $generation): void
     {
         $current = $connection->fresh();
-        if (! $current || $current->status !== 'connected' || ! User::find($connection->user_id)?->canStartWork() || User::find($connection->user_id)?->role === 'viewer' || ($current->metadata['session_generation'] ?? null) !== $generation) {
+        $user = User::find($connection->user_id);
+        if (! $current || $current->status !== 'connected' || ! $user?->canStartWork() || $user->role === 'viewer' || $user->access_version !== $connection->operationAccessVersion || ($current->metadata['session_generation'] ?? null) !== $generation) {
             throw new RuntimeException('Sua conexão BI mudou durante a operação. Confira os dados antes de continuar.');
         }
     }

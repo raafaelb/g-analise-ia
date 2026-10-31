@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.7",
+  "version": "2026-10-31.8",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -198,9 +198,16 @@
           "audience": "all"
         },
         {
+          "id": "catalog-source-relationships",
+          "title": "Investigue como as tabelas se conectam",
+          "description": "Em Conexões de dados, abra a fonte e use Ver relacionamentos. Confira os pares de campos, a busca e as páginas. A consulta mostra os vínculos declarados e visíveis; campos incompletos ou sem validação exigem investigação. Nenhuma carga é iniciada.",
+          "anchor": "catalog-types",
+          "audience": "authors"
+        },
+        {
           "id": "catalog-edit",
           "title": "Ações claras no próprio catálogo",
-          "description": "Crie mesas e conexões quando autorizado. Em Fontes / ETL, use Duplicar ETL para preparar uma cópia. Nos rascunhos, Publicar ETL permite escolher a mesa de dados e revisar o efeito antes de compartilhar. Agendas e tabelas têm formulários próprios.",
+          "description": "Crie mesas e conexões quando autorizado. Nas conexões de dados, confira tabelas, colunas e relacionamentos declarados. Em Fontes / ETL, duplique uma cópia ou publique um rascunho com revisão do destino. Agendas e tabelas têm formulários próprios.",
           "audience": "authors"
         },
         {
@@ -501,7 +508,7 @@
       "id": "data-connections",
       "title": "Como adiciono uma nova conexão de dados?",
       "summary": "Cadastre uma fonte pelo Catálogo BI, com os campos protegidos e revisão.",
-      "body": "Abra **Catálogo BI**, selecione o ambiente e a categoria **Conexões de dados**. Quando sua conta permitir, use **Adicionar nova conexão**, escolha o tipo de fonte e o agente e preencha os dados no formulário privado. Confira a proposta antes de autorizar a criação.\n\nAs credenciais protegidas são tratadas pelo formulário e não precisam ser enviadas à IA. As ações de teste e consulta de estrutura dependem do conector e das permissões. Alguns formatos avançados ainda não possuem editor completo; o portal informa a disponibilidade.\n\nIsso é diferente de conectar sua conta G-Analise BI na página **Conexões**. Uma conexão de dados é o acesso a um banco ou outra fonte que alimenta ETLs.",
+      "body": "Abra **Catálogo BI**, selecione o ambiente e a categoria **Conexões de dados**. Quando sua conta permitir, use **Adicionar nova conexão**, escolha o tipo de fonte e o agente e preencha os dados no formulário privado. Confira a proposta antes de autorizar a criação.\n\nAs credenciais protegidas são tratadas pelo formulário e não precisam ser enviadas à IA. As ações de teste e consulta de estrutura dependem do conector e das permissões. Alguns formatos avançados ainda não possuem editor completo; o portal informa a disponibilidade.\n\nIsso é diferente de conectar sua conta G-Analise BI na página **Conexões**. Uma conexão de dados é o acesso a um banco ou outra fonte que alimenta ETLs. Para investigar combinações de tabelas, abra Ver relacionamentos. A consulta usa apenas os metadados disponíveis à conexão e não altera o banco. Veja a orientação Relacionamentos entre tabelas para entender campos incompletos e limites de acesso.",
       "pages": [
         "catalog",
         "connections"
@@ -788,6 +795,23 @@
       ],
       "actions": [],
       "audience": "authors"
+    },
+    {
+      "id": "source-relationships",
+      "title": "Como a IA descobre os relacionamentos entre tabelas?",
+      "audience": "authors",
+      "pages": [
+        "catalog",
+        "project"
+      ],
+      "body": "A IA pode consultar tabelas, colunas e os relacionamentos declarados da conexão sem pedir que você escreva SQL ou informe nomes técnicos.\n\nNo **Catálogo BI → Conexões de dados**, escolha a fonte e use **Ver relacionamentos**. A consulta está disponível para PostgreSQL, MySQL e SQL Server. Outros conectores continuam com a consulta de estrutura quando o agente a oferece.\n\nO painel mostra a tabela de origem, a tabela referenciada e os pares de campos retornados para cada vínculo. Use **Buscar na fonte** para filtrar por nomes de tabela, schema ou relacionamento. O filtro de schema considera os dois lados da referência. As páginas ficam no início dos resultados, e **Mostrar mais vínculos desta página** amplia a lista atual. Essa busca consulta metadados, não pessoas ou registros do banco. **Ocultar consulta** recolhe o resultado e permite continuar nos detalhes e ETLs vinculados à conexão; o foco retorna à ação de consulta.\n\n**Campos incompletos** indica que a consulta não trouxe todos os pares esperados. Refine pelo nome do vínculo antes de usá-lo para combinar tabelas. No MySQL, o catálogo pode ocultar campos individuais por permissão: **Cobertura a conferir** indica que a quantidade visível não comprova a chave completa, mesmo quando a sequência parece contínua. Os pares servem como pistas para a investigação, sem confirmação automática da chave inteira.\n\n**Desativado na fonte**, **Não validado na fonte** e **Validação não informada** são estados diferentes e podem aparecer junto ao aviso de campos incompletos. Mesmo um vínculo declarado e validado não explica sozinho a regra de negócio nem comprova que uma consulta evita duplicidades.\n\nUma lista vazia pode indicar ausência de declaração, filtro ou limite de permissão; não significa que não exista relação entre os dados. Se a fonte omitir informações de uma resposta vazia, o portal faz uma conferência adicional dos mesmos metadados. Sem evidência suficiente, mantém **Sem confirmação**, pois pode haver uma falha na fonte. A IA deve investigar ETLs existentes e validar os dados antes de definir uma combinação.\n\nA consulta de relacionamentos **não lê linhas de negócio**, não inicia carga, não cria ETL, não publica e não envia informações à IA por si só. Ao pedir uma tarefa na conversa, a IA usa as ferramentas autorizadas daquele projeto e ambiente. Se o acesso mudar durante a consulta, o resultado é descartado.",
+      "summary": "Consulte os vínculos declarados da conexão, confira chaves compostas e entenda os limites de acesso e validação.",
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir Catálogo BI"
+        }
+      ]
     }
   ]
 }

@@ -41,3 +41,9 @@ test('questions about duplicating ETLs find the reviewed copy workflow',()=>{
 test('questions about publishing ETLs find data desks and explicit publication review',()=>{
  assert.equal(searchGuideArticles(content.articles,'publicar etl','catalog')[0]?.id,'etl-publications');
 });
+
+
+test('source relationship help is discoverable without requiring SQL terminology',()=>{
+ const matches=searchGuideArticles(content.articles,'relacionamentos entre tabelas','catalog');
+ assert.equal(matches[0].id,'source-relationships');
+});
