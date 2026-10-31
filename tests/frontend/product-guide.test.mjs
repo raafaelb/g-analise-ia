@@ -32,3 +32,7 @@ test('hidden mobile navigation or missing controls are skipped while the centere
 test('questions about scrolling over a map find the contextual navigation help',()=>{
  assert.equal(searchGuideArticles(content.articles,'rolagem mapa','project')[0]?.id,'preview-navigation');
 });
+
+test('questions about duplicating ETLs find the reviewed copy workflow',()=>{
+ assert.equal(searchGuideArticles(content.articles,'duplicar etl','catalog')[0]?.id,'etl-clones');
+});

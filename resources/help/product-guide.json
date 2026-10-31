@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.5",
+  "version": "2026-10-31.6",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -134,7 +134,7 @@
         {
           "id": "project-request",
           "title": "Peça o resultado em suas palavras",
-          "description": "Explique o que deseja criar ou melhorar. Os anexos ajudam a fornecer referências; a IA deve conferir as fontes reais antes de concluir.",
+          "description": "Explique o que deseja criar ou melhorar e envie referências quando necessário. Na conversa vazia de um ETL, Conferir este ETL preenche um pedido de análise; revise o texto antes de enviar. A IA deve conferir as fontes reais antes de concluir.",
           "anchor": "project-request",
           "audience": "authors"
         },
@@ -147,7 +147,7 @@
         {
           "id": "project-preview",
           "title": "Explore a prévia",
-          "description": "Prévia abre o dashboard para conferência. Amplie a área e simule computador, tablet ou celular. Na ajuda da prévia, confira como rolar sobre mapas e use Entrar no dashboard para direcionar o teclado ao visualizador.",
+          "description": "Nos projetos vinculados a uma aplicação, Prévia permite conferir o dashboard, ampliar a área e simular computador, tablet ou celular. A ajuda explica a rolagem sobre mapas e a entrada pelo teclado.",
           "anchor": "chat-preview-toggle",
           "audience": "all"
         },
@@ -193,15 +193,15 @@
         {
           "id": "catalog-search",
           "title": "Localize e confira",
-          "description": "Use a busca e os filtros. Abra um cartão para conferir vínculos e ações. Aplicações oferecem prévia interativa com ajuda de navegação. Se faltar acesso a uma área, confira o motivo indicado.",
+          "description": "Use a busca e os filtros. Abra um cartão para conferir vínculos e ações. As prévias disponíveis dependem das permissões da conta. Se faltar acesso a uma área, confira o motivo indicado.",
           "anchor": "catalog-search",
           "audience": "all"
         },
         {
           "id": "catalog-edit",
           "title": "Ações claras no próprio catálogo",
-          "description": "Você pode criar mesas e conexões quando autorizado. Em Agendas, use Nova agenda ou Editar agenda para escolher fontes, agente e horários com revisão. Nas tabelas, Organizar nomes e formatos preserva a estrutura. As aplicações oferecem prévias e ações próprias.",
-          "audience": "all"
+          "description": "Crie mesas e conexões quando autorizado. Em Fontes / ETL, abra um recurso e use Duplicar ETL para preparar uma cópia com projeto próprio. Agendas e tabelas têm formulários próprios; confira sempre a revisão antes de autorizar.",
+          "audience": "authors"
         },
         {
           "id": "catalog-schedule",
@@ -762,6 +762,19 @@
           "label": "Ver minhas conexões"
         }
       ]
+    },
+    {
+      "id": "etl-clones",
+      "title": "Como duplico um ETL para trabalhar em uma cópia?",
+      "summary": "No Catálogo BI, abra Fontes / ETL, escolha o recurso e use Duplicar ETL. A cópia terá seu próprio projeto.",
+      "body": "Um ETL prepara os dados que alimentam as tabelas e os dashboards. Para aproveitar um trabalho existente, abra **Catálogo BI → Fontes / ETL**, escolha a origem e selecione **Duplicar ETL**. Informe o nome da cópia e prepare a revisão.\n\nConfira o ambiente, a origem, o nome e o efeito antes de autorizar. A operação usa sua conexão BI e não inicia uma tarefa de IA. Depois, abra o projeto da cópia para continuar o trabalho. Ele identifica o contexto como ETL. Na conversa vazia, **Conferir este ETL** preenche um pedido de análise sem cargas ou alterações; confira e envie o texto quando quiser. O botão sozinho não inicia uma tarefa de IA. Projetos de ETL não mostram o botão de prévia de dashboard: confira suas etapas e seu histórico de cargas no catálogo ou pela conversa. O acompanhamento também fica em **Atividade**. Enquanto a operação manual estiver aberta, use os controles da própria seção; o caminho de criar um projeto para o recurso original fica oculto para evitar confundir origem e cópia.\n\nO novo ETL tem identificadores próprios para as etapas e para suas tabelas de destino. Uma cópia da definição não comprova que os dados já estejam carregados. No projeto, peça à IA para conferir a cópia e testar suas etapas; uma carga depende de outra revisão. A duplicação também não autoriza publicar nem substituir as fontes de dashboards existentes.\n\nSe a cópia aparecer com conferência pendente ou a operação falhar após o envio, confira o catálogo e o projeto antes de solicitar outra duplicação. O portal não repete automaticamente uma tentativa sem confirmação. O editor visual completo de ETLs e as demais ações de gestão continuam em evolução.",
+      "pages": [
+        "catalog",
+        "project",
+        "activity"
+      ],
+      "actions": [],
+      "audience": "authors"
     }
   ]
 }

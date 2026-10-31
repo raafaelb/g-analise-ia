@@ -20,16 +20,16 @@ class BiManualActions
     public function __construct(private BiCatalog $catalog, private TenantPolicy $policy, private ActionBroker $broker) {}
 
     /** @return array{project: Project, approval: Approval, reused: bool} */
-    public function prepare(User $user, string $tenant, string $appId, array $data): array
+    public function prepare(User $user, string $tenant, string $resourceId, array $data, string $kind = 'app'): array
     {
         abort_if($user->role === 'viewer', 403, 'Seu perfil permite somente leitura.');
-        abort_unless(ctype_digit($appId) && (int) $appId > 0, 422, 'Aplicação inválida.');
+        abort_unless(in_array($kind, ['app', 'flow'], true) && ctype_digit($resourceId) && (int) $resourceId > 0, 422, 'Recurso inválido.');
         [$connection, $tenantItem] = $this->catalog->access($user, $tenant);
         $action = $data['action'];
-        abort_unless(in_array($action, ['clone_app', 'delete_draft', 'publish_app'], true), 422, 'Ação manual não permitida.');
-        $this->policy->assertCommandAllowed($tenant, [$action === 'delete_draft' ? 'rm' : 'app', $action === 'clone_app' ? 'clone' : ($action === 'publish_app' ? 'publish' : 'app:'.$appId)], $connection);
-        $arguments = ['action' => $action, 'resource' => 'app:'.$appId];
-        if ($action === 'clone_app') {
+        abort_unless(in_array($action, $kind === 'flow' ? ['clone_flow'] : ['clone_app', 'delete_draft', 'publish_app'], true), 422, 'Ação manual não permitida.');
+        $this->policy->assertCommandAllowed($tenant, [$action === 'delete_draft' ? 'rm' : $kind, in_array($action, ['clone_app', 'clone_flow'], true) ? 'clone' : ($action === 'publish_app' ? 'publish' : 'app:'.$resourceId)], $connection);
+        $arguments = ['action' => $action, 'resource' => $kind.':'.$resourceId];
+        if (in_array($action, ['clone_app', 'clone_flow'], true)) {
             $arguments['name'] = trim($data['name']);
         }
         if ($action === 'publish_app') {
@@ -47,7 +47,7 @@ class BiManualActions
                     return ['project' => Project::where('user_id', $user->id)->findOrFail($existing->project_id), 'approval' => $existing, 'reused' => true];
                 }
 
-                if ($arguments['action'] === 'clone_app') {
+                if (in_array($arguments['action'], ['clone_app', 'clone_flow'], true)) {
                     $project = new Project(['user_id' => $user->id, 'tenant_id' => $tenant, 'tenant_name' => $tenantItem['name'], 'name' => $arguments['name'], 'description' => 'Cópia de '.$arguments['resource'].' preparada pelo catálogo.', 'instructions' => 'A duplicação foi preparada pela interface. Confira o histórico de revisões e o recurso já criado antes de iniciar outra criação.']);
                     $project->id = (string) Str::uuid();
                 } else {
@@ -57,7 +57,7 @@ class BiManualActions
                 }
                 $revision = $this->broker->manualRevision($user, $project, $arguments);
                 if (! $project->exists) {
-                    $project->description = 'Cópia de “'.mb_substr((string) ($revision['info']['data']['nome'] ?? 'aplicação'), 0, 150).'” no G-Analise BI.';
+                    $project->description = 'Cópia de “'.mb_substr((string) ($revision['info']['data']['nome'] ?? 'recurso'), 0, 150).'” no G-Analise BI.';
                 }
 
                 $result = DB::transaction(function () use ($user, $project, $revision, $tenant, $arguments, $requestId, $requestHash): array {

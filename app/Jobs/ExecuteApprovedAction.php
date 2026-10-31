@@ -61,7 +61,7 @@ class ExecuteApprovedAction implements ShouldQueue
             if ($approval->type === 'manual' && $approval->agent_run_id === null && ($approval->payload['origin'] ?? '') === 'manual') {
                 $result = $broker->performApproved($approval);
                 if (strlen(json_encode($result, JSON_THROW_ON_ERROR)) > 60000) {
-                    $result = array_intersect_key($result, array_flip(['managed_resource', 'management_warning', 'publication', 'published_resource', 'confirmed_name'])) + ['summary' => 'Operação concluída; confira o recurso no catálogo.'];
+                    $result = array_intersect_key($result, array_flip(['managed_resource', 'management_warning', 'flow_clone', 'publication', 'published_resource', 'confirmed_name'])) + ['summary' => 'Operação concluída; confira o recurso no catálogo.'];
                 }
                 DB::transaction(function () use ($approval, $result): void {
                     $approval->update(['status' => 'completed', 'payload' => [...$approval->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => $result]]]);
@@ -79,7 +79,7 @@ class ExecuteApprovedAction implements ShouldQueue
             $result = $broker->performApproved($approval);
             $encoded = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             if (strlen($encoded) > 60000) {
-                $result = array_intersect_key($result, array_flip(['publication', 'published_resource', 'confirmed_name'])) + ['resource' => $approval->payload['action']['resource'], 'summary' => 'A operação foi concluída; inspecione o recurso para obter sua configuração canônica.'];
+                $result = array_intersect_key($result, array_flip(['managed_resource', 'management_warning', 'flow_clone', 'publication', 'published_resource', 'confirmed_name'])) + ['resource' => $approval->payload['action']['resource'], 'summary' => 'A operação foi concluída; inspecione o recurso para obter sua configuração canônica.'];
             }
             $nextRun = DB::transaction(function () use ($approval, $run, $result) {
                 $run->conversation()->lockForUpdate()->firstOrFail();

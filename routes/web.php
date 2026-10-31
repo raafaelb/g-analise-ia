@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/catalog/{tenant}/credentials/actions', [BiCredentialController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::post('/catalog/{tenant}/credentials/{id}/inspect/{action}', [BiCredentialController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['test', 'schema'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/{id}/actions', [CatalogController::class, 'prepareAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
+        Route::post('/catalog/{tenant}/flows/{id}/actions', [CatalogController::class, 'prepareFlowAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
         Route::post('/bi-actions/{id}/schedule-verification', [BiScheduleController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::post('/approvals/{id}/publication/verify', [CatalogController::class, 'reconcilePublication'])->whereUuid('id')->middleware('throttle:bi-inspect');

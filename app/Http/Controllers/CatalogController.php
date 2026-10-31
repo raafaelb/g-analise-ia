@@ -36,6 +36,20 @@ class CatalogController extends Controller
         }
     }
 
+    public function prepareFlowAction(Request $request, string $tenant, string $id, BiManualActions $actions): JsonResponse
+    {
+        $data = $request->validate(['action' => ['required', 'in:clone_flow'], 'name' => ['required', 'string', 'max:100', 'not_regex:/[\x00-\x1F\x7F]/'], 'request_id' => ['required', 'uuid']]);
+        try {
+            $result = $actions->prepare($request->user(), $tenant, $id, $data, 'flow');
+
+            return response()->json($result, $result['reused'] ? 200 : 201);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['operation' => $e->getMessage()]);
+        }
+    }
+
     public function actionStatus(Request $request, string $id, BiManualActions $actions): JsonResponse
     {
         return response()->json($actions->status($request->user(), $id));

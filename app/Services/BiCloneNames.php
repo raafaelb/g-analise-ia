@@ -18,10 +18,10 @@ class BiCloneNames
     /** @return array{verified: bool, name: string, renamed: bool} */
     public function ensure(Connection $connection, Project $project, string $ref, string $name): array
     {
-        if (! preg_match('/^app:([1-9][0-9]*)$/D', $ref, $match) || trim($name) === '' || mb_strlen($name) > 150 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
+        if (! preg_match('/^(app|flow):([1-9][0-9]*)$/D', $ref, $match) || trim($name) === '' || mb_strlen($name) > 150 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
             throw new RuntimeException('Nome ou referência inválida para a cópia.');
         }
-        $managed = ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->where('status', 'draft')->where('origin', 'clone_app')->first();
+        $managed = ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->where('status', 'draft')->where('origin', 'clone_'.$match[1])->first();
         if (! $managed || $managed->source_ref === $ref || $connection->user_id !== $project->user_id) {
             throw new RuntimeException('O nome só pode ser ajustado na cópia criada e registrada por este projeto.');
         }
@@ -33,7 +33,7 @@ class BiCloneNames
         }
         $this->lumo->run($connection, ['pull', $ref], $project, 90);
         $this->assertWritable($connection, $project, $generation, $ref);
-        [$path, $original, $header, $working, $bodyText] = $this->working($project, $match[1]);
+        [$path, $original, $header, $working, $bodyText] = $this->working($project, $match[1], $match[2]);
         $proposal = $header."---\n".$this->replaceName($bodyText, $name);
         $parts = preg_split('/^---[ \t]*\r?$/m', $proposal, 2);
         $proposed = Yaml::parse($parts[1] ?? '');
@@ -55,7 +55,7 @@ class BiCloneNames
             if (($confirmed['nome'] ?? null) !== $name) {
                 throw new RuntimeException('O BI manteve outro nome após a sincronização.');
             }
-            [, , , $saved] = $this->working($project, $match[1]);
+            [, , , $saved] = $this->working($project, $match[1], $match[2]);
             if (($saved['nome'] ?? null) !== $name || $this->configuration($saved) !== $this->configuration($working)) {
                 throw new RuntimeException('Outras configurações da cópia foram alteradas pelo BI.');
             }
@@ -85,9 +85,12 @@ class BiCloneNames
     {
         $data = $this->lumo->run($connection, ['info', $ref, '--full'], $project, 60)['data'];
         $payload = is_array($data) ? ($data['payload'] ?? $data) : [];
-        $body = $payload['body'] ?? null;
-        if (! is_array($body) || (isset($payload['header']['tenantId']) && (string) $payload['header']['tenantId'] !== (string) $project->tenant_id) || (isset($payload['header']['id']) && (string) $payload['header']['id'] !== substr($ref, 4))) {
+        $body = $payload['body'] ?? (str_starts_with($ref, 'flow:') ? $payload : null);
+        if (! is_array($body) || (isset($payload['header']['tenantId']) && (string) $payload['header']['tenantId'] !== (string) $project->tenant_id) || (isset($payload['header']['id']) && (string) $payload['header']['id'] !== explode(':', $ref, 2)[1])) {
             throw new RuntimeException('A cópia retornou fora do contexto autorizado.');
+        }
+        if (str_starts_with($ref, 'flow:') && (string) ($body['id'] ?? '') !== explode(':', $ref, 2)[1]) {
+            throw new RuntimeException('O BI retornou outro ETL durante a conferência do nome.');
         }
         $state = is_array($body['_state'] ?? null) ? $body['_state'] : [];
         if ((! array_key_exists('deskId', $body) && ! array_key_exists('deskId', $state)) || isset($body['deskId']) || isset($state['deskId'])) {
@@ -98,9 +101,9 @@ class BiCloneNames
     }
 
     /** @return array{string, string, string, array<string, mixed>, string} */
-    private function working(Project $project, string $id): array
+    private function working(Project $project, string $kind, string $id): array
     {
-        $folder = $this->workspaces->path($project).'/apps';
+        $folder = $this->workspaces->path($project).($kind === 'flow' ? '/flows' : '/apps');
         if (! is_dir($folder) || is_link($folder)) {
             throw new RuntimeException('A autoria da cópia não está disponível.');
         }
@@ -111,7 +114,7 @@ class BiCloneNames
             $text = File::get($file->getPathname());
             $parts = preg_split('/^---[ \t]*\r?$/m', $text, 2);
             $header = Yaml::parse($parts[0]);
-            if (! is_array($header) || (string) ($header['id'] ?? '') !== $id || ($header['kind'] ?? '') !== 'app' || (string) ($header['tenantId'] ?? '') !== (string) $project->tenant_id) {
+            if (! is_array($header) || (string) ($header['id'] ?? '') !== $id || ($header['kind'] ?? '') !== $kind || (string) ($header['tenantId'] ?? '') !== (string) $project->tenant_id) {
                 continue;
             }
             $body = Yaml::parse($parts[1] ?? '');
