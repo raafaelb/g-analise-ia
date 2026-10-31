@@ -1,0 +1,701 @@
+{
+  "version": "2026-10-30.1",
+  "welcome": {
+    "title": "Bem-vindo ao G-Analise IA",
+    "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
+    "features": [
+      {
+        "title": "Converse com sua IA",
+        "description": "Descreva objetivos em linguagem de negócio e mantenha o contexto em projetos."
+      },
+      {
+        "title": "Explore seu BI",
+        "description": "Encontre aplicações, mesas, fontes e as ações autorizadas para sua conta."
+      },
+      {
+        "title": "Revise e acompanhe",
+        "description": "Confira prévias, autorize propostas e verifique a atualização dos dados."
+      }
+    ]
+  },
+  "pages": {
+    "welcome": {
+      "title": "Bem-vindo ao G-Analise IA",
+      "steps": [
+        {
+          "id": "welcome-intro",
+          "title": "Seu espaço para trabalhar com dados",
+          "description": "Crie e mantenha dashboards com ajuda da IA, explore o catálogo e acompanhe as atualizações, usando suas permissões do G-Analise BI.",
+          "audience": "all"
+        }
+      ]
+    },
+    "home": {
+      "title": "Criar com IA",
+      "steps": [
+        {
+          "id": "home-intro",
+          "title": "Da pergunta ao dashboard",
+          "description": "Descreva o resultado que precisa em linguagem de negócio. O G-Analise IA ajuda a investigar as fontes, preparar alterações e conferir os resultados.",
+          "audience": "all"
+        },
+        {
+          "id": "home-request",
+          "title": "Comece pelo que você precisa",
+          "description": "Conte o objetivo, quem usará o dashboard e os indicadores importantes. Você não precisa fornecer SQL nem conhecer os nomes das tabelas.",
+          "anchor": "home-request",
+          "audience": "authors"
+        },
+        {
+          "id": "home-project",
+          "title": "Escolha onde organizar o trabalho",
+          "description": "Abra um projeto existente para continuar uma criação ou manutenção. Um novo projeto reúne suas conversas, arquivos e recurso BI de trabalho.",
+          "anchor": "home-project",
+          "audience": "all"
+        },
+        {
+          "id": "home-connections",
+          "title": "Conecte suas contas",
+          "description": "O login no portal é separado das conexões ChatGPT e G-Analise BI. Use Conexões para conferir cada conta.",
+          "anchor": "workspace-connections",
+          "audience": "all"
+        },
+        {
+          "id": "home-help",
+          "title": "A ajuda fica sempre aqui",
+          "description": "Abra a ajuda para pesquisar orientações, fazer perguntas e refazer o tour desta página.",
+          "anchor": "workspace-help",
+          "audience": "all"
+        },
+        {
+          "id": "home-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "projects": {
+      "title": "Meus projetos",
+      "steps": [
+        {
+          "id": "projects-intro",
+          "title": "O que é um projeto?",
+          "description": "Um projeto organiza um objetivo, suas conversas, arquivos e o recurso BI em que você está trabalhando. Ele não é a própria dashboard.",
+          "audience": "all"
+        },
+        {
+          "id": "projects-create",
+          "title": "Organize um novo objetivo",
+          "description": "Novo projeto abre a configuração inicial. Escolha um nome claro e o ambiente de trabalho.",
+          "anchor": "projects-create",
+          "audience": "authors"
+        },
+        {
+          "id": "projects-search",
+          "title": "Encontre seu trabalho",
+          "description": "Busque pelo nome e abra o projeto para retomar o contexto. Projetos diferentes mantêm conversas e arquivos separados.",
+          "anchor": "projects-search",
+          "audience": "all"
+        },
+        {
+          "id": "projects-browse",
+          "title": "Projetos e catálogo",
+          "description": "Meus projetos mostra seu trabalho no portal. Para encontrar aplicações já existentes no BI, abra Catálogo BI.",
+          "anchor": "workspace-catalog",
+          "audience": "all"
+        },
+        {
+          "id": "projects-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "project": {
+      "title": "Conversa do projeto",
+      "steps": [
+        {
+          "id": "project-intro",
+          "title": "Continue com o contexto certo",
+          "description": "Esta conversa pertence ao projeto aberto. Confira o nome, o ambiente e o recurso de trabalho antes de pedir alterações.",
+          "audience": "all"
+        },
+        {
+          "id": "project-config",
+          "title": "Confira o projeto",
+          "description": "Configurar permite conferir as instruções e o vínculo do projeto. Trocar o ambiente depois de iniciar um trabalho exige outro projeto.",
+          "anchor": "project-config",
+          "audience": "all"
+        },
+        {
+          "id": "project-request",
+          "title": "Peça o resultado em suas palavras",
+          "description": "Explique o que deseja criar ou melhorar. Os anexos ajudam a fornecer referências; a IA deve conferir as fontes reais antes de concluir.",
+          "anchor": "project-request",
+          "audience": "authors"
+        },
+        {
+          "id": "project-approval",
+          "title": "Revise na própria conversa",
+          "description": "Quando uma ação precisar de autorização, uma solicitação destacada aparecerá no chat. Confira os valores e o destino antes de autorizar ou recusar.",
+          "audience": "all"
+        },
+        {
+          "id": "project-preview",
+          "title": "Explore a prévia",
+          "description": "Prévia abre a visualização ao lado da conversa. Você pode ampliar a área, ajustar a altura disponível e simular computador, tablet ou celular.",
+          "anchor": "chat-preview-toggle",
+          "audience": "all"
+        },
+        {
+          "id": "project-control",
+          "title": "Confira antes de publicar",
+          "description": "Uma resposta ou imagem não comprova publicação nem atualização dos dados. O sistema precisa confirmar o resultado no BI. Use a ajuda para entender as etapas.",
+          "anchor": "workspace-help",
+          "audience": "all"
+        },
+        {
+          "id": "project-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "catalog": {
+      "title": "Catálogo BI",
+      "steps": [
+        {
+          "id": "catalog-intro",
+          "title": "Explore o que sua conta permite",
+          "description": "O catálogo reúne aplicações, mesas, tabelas, ETLs, agendas e outros recursos disponíveis para seu usuário do BI.",
+          "audience": "all"
+        },
+        {
+          "id": "catalog-tenant",
+          "title": "Escolha o ambiente",
+          "description": "Tenant identifica o ambiente da organização. A escolha muda o inventário exibido; confira o nome antes de trabalhar.",
+          "anchor": "catalog-tenant",
+          "audience": "all"
+        },
+        {
+          "id": "catalog-types",
+          "title": "Escolha o tipo de recurso",
+          "description": "Aplicações contêm dashboards. Mesas organizam recursos. Tabelas guardam os dados, e ETLs preparam suas cargas. Conexões de dados são acessos às fontes.",
+          "anchor": "catalog-types",
+          "audience": "all"
+        },
+        {
+          "id": "catalog-search",
+          "title": "Localize e confira",
+          "description": "Use a busca e os filtros. Abra um cartão para ver detalhes, vínculos, amostras, prévias e as ações disponíveis.",
+          "anchor": "catalog-search",
+          "audience": "all"
+        },
+        {
+          "id": "catalog-edit",
+          "title": "Ações claras no próprio catálogo",
+          "description": "Você pode criar mesas e conexões quando autorizado. Nas tabelas, Organizar nomes e formatos altera a apresentação com revisão, preservando a estrutura. Nas aplicações, confira as prévias e as ações oferecidas para o recurso.",
+          "audience": "all"
+        },
+        {
+          "id": "catalog-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "connections": {
+      "title": "Conexões",
+      "steps": [
+        {
+          "id": "connections-intro",
+          "title": "Três acessos diferentes",
+          "description": "Entrar no portal identifica você. Conectar ChatGPT permite usar sua IA. Conectar G-Analise BI permite trabalhar com os recursos autorizados dessa conta.",
+          "audience": "all"
+        },
+        {
+          "id": "connections-chatgpt",
+          "title": "Conecte sua inteligência",
+          "description": "Autorize sua própria conta ChatGPT na página oficial. A inferência acontece nos servidores da OpenAI e compartilha os limites do seu plano.",
+          "anchor": "connections-chatgpt",
+          "audience": "all"
+        },
+        {
+          "id": "connections-bi",
+          "title": "Conecte seu BI",
+          "description": "Use sua própria conta G-Analise BI e o código de autenticação, se solicitado. Atualizar acessos recebe novamente os ambientes autorizados.",
+          "anchor": "connections-bi",
+          "audience": "all"
+        },
+        {
+          "id": "connections-mcp",
+          "title": "Consultas de dados pelo MCP",
+          "description": "Quando disponível, a consulta semântica exige uma autorização própria por ambiente. Escolha a conta correta no consentimento. Isso é separado da conexão de autoria pelo Lumo.",
+          "anchor": "bi-mcp-connection",
+          "audience": "all"
+        },
+        {
+          "id": "connections-data",
+          "title": "Conexões com bancos e outras fontes",
+          "description": "Para cadastrar uma nova conexão de dados, abra Catálogo BI e a categoria Conexões de dados. Esse cadastro é diferente de conectar sua conta ao portal.",
+          "audience": "all"
+        },
+        {
+          "id": "connections-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "refresh": {
+      "title": "Atualização de dados",
+      "steps": [
+        {
+          "id": "refresh-intro",
+          "title": "Dados precisam continuar atuais",
+          "description": "Cada novo dashboard deve ter suas fontes atualizadas pelo menos diariamente. Agendas mais frequentes devem ser preservadas.",
+          "audience": "all"
+        },
+        {
+          "id": "refresh-coverage",
+          "title": "Confira todas as fontes",
+          "description": "Selecione o trabalho para verificar as fontes, os vínculos e a cobertura de atualização. Fontes compartilhadas não devem ganhar agendas duplicadas.",
+          "anchor": "refresh-coverage",
+          "audience": "all"
+        },
+        {
+          "id": "refresh-plan",
+          "title": "Planeje a atualização",
+          "description": "Planejar atualização abre o planejamento. A agenda e a execução precisam ser conferidas no BI; uma fonte privada pode exigir autorização de publicação.",
+          "anchor": "refresh-plan",
+          "audience": "authors"
+        },
+        {
+          "id": "refresh-result",
+          "title": "Enfileirado ainda não é sucesso",
+          "description": "Confira agenda ativa, horário de Brasília e execução concluída. Use os detalhes e o histórico para investigar falhas, sem repetir cargas às cegas.",
+          "audience": "all"
+        },
+        {
+          "id": "refresh-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "activity": {
+      "title": "Atividade",
+      "steps": [
+        {
+          "id": "activity-intro",
+          "title": "Acompanhe o que aconteceu",
+          "description": "Aqui ficam o histórico das tarefas, as revisões e os resultados das operações do portal.",
+          "audience": "all"
+        },
+        {
+          "id": "activity-review",
+          "title": "Autorização e execução são etapas diferentes",
+          "description": "Autorizar uma revisão permite executar somente aquela proposta. Aguarde a confirmação; resultado incerto pede conferência antes de repetir.",
+          "audience": "all"
+        },
+        {
+          "id": "activity-history",
+          "title": "Use o histórico para investigar",
+          "description": "Os registros ajudam a entender falhas e conferir ações manuais. Nas conversas, as solicitações de autorização também ficam disponíveis no próprio chat.",
+          "anchor": "activity-history",
+          "audience": "all"
+        },
+        {
+          "id": "activity-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "account": {
+      "title": "Segurança da conta",
+      "steps": [
+        {
+          "id": "account-intro",
+          "title": "Cuide do seu acesso",
+          "description": "Esta página reúne a segurança da sua conta no portal. O acesso às integrações continua sendo individual.",
+          "audience": "all"
+        },
+        {
+          "id": "account-security",
+          "title": "Confira a origem da conta",
+          "description": "Contas locais podem trocar a senha aqui. Colaboradores que entram pela Suíte administram o acesso conforme as opções mostradas na página.",
+          "anchor": "account-security",
+          "audience": "all"
+        },
+        {
+          "id": "account-sessions",
+          "title": "Uma mudança de senha encerra sessões",
+          "description": "Ao atualizar uma senha local, as sessões são encerradas e trabalhos pendentes da versão anterior do acesso são cancelados. Guarde o contexto antes de continuar.",
+          "audience": "all"
+        },
+        {
+          "id": "account-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    },
+    "users": {
+      "title": "Usuários e acessos",
+      "audience": "admins",
+      "steps": [
+        {
+          "id": "users-intro",
+          "title": "Quem pode entrar no portal",
+          "description": "Administradores podem disponibilizar acesso local a clientes e gerenciar os perfis exibidos. Colaboradores autenticados pela Suíte recebem o acesso administrativo definido pela Inovadora.",
+          "audience": "all"
+        },
+        {
+          "id": "users-manage",
+          "title": "Cadastre e gerencie com clareza",
+          "description": "Confira nome, e-mail, perfil e situação. Uma senha inicial local exige troca no primeiro acesso.",
+          "anchor": "users-management",
+          "audience": "all"
+        },
+        {
+          "id": "users-bi",
+          "title": "Portal e BI têm permissões próprias",
+          "description": "O perfil no portal não concede acesso extra no BI. Cada pessoa precisa conectar sua conta e continua sujeita às permissões do provedor.",
+          "audience": "all"
+        },
+        {
+          "id": "users-menu",
+          "title": "As outras áreas estão no menu",
+          "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
+          "anchor": "workspace-menu",
+          "audience": "all"
+        }
+      ]
+    }
+  },
+  "articles": [
+    {
+      "id": "getting-started",
+      "title": "Como começar no G-Analise IA",
+      "summary": "Conecte suas contas, escolha o ambiente e descreva seu objetivo.",
+      "body": "O G-Analise IA é o espaço da Inovadora para criar e manter dashboards por conversa, explorar os recursos do G-Analise BI e acompanhar a atualização dos dados.\n\n1. Entre no portal com sua conta local ou pela Suíte.\n2. Em **Conexões**, autorize sua conta ChatGPT e conecte seu usuário do G-Analise BI.\n3. No **Catálogo BI**, escolha o ambiente e localize um recurso existente, ou abra **Novo projeto** para começar um objetivo.\n4. Descreva o que deseja em linguagem de negócio. A IA deve investigar as fontes disponíveis.\n5. Confira os dados, as prévias e cada proposta de alteração antes de autorizar.\n\nSeu perfil e suas permissões no BI determinam as ações disponíveis.",
+      "pages": [
+        "home",
+        "connections"
+      ],
+      "actions": [
+        {
+          "page": "connections",
+          "label": "Abrir Conexões"
+        },
+        {
+          "page": "catalog",
+          "label": "Explorar catálogo"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "projects",
+      "title": "Para que servem os projetos?",
+      "summary": "Projetos organizam o objetivo, as conversas, os arquivos e o recurso BI de trabalho.",
+      "body": "Um **projeto** organiza um trabalho, como criar uma visão financeira ou melhorar um dashboard de estoque. Ele reúne o objetivo, instruções, conversas, arquivos e o recurso BI vinculado.\n\nUma **conversa** é o histórico de pedidos e respostas dentro desse projeto. Uma **aplicação BI** pode conter uma ou várias **dashboards**, que são as páginas visuais com indicadores e filtros. O projeto não é a própria dashboard e não cria automaticamente um novo recurso no BI.\n\nPara continuar uma manutenção, abra o projeto correspondente em **Meus projetos**. Para localizar dashboards que já existem na sua conta BI, use **Catálogo BI**. Trabalhos em ambientes diferentes precisam de projetos separados.",
+      "pages": [
+        "home",
+        "projects",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "projects",
+          "label": "Meus projetos"
+        },
+        {
+          "page": "catalog",
+          "label": "Catálogo BI"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "find-dashboards",
+      "title": "Onde encontro minhas dashboards?",
+      "summary": "Encontre aplicações no catálogo ou retome seu projeto no portal.",
+      "body": "Abra **Catálogo BI**, escolha o **tenant** e a categoria **Aplicações**. Use busca, filtros de mesa e situação para localizar o recurso. Uma aplicação pode conter várias dashboards; abra seu detalhe para escolher a página e visualizar.\n\n**Minha Mesa** identifica os rascunhos privados retornados pela conta BI. **Publicadas** reúne as aplicações compartilhadas conforme as permissões das mesas. Já **Meus projetos** mostra os trabalhos organizados por você neste portal.\n\nFalta de permissão ou consulta indisponível é diferente de uma lista vazia. Confira o motivo apresentado antes de concluir que um recurso foi removido.",
+      "pages": [
+        "catalog",
+        "projects",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Encontrar dashboards"
+        },
+        {
+          "page": "projects",
+          "label": "Retomar projetos"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "financial-dashboard",
+      "title": "Como crio um dashboard financeiro?",
+      "summary": "Descreva as decisões e os indicadores desejados, sem precisar escrever SQL.",
+      "body": "Comece em **Criar com IA** ou abra um projeto adequado. Um exemplo de pedido é: **Quero acompanhar receitas, despesas e saldo mensal, com comparação ao mês anterior e filtros por unidade.**\n\nInforme o período, quem usará a visão e o significado esperado dos indicadores. Você não precisa conhecer nomes de tabelas ou escrever consultas. A IA deve investigar as conexões e a estrutura disponível, conferir os dados reais e apontar o que estiver ausente.\n\nAntes de autorizar, confira definições de receitas/despesas, sinais, unidades monetárias, datas, fontes e os números da prévia. Um gráfico bonito não comprova que a métrica está correta. A publicação precisa de revisão própria e as fontes devem ter atualização automática verificada.",
+      "pages": [
+        "home",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "home",
+          "label": "Ir para Criar com IA"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "portal-connections",
+      "title": "Como conecto minhas contas?",
+      "summary": "O login no portal, o ChatGPT e o acesso ao BI são conexões diferentes.",
+      "body": "Em **Conexões**, autorize sua conta ChatGPT na página oficial e conecte o usuário do G-Analise BI. Se a conta BI tiver autenticação adicional, informe o código no formulário do navegador. Não envie senhas pelo chat.\n\nO login pela **Suíte** ou por senha local permite entrar no portal. Ele não substitui a conexão ChatGPT nem cria permissões extras no BI. A conta BI precisa ter autorização de uso do Lumo CLI. Se essa permissão faltar, procure o responsável pelo ambiente.\n\nA configuração de ChatGPT depende do modo habilitado pelo administrador. O fluxo local foi homologado; hospedagem central depende da configuração oficial adequada. Se a opção estiver indisponível, a mensagem da página explica a pendência.",
+      "pages": [
+        "connections",
+        "home"
+      ],
+      "actions": [
+        {
+          "page": "connections",
+          "label": "Conectar contas"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "data-connections",
+      "title": "Como adiciono uma nova conexão de dados?",
+      "summary": "Cadastre uma fonte pelo Catálogo BI, com os campos protegidos e revisão.",
+      "body": "Abra **Catálogo BI**, selecione o ambiente e a categoria **Conexões de dados**. Quando sua conta permitir, use **Adicionar nova conexão**, escolha o tipo de fonte e o agente e preencha os dados no formulário privado. Confira a proposta antes de autorizar a criação.\n\nAs credenciais protegidas são tratadas pelo formulário e não precisam ser enviadas à IA. As ações de teste e consulta de estrutura dependem do conector e das permissões. Alguns formatos avançados ainda não possuem editor completo; o portal informa a disponibilidade.\n\nIsso é diferente de conectar sua conta G-Analise BI na página **Conexões**. Uma conexão de dados é o acesso a um banco ou outra fonte que alimenta ETLs.",
+      "pages": [
+        "catalog",
+        "connections"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir catálogo"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "tenants-desks",
+      "title": "O que são tenants e mesas?",
+      "summary": "Tenants separam ambientes; mesas organizam e compartilham recursos dentro deles.",
+      "body": "**Tenant** é o ambiente de uma organização ou operação no BI. Sua conta só deve receber os tenants autorizados. A escolha do catálogo muda o ambiente consultado.\n\n**Mesas de aplicações** organizam aplicações e dashboards. **Mesas de dados** organizam tabelas, ETLs e outros recursos de dados. **Minha Mesa** é a área de rascunhos privados indicada pelo estado do recurso.\n\nCriar ou renomear uma mesa não publica automaticamente os recursos nela. Compartilhamento e permissões obedecem às regras do BI e à revisão de publicação quando oferecida pelo portal.",
+      "pages": [
+        "catalog",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Explorar ambientes e mesas"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "reviews",
+      "title": "Por que a IA está aguardando autorização?",
+      "summary": "Algumas ações só continuam depois de você conferir a proposta na conversa.",
+      "body": "Uma solicitação de autorização indica que a IA preparou uma ação que precisa da sua decisão. No chat, procure o aviso destacado e use **Revisar agora**. Confira recurso, ambiente, valores e destino e escolha autorizar ou recusar na própria conversa.\n\nA autorização vale somente para a revisão apresentada. Se o recurso mudar, a revisão vencer ou o acesso for alterado, pode ser necessária outra conferência. Autorizar não significa que a execução terminou: aguarde a confirmação.\n\nSe o resultado for incerto, confira o estado atual antes de repetir. O histórico em **Atividade** ajuda nessa análise. Perguntar algo na ajuda não autoriza alterações no BI.",
+      "pages": [
+        "project",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "activity",
+          "label": "Consultar atividade"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "preview",
+      "title": "Como visualizo e confiro uma prévia?",
+      "summary": "Use o painel interativo, os dispositivos e a ampliação para explorar o dashboard.",
+      "body": "Na conversa de um projeto vinculado a uma aplicação, **Prévia** abre a visualização ao lado do chat. A divisão normal mantém metade da largura para cada lado. Amplie o painel ou recolha suas opções para aproveitar melhor a altura.\n\nUse os ícones de computador, tablet e celular para ajustar o tamanho simulado. Isso não cria outra dashboard nem confirma a experiência em todos os dispositivos reais. A prévia interativa permite explorar os filtros disponíveis; a prévia visual mostra uma imagem estática. **Abrir no BI** leva à aplicação completa.\n\nA sessão interativa é temporária e depende do navegador e das permissões. Recarregar inicia uma nova sessão. A ocorrência de rolagem intermitente na troca de dispositivos continua em verificação de compatibilidade. Se ocorrer, preserve o contexto e use Recarregar ou Abrir no BI para continuar a conferência.",
+      "pages": [
+        "project",
+        "catalog"
+      ],
+      "actions": [],
+      "audience": "all"
+    },
+    {
+      "id": "table-presentation",
+      "title": "Como altero os nomes e formatos de uma tabela?",
+      "summary": "Organize a apresentação sem alterar a estrutura física ou os dados.",
+      "body": "No **Catálogo BI**, escolha **Tabelas**, abra o recurso e use **Organizar nomes e formatos**. Edite os nomes, descrições e os formatos numéricos disponíveis. A busca, a paginação e o filtro de campos alterados ajudam em tabelas maiores.\n\nUse **Conferir alterações**, compare Atual e Proposto e autorize ou recuse. O portal lê o resultado de volta antes de confirmar. Se outra alteração ocorrer durante a revisão, reabra a configuração atual.\n\nEsses campos definem padrões de apresentação da tabela; cada dashboard pode ter suas próprias escolhas. Este formulário não altera nomes físicos, tipos de coluna, linhas, chaves ou o ETL. Alguns formatos da origem são preservados e não possuem edição aqui.",
+      "pages": [
+        "catalog"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir tabelas no catálogo"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "etl-tables",
+      "title": "Qual a diferença entre ETL e tabela?",
+      "summary": "O ETL prepara a carga; a tabela recebe os dados usados nas aplicações.",
+      "body": "Um **ETL** é o fluxo que extrai e prepara informações. A **tabela** recebe os dados resultantes no ambiente analítico. As aplicações usam essas informações para apresentar indicadores.\n\nA IA pode investigar as conexões autorizadas, analisar a estrutura e preparar um novo fluxo. Testar uma etapa pode exigir revisão. A criação de uma tabela não comprova que seus dados foram carregados: é preciso executar a inserção e conferir o conteúdo.\n\nMudanças de estrutura devem seguir o fluxo de origem. Recriar uma tabela existente pode apagar dados e não deve ser usado para corrigir apenas nomes ou formatos. Fluxos publicados exigem cuidado próprio e uma cópia para testes de nós.",
+      "pages": [
+        "catalog",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Consultar fontes e tabelas"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "refresh",
+      "title": "Como garanto a atualização dos dados?",
+      "summary": "Confira todas as fontes, agenda ativa e execução concluída com sucesso.",
+      "body": "Abra **Atualização de dados** para verificar a cobertura do trabalho. Cada novo dashboard deve ter todas as fontes atualizadas pelo menos uma vez por dia; agendas mais frequentes devem ser preservadas. Prefira a madrugada no horário de Brasília e evite duplicar agendas para fontes compartilhadas.\n\n**Enfileirado** não significa sucesso. Confirme que a agenda está ativa e que a carga terminou com sucesso no BI. Histórico e detalhes ajudam a investigar falhas.\n\nUma fonte privada pode impedir o agendamento. Nessa situação, a publicação necessária deve ser apresentada para autorização; o trabalho não deve ser considerado concluído com atualização apenas manual sem explicar a pendência.",
+      "pages": [
+        "refresh",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "refresh",
+          "label": "Conferir atualização"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "mcp",
+      "title": "Para que serve a consulta de dados pelo MCP?",
+      "summary": "A autorização semântica permite consultar os conceitos da aplicação sem escrever SQL.",
+      "body": "Quando habilitada, a integração MCP oferece consultas de dados de uma aplicação por conceitos e campos disponíveis, sem exigir SQL do usuário. A conexão é autorizada separadamente, por ambiente, em **Conexões**.\n\nEscolha a conta e o ambiente corretos no consentimento oficial. O acesso de autoria pelo Lumo e o acesso de consulta MCP são diferentes. A conferência de uma aplicação valida o ambiente, mas não comprova que duas contas distintas tenham a mesma identidade ou regras de linha.\n\nA consulta MCP do portal é de leitura. Ela não cria ETLs, não publica e não altera recursos. Confira unidades, período, filtros e indicações de limite ou resultado parcial.",
+      "pages": [
+        "connections",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "connections",
+          "label": "Conferir consulta de dados"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "ai-plan",
+      "title": "Como acompanho os limites da IA?",
+      "summary": "Veja os dados do plano quando o provedor os fornecer e abra o gerenciamento do ChatGPT.",
+      "body": "O portal usa sua própria conta ChatGPT, com inferência na OpenAI. A utilização compartilha os limites do plano dessa conta; não existe uma franquia separada criada pelo portal.\n\nQuando o provedor disponibiliza as informações, o painel mostra plano, saldo percentual, janelas e renovação. Se esses dados não forem retornados, o sistema informa a ausência e oferece acesso ao gerenciamento de uso no ChatGPT. Ele não inventa limites a partir da quantidade de mensagens locais.\n\nA versão homologada usa ChatGPT. O login Claude ainda não está disponível neste portal.",
+      "pages": [
+        "connections",
+        "project"
+      ],
+      "actions": [],
+      "audience": "all"
+    },
+    {
+      "id": "attachments",
+      "title": "Como uso arquivos e referências?",
+      "summary": "Anexe materiais ao projeto e confira o que foi extraído antes de usá-los como fonte.",
+      "body": "Na conversa, use o botão de anexar para enviar referências do trabalho. Os arquivos ficam vinculados ao projeto e o sistema mostra o estado de processamento e as limitações de extração.\n\nUma referência ajuda a explicar o objetivo, mas não comprova que os dados de produção estejam disponíveis ou corretos. A IA precisa conferir a fonte real. Não envie senhas ou segredos dentro de arquivos.\n\nA análise visual de uma prévia com indicadores reais exige a autorização apresentada pelo portal. O envio de um arquivo não autoriza publicar dashboards ou alterar fontes.",
+      "pages": [
+        "project"
+      ],
+      "actions": [],
+      "audience": "authors"
+    },
+    {
+      "id": "account-security",
+      "title": "Como gerencio minha senha e meu acesso?",
+      "summary": "Contas locais e contas da Suíte têm opções de segurança diferentes.",
+      "body": "Abra **Segurança da conta**. As contas locais podem trocar a senha conforme os campos mostrados. Uma senha inicial precisa ser substituída antes de acessar as demais funcionalidades.\n\nA troca de senha local encerra sessões e cancela tarefas e revisões da versão anterior do acesso. Colaboradores que usam a Suíte gerenciam sua autenticação pelas opções disponíveis para essa origem.\n\nO perfil do portal não concede acesso adicional ao BI: cada pessoa continua usando sua própria conexão e suas permissões.\n\nSe outra conta entrar no mesmo navegador, uma aba antiga solicitará uma nova entrada ou atualização antes de enviar pedidos. Isso mantém o contexto do atendimento separado. Não compartilhe a sessão da conta entre pessoas.",
+      "pages": [
+        "account"
+      ],
+      "actions": [
+        {
+          "page": "account",
+          "label": "Abrir segurança da conta"
+        }
+      ],
+      "audience": "all"
+    },
+    {
+      "id": "users-access",
+      "title": "Como disponibilizo acesso a outra pessoa?",
+      "summary": "Administradores podem cadastrar acessos locais e gerenciar os perfis permitidos.",
+      "body": "Em **Usuários e acessos**, administradores autorizados podem criar contas locais para pessoas que não entram pela Suíte e conferir perfil e situação. A senha inicial local exige troca no primeiro acesso.\n\nColaboradores da Inovadora que entram pela Suíte recebem o acesso administrativo previsto para essa integração. Inativar um usuário ou alterar seu acesso encerra sessões e protege tarefas e revisões pendentes.\n\nEssas ações controlam o portal. Permissões, usuários e ambientes do BI continuam sujeitos à administração e aos contratos do provedor.",
+      "pages": [
+        "users"
+      ],
+      "actions": [
+        {
+          "page": "users",
+          "label": "Gerenciar usuários"
+        }
+      ],
+      "audience": "admins"
+    },
+    {
+      "id": "product-help",
+      "audience": "all",
+      "title": "Como tiro dúvidas sobre o próprio G-Analise IA?",
+      "summary": "Use guias, tour e o atendimento com sua conta ChatGPT.",
+      "pages": [
+        "home",
+        "project",
+        "account"
+      ],
+      "body": "A ajuda explica o próprio G-Analise IA: para que servem projetos e conversas, onde encontrar dashboards, como usar conexões, prévias, revisões e atualização de dados.\n\nAbra **Ajuda** no topo ou **Ajuda e primeiros passos** no menu. Em **Guias e respostas**, busque uma dúvida e leia as orientações, mesmo sem uma conta de IA conectada. **Refazer tour** repete o passo a passo da página atual; **Rever boas-vindas** apresenta novamente o produto.\n\nNa aba **Conversar com IA**, escreva sua pergunta, por exemplo: “Para que servem os projetos aqui dentro?”. O atendimento usa a documentação desta versão e a autorização da sua conta ChatGPT. A pergunta e as orientações são enviadas à OpenAI, consumindo os limites do seu plano. Não envie senhas ou dados sensíveis.\n\nO atendimento de ajuda orienta e não opera o BI. Para criar ou manter um dashboard, abra **Criar com IA** e use um projeto e as revisões normais. Os botões dos artigos levam às páginas disponíveis para seu perfil.\n\nO histórico é pessoal e separado das conversas dos projetos. Você pode interromper a resposta ou apagar o histórico da ajuda. Se houver falha ou limite da conta, os guias continuam disponíveis.\n\nO tour aguarda os carregamentos e as janelas em uso e pula controles indisponíveis para seu perfil ou tela. No celular, a ajuda fica no menu. Ao abrir a conversa da ajuda, o histórico mostra as mensagens mais recentes.",
+      "actions": [
+        {
+          "page": "home",
+          "label": "Abrir Criar com IA"
+        },
+        {
+          "page": "connections",
+          "label": "Ver minhas conexões"
+        }
+      ]
+    }
+  ]
+}

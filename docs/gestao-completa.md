@@ -213,39 +213,49 @@ O usuário pode recolher o menu para uma faixa de ícones de 72 pixels ou fixá-
 A preferência fica no próprio navegador, separada por usuário do portal, e é mantida na navegação e na recarga. Os itens têm nomes acessíveis mesmo quando só o ícone aparece. A rolagem dos itens é independente do rodapé para preservar acesso à conta e à ajuda. No celular permanece a abertura por botão sobre o conteúdo, com fechamento pelo fundo; a preferência de computador não cria uma margem vazia no celular. Foram conferidos mouse, teclado, persistência, navegação e layouts de 1.440 × 1.000, 1.024 × 768 e 390 × 844, além da compilação Vue/TypeScript e dos 41 testes de interface.
 
 
-## Fila: boas-vindas, tours por página e tira-dúvidas — 30/10/2026
+## Boas-vindas, tours por página e tira-dúvidas — 30/10/2026
 
-Solicitação do usuário: usar como referência [Driver.js](https://driverjs.com/) e seu [repositório](https://github.com/nilbuild/driver.js). Está na fila de desenvolvimento; a biblioteca não foi instalada e não há tour, tabelas de progresso ou atendimento de ajuda implementados nesta revisão. Antes da implementação, conferir a documentação e a licença da biblioteca e sua integração com Vue, acessibilidade e navegação do portal.
+Implementados com [Driver.js 1.10.2](https://driverjs.com/docs/configuration), de licença MIT; o aviso de licença acompanha os assets em `public/vendor/driverjs-LICENSE.txt`. A fonte de conteúdo é `resources/help/product-guide.json`: a mesma versão abastece os tours, os guias locais e as orientações enviadas à IA. A regra de atualização obrigatória está em `AGENTS.md`.
 
 ### Boas-vindas e persistência
 
-Na primeira entrada, explicar o que é o G-Analise IA, suas principais funcionalidades e um caminho de início: entrar com conta local/Suíte, conectar as contas em Conexões, escolher um tenant e criar ou abrir um projeto. A troca inicial obrigatória de senha deve ocorrer antes dessa apresentação. As boas-vindas têm estado próprio por usuário.
+A primeira entrada apresenta o G-Analise IA, suas principais funcionalidades e o botão **Conhecer esta página**, depois da troca inicial obrigatória de senha. **Explorar sozinho** ou fechar permite continuar sem completar o tour.
 
-O tour automático é exibido uma vez por usuário e tipo de página. Salvar a visualização no banco, com chave única de usuário/página e informações de versão/data. Usar uma chave estável do tipo de página: abrir outro projeto ou dashboard não deve repetir o mesmo tour. Diferenciar visualização, fechamento e conclusão para medir dificuldades sem impedir o trabalho. Atualizar o conteúdo não reinicia automaticamente o tour já visto.
+`user_guide_progress` tem unicidade por usuário/tipo de página. Registra início, primeira exibição efetiva, fechamento, conclusão, versão, instância e repetições manuais. A reserva do início automático é atômica para evitar duplicação entre abas. Fechar ou concluir não dispara novo tour automático; abrir outro projeto usa a mesma chave `project`. Atualizar o conteúdo preserva a primeira versão e não reinicia tours já apresentados. Respostas tardias de uma instância antiga não substituem o progresso da instância atual.
 
-Oferecer **Refazer tour desta página** na ajuda contextual, inclusive depois da primeira visualização. O usuário pode fechar ou pular o tour; o uso do sistema não depende de terminá-lo. Conferir navegação por teclado, foco, rolagem, redução de movimento, menu recolhido, computador, tablet e celular. Passos de administração só aparecem a quem possui essas ações. Os tours do portal orientam pelos controles do próprio portal; não dependem de acessar o DOM do BI externo.
+**Ajuda**, no topo, e **Ajuda e primeiros passos**, no menu, oferecem **Refazer tour** e **Rever boas-vindas**. O tour espera janelas, tarefas, rascunhos de mensagem e a consulta do catálogo para apresentar seus controles já carregados; considera perfil e controles visíveis e usa âncoras `data-tour` do portal. A apresentação tem teclado, fechamento acessível, foco contido nos diálogos e redução de movimento. Não depende de ler o DOM externo do BI.
 
-### Cobertura prevista
+### Páginas cobertas
 
 | Página | Orientações principais |
 |---|---|
-| Criar com IA | O que o sistema faz, conexões necessárias, escolha de projeto e primeiros pedidos em linguagem de negócio |
-| Meus projetos | Para que serve um projeto, diferença entre projeto/conversa/dashboard, criar, localizar e organizar o trabalho |
-| Conversa do projeto | Pedir criações e manutenções, anexos, revisão na conversa, prévia interativa, opções, expansão, divisão 50/50 e visualizações de computador, tablet e celular |
-| Catálogo BI | Tenant, aplicações, Minha Mesa, mesas de aplicações/dados, tabelas, fontes, conexões e ações realmente disponíveis |
-| Conexões | Diferença entre entrar no portal, vincular ChatGPT/BI e cadastrar conexões de dados; estado da conta e limites de IA quando fornecidos |
-| Atualização de dados | Fontes, agendas, frequência, permissões e diferença entre enfileirar uma carga e confirmar seu sucesso |
-| Atividade | Histórico, situações das tarefas e revisões, falhas e como retomar com contexto |
-| Segurança da conta | Ações disponíveis conforme a origem da conta, senha inicial e gestão pela Suíte |
-| Usuários e acessos | Cadastro local, colaboradores da Suíte, perfis e inativação, somente para administradores autorizados |
+| Criar com IA | Objetivo em linguagem de negócio, conexões, escolha do projeto e ajuda |
+| Meus projetos | Projeto versus conversa/dashboard, localizar e organizar o trabalho |
+| Conversa do projeto | Pedidos, configuração do projeto, revisão na conversa e prévia disponível |
+| Catálogo BI | Tenant, tipos de recursos, busca, consultas e ações disponíveis |
+| Conexões | Contas ChatGPT/BI, limites quando fornecidos e consulta MCP autorizada separadamente |
+| Atualização de dados | Cobertura, agendas, frequência e confirmação do resultado da carga |
+| Atividade | Histórico e diferença entre revisão, execução e confirmação |
+| Segurança da conta | Ações conforme a origem da conta e gestão pela Suíte |
+| Usuários e acessos | Cadastro local, perfis e inativação, somente para administradores |
 
-A regra de manutenção está em `AGENTS.md`. O menu recolhível e as novas opções de prévia precisam fazer parte dos passos e dos exemplos da ajuda quando esses módulos forem implementados.
+Passos de controles ainda fechados, indisponíveis, desabilitados ou fora do menu móvel visível são omitidos. Os guias explicam também dispositivos da prévia, expansão, acompanhamento, anexos, conexões de dados, mesas e edição de apresentação de tabelas.
 
-### Atendimento de ajuda com IA
+### Guias e atendimento com IA
 
-O atendimento deve responder dúvidas sobre o **próprio G-Analise IA**, usando documentação versionada das funcionalidades e o contexto da página/perfil. Exemplos obrigatórios: “Para que servem os projetos aqui dentro do G-Analise IA?”, “Onde encontro minhas dashboards?”, “Como crio uma dashboard com dados financeiros?”, “Como conecto minha conta?” e “Por que a IA está aguardando uma autorização?”. Deve apresentar orientações curtas e links/botões para o local correto do portal, sem exigir SQL ou nomes técnicos.
+**Guias e respostas** oferece 18 artigos pesquisáveis sem exigir conexão de IA, incluindo “Para que servem os projetos?”, “Onde encontro minhas dashboards?” e “Como crio um dashboard financeiro?”. Os artigos e seus botões são filtrados pelo perfil; a busca prioriza a dúvida e o contexto da página.
 
-Usar a integração de IA do próprio usuário e os limites disponíveis dessa conta; explicar a indisponibilidade e oferecer artigos/tours quando ela não estiver conectada. Perguntas de ajuda não iniciam silenciosamente uma criação ou alteração BI. Para transformar uma orientação em trabalho, oferecer a entrada em Criar com IA com o pedido do usuário e manter as revisões normais. Respeitar isolamento de histórico, permissões, retenção e proteção de dados já existentes. As respostas devem indicar os limites reais da versão e não inventar botões ou operações.
+**Conversar com IA** usa a autorização do plano ChatGPT do próprio usuário pelo endpoint público Responses. A chamada seleciona um modelo visível no catálogo autorizado da conta, usa `store:false`, `stream:true`, `tools:[]` e `tool_choice:none`; a inferência permanece na OpenAI. A implementação não pede API key. A elegibilidade para hospedagem central continua dependente da configuração oficial; o módulo respeita a mesma configuração da instalação. Consulte [o contrato oficial de modelos e inferência](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference).
+
+São enviados a pergunta, a página, o perfil, as orientações da versão e um histórico limitado do próprio atendimento na mesma autorização e versão de acesso. O módulo não carrega dados BI, projetos, anexos ou credenciais no contexto e não possui ferramentas de execução. Uma pergunta de suporte não cria ETL, aplicação, publicação ou revisão. A resposta orienta o caminho correto e a interface oferece guias relacionados e **Abrir Criar com IA**, mantendo as revisões normais desse fluxo. Links e imagens arbitrários do modelo não são renderizados como ações.
+
+`help_questions` mantém histórico pessoal separado das conversas dos projetos. A interface mostra texto progressivo, interrupção, falha, conclusão, cópia e limpeza do histórico. Texto parcial não é apresentado como resposta concluída. Só o evento de conclusão confirmado permite finalizar; o leitor aceita o texto já recebido quando o gateway não repete a cópia no último evento. Campos e conteúdo de erro do provedor não são expostos ao usuário.
+
+Uma identificação idempotente evita duplicar uma pergunta ao repetir uma requisição. Há uma pergunta pendente por usuário; cancelamento, limpeza, troca de acesso/senha ou desconexão ChatGPT impedem gravar respostas tardias. A autorização é vinculada à própria conexão e sua geração; reconectar não reaproveita o histórico de outra autorização. Desconectar apenas o BI não encerra orientações do produto que não usam esse acesso. As requisições do workspace identificam a conta exibida: uma aba antiga não usa a sessão de outra conta que entrou no mesmo navegador e não encerra a sessão nova. O histórico permanece até a limpeza pelo titular ou política adicional da instalação; a limpeza da ajuda não apaga projetos ou conversas de trabalho.
+
+A fila `help`, em worker próprio, evita aguardar tarefas longas de autoria. Não há repetição automática de inferência após falha. Perguntas enfileiradas sem início por dez minutos e execuções sem heartbeat por quatro minutos expiram, inclusive pela manutenção periódica. O monitoramento inclui fila e heartbeat da ajuda; o backup recusa respostas ativas. A restauração isolada desabilita integrações e invalida atendimentos pendentes.
+
+A validação automatizada cobre persistência, perfis, primeira senha, instâncias antigas, repetição manual, versão de conteúdo, isolamento de histórico, idempotência, erros e formatos do stream, bloqueio de ferramentas, cancelamento e revogação. A homologação no navegador inclui uma resposta real sobre projetos e a orientação de um pedido de criação para o fluxo correto, sem operar o BI. Os 624 testes de backend passaram em SQLite e PostgreSQL isolado, e os 66 testes de interface passaram. A abertura dos tours foi conferida nas nove áreas; a ajuda foi conferida em 390 × 667, 390 × 844, 768 × 1024 e 1440 × 1000, com foco inicial e retorno do foco/rolagem ao fechar. O histórico abre na última resposta, a conversa ocupa a altura disponível e a criação solicitada na ajuda recebeu orientação sem gerar tarefas BI. A restauração criptografada foi comprovada em banco isolado com dez registros de progresso e sete atendimentos de homologação, com integrações externas desabilitadas e o banco em uso preservado. Os registros descartáveis foram depois removidos pela interface da ajuda e por uma limpeza restrita aos IDs dos tours de teste, preservando o primeiro acesso real. A automação de teclas físicas não estava disponível no navegador conectado; o tratamento de Tab/Escape foi revisado no código, sem declarar esse ensaio nativo executado.
 
 
 ## Prévia por dispositivo e compatibilidade de incorporação — 30/10/2026
@@ -254,7 +264,7 @@ Os botões da prévia oferecem **Computador (1280 × 800)**, **Tablet (768 × 10
 
 A troca de dispositivo preserva o iframe e sua sessão, sem usar novamente o ticket de autenticação. A seleção do dispositivo fica no painel do projeto e é mantida quando o visualizador é recriado para uma nova prévia. A validação real conferiu os três tamanhos e a interação com um filtro: a seleção foi preservada ao trocar de computador para celular, e a limpeza restaurou o total anterior. As dimensões e o enquadramento também possuem testes isolados; são 47 testes de interface nesta revisão.
 
-Impacto no futuro tour/tira-dúvidas: ensinar o ajuste automático, os três botões de dispositivo, a expansão e o retorno à conversa. As âncoras `chat-preview`, `chat-preview-devices`, `chat-preview-expand` e `chat-preview-options` identificam esses controles sem depender de posições ou nomes de projetos. As boas-vindas, os tours e o atendimento com IA permanecem na fila descrita acima; essas âncoras não constituem um tour já implementado.
+Impacto no tour e tira-dúvidas: ensinar o ajuste automático, os três botões de dispositivo, a expansão e o retorno à conversa. As âncoras `chat-preview`, `chat-preview-devices`, `chat-preview-expand` e `chat-preview-options` identificam esses controles sem depender de posições ou nomes de projetos. Esses controles alimentam os tours e os guias descritos acima; os passos usam somente âncoras presentes e visíveis.
 
 ### Correção de perda de sessão durante redimensionamento
 
@@ -301,7 +311,7 @@ A homologação real usou uma cópia privada e identificada no tenant Inovadora.
 
 A abertura inicial com altura útil zero permaneceu sem iframe e sem emitir sessão; depois de restaurar a área, a visualização pôde iniciar normalmente. A perda de sessão no redimensionamento de um iframe existente continua coberta pela verificação registrada na seção anterior. Safari, Firefox, toque real e outros tipos de dashboard ainda precisam de homologação própria.
 
-Impacto no tour e tira-dúvidas: acrescentar o aviso de autorização na prévia, **Revisar na conversa**, **Voltar à prévia**, o significado de **Pausado** e como retomar o acompanhamento. As âncoras `chat-preview-review`, `chat-preview-toggle`, `chat-preview-options` e `chat-preview-follow` permitem orientar esses passos. A ajuda deve explicar que uma pergunta de suporte não autoriza alterações e que a revisão só termina com um resultado de execução conferido. Os módulos de tour e atendimento com IA permanecem na fila; esta revisão atualiza suas orientações previstas.
+Impacto no tour e tira-dúvidas: acrescentar o aviso de autorização na prévia, **Revisar na conversa**, **Voltar à prévia**, o significado de **Pausado** e como retomar o acompanhamento. As âncoras `chat-preview-review`, `chat-preview-toggle`, `chat-preview-options` e `chat-preview-follow` permitem orientar esses passos. A ajuda deve explicar que uma pergunta de suporte não autoriza alterações e que a revisão só termina com um resultado de execução conferido. Essas orientações fazem parte dos guias do projeto e de revisões; os passos dependem dos controles visíveis.
 
 Validação desta revisão: 465 testes de backend em SQLite e em PostgreSQL, com 2.624 asserções em cada execução, mais 55 testes de interface e compilação com TypeScript. A evidência local e os resultados do CI devem ser conferidos no commit correspondente.
 
@@ -328,7 +338,7 @@ O portal apaga as credenciais e bloqueia imediatamente novas consultas e respost
 
 A funcionalidade é habilitada por BI_MCP_ENABLED; BI_MCP_RESOURCE define o endereço copiado do BI e BI_MCP_REDIRECT_URI deve coincidir com o callback e a origem de acesso desta instalação; não misturar localhost e 127.0.0.1 na mesma autorização. BI_MCP_CLIENT_ID é opcional quando o servidor aceita registro dinâmico. Os exemplos permanecem desabilitados; a homologação foi habilitada apenas na instalação local. O ensaio de restauração desabilita MCP, ChatGPT, Lumo, visualizador e Suíte, impede HTTP externo e exige nova autenticação nas conexões restauradas.
 
-Impacto no futuro tour/tira-dúvidas: usar a âncora bi-mcp-connection na página Conexões; explicar autorização por ambiente, aplicação de conferência, escolha da própria conta no consentimento, consulta sem SQL, unidade/data/link, **Conferir acesso**, reconexão e **Desconectar**. Diferenciar consultas de dados, autoria/ETL pelo Lumo e inferência pelo plano ChatGPT. O tour e o suporte com IA continuam na fila; esta revisão fornece a orientação da nova funcionalidade.
+Impacto no tour e tira-dúvidas: usar a âncora bi-mcp-connection na página Conexões; explicar autorização por ambiente, aplicação de conferência, escolha da própria conta no consentimento, consulta sem SQL, unidade/data/link, **Conferir acesso**, reconexão e **Desconectar**. Diferenciar consultas de dados, autoria/ETL pelo Lumo e inferência pelo plano ChatGPT. O guia de MCP explica esses conceitos; o passo da página usa a âncora disponível da conexão.
 
 Critério adicional da ocorrência de rolagem registrada pelo usuário: repetir alternâncias entre celular, tablet e computador em diferentes dashboards, com rolagem vertical, filtros ativos, painel ampliado/retorno e atualização acompanhada. Conferir roda do mouse, teclado e toque nos navegadores disponíveis. O resultado esperado é continuar rolando sem recarregar nem perder sessão/filtros; os ensaios já realizados no Chrome não encerram a verificação de compatibilidade nos demais navegadores e dispositivos.
 
@@ -353,6 +363,6 @@ A criação de tabela pelo broker também aceita o caminho comprovado no Lumo in
 
 Os dois recursos fictícios foram removidos após conferir vínculos e guardar um checkpoint privado dos seus YAMLs. O inventário remoto voltou a 171 tabelas e 171 ETLs, sem os recursos de teste, e manteve a tabela e a fonte originais de conferência. Nenhuma aplicação, publicação ou agenda foi criada nesta homologação. A validação real de gravação desta entrega ocorreu em tabela privada; contratos de edição de tabelas publicadas, concorrência e isolamento passaram por testes isolados e ainda precisam de ensaios ampliados com contas independentes.
 
-Impacto no tour e tira-dúvidas: usar a âncora estável `table-presentation`. Orientar **Catálogo BI → Tabelas → Organizar nomes e formatos → Conferir alterações → Autorizar/Recusar → Ver tabela atualizada**, conforme perfil e tamanho de tela. Explicar nomes de exibição, padrões da tabela versus escolhas do dashboard, campos alterados, filtros/paginação, revisão vencida e resultado não confirmado. Alterar apresentação não equivale a alterar estrutura ou autorizar publicação. O tour e o atendimento de ajuda continuam na fila; estes passos alimentam a documentação da funcionalidade sem declará-los instalados.
+Impacto no tour e tira-dúvidas: usar a âncora estável `table-presentation`. Orientar **Catálogo BI → Tabelas → Organizar nomes e formatos → Conferir alterações → Autorizar/Recusar → Ver tabela atualizada**, conforme perfil e tamanho de tela. Explicar nomes de exibição, padrões da tabela versus escolhas do dashboard, campos alterados, filtros/paginação, revisão vencida e resultado não confirmado. Alterar apresentação não equivale a alterar estrutura ou autorizar publicação. O guia de edição de tabelas acompanha esse fluxo e suas limitações, e pode ser encontrado na ajuda contextual.
 
 Validação final desta entrega: **571 testes de backend, com 3.294 asserções em SQLite e novamente em PostgreSQL isolado**; 61 testes de interface; TypeScript/build local; Pint; teste operacional e smoke do protocolo Codex sem inferência. Formulário e revisão foram conferidos em 390, 768 e 1440 px. O relato de rolagem na troca de dispositivos permanece na fila de compatibilidade descrita acima; a edição de tabelas não altera o visualizador externo.

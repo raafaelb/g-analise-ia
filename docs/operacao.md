@@ -24,9 +24,11 @@ docker compose exec -T app php artisan ganalise:health
 docker compose exec -T app php artisan ganalise:backup-state
 ```
 
-`ganalise:health` retorna JSON/exit code: banco, cache, scheduler, workers e disco. O primeiro heartbeat chega após a próxima virada de minuto. Scheduler/documentos: tolerância 3 minutos; worker IA: 20 minutos, incluindo turno autorizado de até 15 minutos. A saída inclui tamanho das filas sem conteúdo das tarefas. Monitore exit code e crescimento das filas; `/up` verifica apenas o processo web.
+`ganalise:health` retorna JSON/exit code: banco, cache, scheduler, workers e disco. O primeiro heartbeat chega após a próxima virada de minuto. Scheduler/documentos: tolerância 3 minutos; worker de ajuda: 5 minutos, incluindo resposta de até 3 minutos; worker IA: 20 minutos, incluindo turno autorizado de até 15 minutos. A saída inclui tamanho das filas sem conteúdo das tarefas. Monitore exit code e crescimento das filas; `/up` verifica apenas o processo web.
 
 A migração `add_preview_revision_to_projects_table` acrescenta a revisão confirmada e sua data ao projeto. Aplique as migrações antes de iniciar os workers com o código atualizado. Registros anteriores continuam válidos com esses campos vazios; não é necessário exportar imagens ou recriar projetos.
+
+As migrações `create_user_guide_progress_table` e `create_help_questions_table` acrescentam o progresso individual e o histórico do atendimento. Aplique-as antes de iniciar a versão com ajuda. O serviço **help** consome somente a fila `help`, com timeout de 180 segundos e uma tentativa; deve iniciar junto de `worker`, `documents` e `scheduler`. A manutenção expira atendimentos interrompidos, sem reenviar perguntas à OpenAI. `ganalise:backup-state` inclui `active_help`; o backup aguarda não haver resposta ativa. A restauração isolada invalida perguntas pendentes.
 
 Os workers têm `restart: unless-stopped`. Alterações no código exigem reiniciar os workers; a fila é preservada. Em produção, use a nova imagem em todos os serviços. Timeout da fila é maior que o turno; ações remotas não têm repetição automática após resultado incerto. Não monte Docker socket no worker.
 
@@ -59,7 +61,7 @@ O backup verifica tarefas ativas, usa manutenção breve para copiar banco/arqui
 
 ## Retenção
 
-Conversas, projetos e anexos originais são preservados. Exportações PNG geradas: 30 dias; eventos de auditoria: 180 dias; logs diários: 14 dias. Configure `EXPORT_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS` e `LOG_DAILY_DAYS`. Valor zero desliga a expiração da categoria. A retenção local não apaga recursos no BI.
+Conversas, projetos, anexos originais e histórico da ajuda são preservados. O titular pode apagar seu histórico pessoal pela própria ajuda; essa ação não afeta as conversas dos projetos. Exportações PNG geradas: 30 dias; eventos de auditoria: 180 dias; logs diários: 14 dias. Configure `EXPORT_RETENTION_DAYS`, `AUDIT_RETENTION_DAYS` e `LOG_DAILY_DAYS`. Valor zero desliga a expiração da categoria. A retenção local não apaga recursos no BI.
 
 ```sh
 docker compose exec -T app php artisan ganalise:retention

@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\AgentRun;
 use App\Models\Approval;
+use App\Models\HelpQuestion;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class UserAccessRevocation
 {
@@ -16,6 +18,9 @@ class UserAccessRevocation
             $sessions->where('id', '!=', $exceptSession);
         }
         $sessions->delete();
+        if (Schema::hasTable('help_questions')) {
+            HelpQuestion::where('user_id', $user->id)->whereIn('status', ['queued', 'running'])->update(['status' => 'cancelled', 'finished_at' => now()]);
+        }
         foreach (Approval::where('user_id', $user->id)->whereIn('status', ['pending', 'approved'])->lockForUpdate()->get() as $approval) {
             $approval->update(['status' => 'cancelled', 'decided_at' => now()]);
             if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {

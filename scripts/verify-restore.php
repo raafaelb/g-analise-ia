@@ -4,10 +4,13 @@ use App\Models\AgentRun;
 use App\Models\Approval;
 use App\Models\Artifact;
 use App\Models\Connection;
+use App\Models\HelpQuestion;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\UserGuideProgress;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 require __DIR__.'/../vendor/autoload.php';
 
@@ -36,6 +39,14 @@ try {
     if (config('database.connections.pgsql.database') !== $database) {
         throw new RuntimeException('A conexão não aponta para o banco isolado.');
     }
+    $guideCount = Schema::hasTable('user_guide_progress') ? UserGuideProgress::count() : 0;
+    $helpCount = Schema::hasTable('help_questions') ? HelpQuestion::count() : 0;
+    $manifest = json_decode(file_get_contents('/restore/manifest.json'), true, 512, JSON_THROW_ON_ERROR);
+    foreach (['guide_progress' => $guideCount, 'help_questions' => $helpCount] as $key => $actual) {
+        if (isset($manifest['state'][$key]) && $manifest['state'][$key] !== $actual) {
+            throw new RuntimeException('A restauração não preservou todo o progresso e histórico de ajuda.');
+        }
+    }
     $checked = 0;
     foreach (Connection::cursor() as $connection) {
         $credentials = $connection->credentials;
@@ -53,9 +64,12 @@ try {
     }
     // Cópias restauradas nunca retomam tarefas remotas ou usam sessões antigas automaticamente.
     AgentRun::whereIn('status', ['queued', 'running', 'awaiting_approval', 'cancel_requested'])->update(['status' => 'failed', 'error_code' => 'restored_requires_review', 'error_message' => 'Dados restaurados. Confira o estado atual do BI antes de retomar.', 'finished_at' => now()]);
+    if (Schema::hasTable('help_questions')) {
+        HelpQuestion::whereIn('status', ['queued', 'running'])->update(['status' => 'failed', 'error_message' => 'Dados restaurados. Reconecte sua conta antes de iniciar outro atendimento.', 'finished_at' => now()]);
+    }
     Approval::whereIn('status', ['pending', 'approved', 'executing'])->update(['status' => 'expired']);
     Connection::whereNotNull('credentials')->update(['status' => 'reauthentication_required']);
-    echo json_encode(['ok' => true, 'users' => User::count(), 'projects' => Project::count(), 'private_files_checked' => $files, 'encrypted_credentials_checked' => $checked, 'outbound_integrations_disabled' => true], JSON_THROW_ON_ERROR).PHP_EOL;
+    echo json_encode(['ok' => true, 'users' => User::count(), 'projects' => Project::count(), 'guide_progress_checked' => $guideCount, 'help_questions_checked' => $helpCount, 'private_files_checked' => $files, 'encrypted_credentials_checked' => $checked, 'outbound_integrations_disabled' => true], JSON_THROW_ON_ERROR).PHP_EOL;
 } catch (Throwable $e) {
     fwrite(STDERR, json_encode(['ok' => false, 'error_type' => get_class($e), 'message' => 'A validação isolada da restauração falhou. Os dados em uso não foram alterados.']).PHP_EOL);
     exit(1);

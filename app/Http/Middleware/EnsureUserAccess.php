@@ -22,6 +22,9 @@ class EnsureUserAccess
 
             return redirect()->route('login')->with('error', 'Sua sessão foi encerrada. Entre novamente ou procure a Inovadora.');
         }
+        if ($user && $request->hasHeader('X-GAnalise-User') && $request->header('X-GAnalise-User') !== (string) $user->id) {
+            return response()->json(['message' => 'A conta deste navegador mudou. Atualize a página para continuar com a conta atual.'], 401);
+        }
         if ($user?->must_change_password && ! $request->routeIs('account.password', 'logout') && ! ($request->routeIs('workspace') && $request->route('section') === 'account')) {
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'Defina sua senha pessoal para continuar.', 'requires_password_change' => true], 423);

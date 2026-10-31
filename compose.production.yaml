@@ -42,6 +42,10 @@ services:
     <<: *app
     command: ["php","artisan","queue:work","--queue=actions,agents,default","--sleep=1","--tries=1","--timeout=960"]
     stop_grace_period: 30s
+  help:
+    <<: *app
+    command: ["php","artisan","queue:work","--queue=help","--sleep=1","--tries=1","--timeout=180"]
+    stop_grace_period: 190s
   documents:
     <<: *app
     command: ["php","artisan","queue:work","--queue=documents","--sleep=1","--tries=1","--timeout=90"]

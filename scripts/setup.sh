@@ -12,5 +12,5 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/app" -w /app node:24-alpine
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/app" -w /app node:24-alpine npm run build:local
 docker compose up -d postgres redis
 docker compose run --rm app php artisan migrate --force
-docker compose up -d app worker documents scheduler reverb
+docker compose up -d app worker help documents scheduler reverb
 printf '\nG-Analise IA: http://localhost:8088\nCrie a primeira conta com: docker compose exec app php artisan horus:user seu@email.com --name="Seu nome" --role=owner\n'

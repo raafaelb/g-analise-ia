@@ -2,6 +2,7 @@
 
 use App\Jobs\OperationsHeartbeat;
 use App\Models\AgentRun;
+use App\Models\HelpQuestion;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\UserAccessRevocation;
@@ -69,6 +70,7 @@ Artisan::command('horus:user {email} {--name=} {--role=editor}', function () {
 })->purpose('Cria ou redefine um acesso local sem expor a senha nos argumentos.');
 Schedule::call(function () {
     Artisan::call('ganalise:expire-reviews');
+    HelpQuestion::interrupted()->update(['status' => 'failed', 'error_message' => 'O atendimento foi interrompido. Envie uma nova pergunta para continuar.', 'finished_at' => now()]);
     AgentRun::whereIn('status', ['running'])->where('heartbeat_at', '<', now()->subMinutes(5))->each(function ($run) {
         $run->update(['status' => 'failed', 'finished_at' => now(), 'error_code' => 'worker_lost', 'error_message' => 'O worker perdeu a conexão. Sua conversa foi preservada.']);
         Audit::record($run->user_id, 'agent.interrupted', 'Worker interrompido; tarefa requer retomada.', $run->conversation->project_id);
@@ -79,5 +81,6 @@ Schedule::call(function () {
     Cache::put('operations:scheduler', now()->timestamp, 300);
     OperationsHeartbeat::dispatch('agents');
     OperationsHeartbeat::dispatch('documents');
+    OperationsHeartbeat::dispatch('help');
 })->everyMinute()->name('operations-heartbeat')->withoutOverlapping();
 Schedule::command('ganalise:retention --apply')->dailyAt('03:40')->timezone('America/Sao_Paulo')->withoutOverlapping();

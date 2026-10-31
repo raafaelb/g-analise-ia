@@ -19,6 +19,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -36,6 +37,23 @@ class UserAccessTest extends TestCase
     private function updateInput(User $user, array $changes = []): array
     {
         return [...$user->only(['name', 'email', 'role', 'active']), 'version' => (string) $user->access_revision, ...$changes];
+    }
+
+    public function test_a_stale_workspace_tab_cannot_use_another_accounts_session_or_log_the_new_account_out(): void
+    {
+        $previous = User::factory()->create();
+        $current = User::factory()->create();
+        Queue::fake();
+
+        $this->actingAs($current)->withHeader('X-GAnalise-User', (string) $previous->id)->getJson('/api/bootstrap')->assertUnauthorized();
+        $this->postJson('/api/help/questions', ['question' => 'Contexto da aba antiga', 'page' => 'home', 'request_id' => '00000000-0000-4000-8000-000000000001'])->assertUnauthorized();
+
+        $this->assertAuthenticatedAs($current);
+        $this->assertDatabaseCount('help_questions', 0);
+        Queue::assertNothingPushed();
+        $this->withHeader('X-GAnalise-User', (string) $current->id)->getJson('/api/bootstrap')->assertOk()->assertJsonPath('user.id', $current->id);
+        $this->withHeader('X-GAnalise-User', (string) $previous->id)->getJson('/api/guide')->assertUnauthorized();
+        $this->withoutHeader('X-GAnalise-User')->getJson('/api/guide')->assertOk();
     }
 
     public function test_admin_can_create_local_access_without_disclosing_password_hashes_or_provider_identifiers(): void

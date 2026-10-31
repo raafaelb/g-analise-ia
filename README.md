@@ -18,6 +18,7 @@ Produto gratuito e aberto da Inovadora, complementar ao G-Analise BI. PHP 8.5/La
 - Atualização da autoria com **Atualizar do BI**, preservando edições locais e revisões pendentes. Conferência de publicações com resultado incerto por leitura remota, sem repetir a operação.
 - Painel de plano/limites informa somente o que o provedor disponibiliza; o fluxo OSS testado não retornou saldo. A interface oferece acesso ao uso no ChatGPT.
 - Revisão humana dentro da conversa, com cartão destacado, aviso fixo, proposta e botões Autorizar/Recusar. No fluxo assíncrono, o worker é liberado enquanto aguarda decisão; a ação aprovada executa uma vez e a IA retoma com o resultado confirmado. Publicação depende da revisão concreta e das fontes verificadas.
+- Boas-vindas e tours guiados por usuário/página, com repetição manual, guias pesquisáveis e atendimento sobre o próprio produto usando o plano ChatGPT. Histórico pessoal e fila própria, sem executar ações BI na ajuda.
 - Anexos privados: texto/CSV/JSON/YAML/Markdown, XLSX, PDF com texto e PNG/JPEG. Limites explícitos; PDFs digitalizados ainda exigem OCR ou envio de imagem.
 - Cobertura das fontes, preservação de agendas mais frequentes e identificação de carga concluída. A ativação de uma segunda agenda para uma fonte já agendada é bloqueada no servidor. A solicitação/enfileiramento não é sucesso. Nova publicação de aplicação gerenciada é bloqueada enquanto faltar a verificação das cargas.
 - Imagens imutáveis PHP-FPM/Nginx, caminho `/ia-ganalise`, HTTPS/WebSocket testados localmente, backup criptografado com restauração isolada, retenção e monitoramento por heartbeat.
@@ -41,7 +42,7 @@ O modo de demonstração `LOCAL_PREVIEW=true` abre uma conta de exemplo somente 
 
 ```sh
 docker compose ps
-docker compose up -d app worker documents scheduler reverb postgres redis
+docker compose up -d app worker help documents scheduler reverb postgres redis
 docker compose stop
 ```
 
@@ -72,7 +73,7 @@ docker compose exec app php scripts/codex-smoke.php
 docker compose exec app php artisan ganalise:health
 ```
 
-A rodada local de 30/10/2026 passou com 403 testes PHP / 2.362 verificações, tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 32 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
+A rodada local de 30/10/2026 passou com 624 testes PHP, tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 66 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
 
 Codex está fixado em 0.165.0 e Lumo em 3.44.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
 

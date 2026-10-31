@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AgentRun;
 use App\Models\Approval;
 use App\Models\Connection;
+use App\Models\HelpQuestion;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\BiCredentials;
@@ -18,6 +19,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -72,7 +75,7 @@ class ConnectionController extends Controller
             if ($result['mode'] !== 'oss_local') {
                 unset($tokens['id_token']);
             }
-            Connection::updateOrCreate(['user_id' => $user->id, 'provider' => 'openai'], ['subject' => $subject, 'status' => 'connected', 'account_label' => $claims['email'] ?? $claims['name'] ?? 'Conta ChatGPT', 'credentials' => $tokens, 'scopes' => preg_split('/\s+/', trim($tokens['scope'] ?? '')), 'metadata' => ['issuer' => $claims['iss'], 'client_id' => $result['client_id'], 'auth_mode' => $result['mode'], 'plan_usage' => $identity->planAuthorized($tokens)], 'expires_at' => isset($tokens['expires_in']) ? now()->addSeconds((int) $tokens['expires_in']) : null]);
+            Connection::updateOrCreate(['user_id' => $user->id, 'provider' => 'openai'], ['subject' => $subject, 'status' => 'connected', 'account_label' => $claims['email'] ?? $claims['name'] ?? 'Conta ChatGPT', 'credentials' => $tokens, 'scopes' => preg_split('/\s+/', trim($tokens['scope'] ?? '')), 'metadata' => ['issuer' => $claims['iss'], 'client_id' => $result['client_id'], 'auth_mode' => $result['mode'], 'plan_usage' => $identity->planAuthorized($tokens), 'session_generation' => (string) Str::uuid()], 'expires_at' => isset($tokens['expires_in']) ? now()->addSeconds((int) $tokens['expires_in']) : null]);
             Auth::setUser($user);
             $request->session()->regenerate();
             $request->session()->put('user_access_version', $user->access_version);
@@ -172,6 +175,9 @@ class ConnectionController extends Controller
             $reviews->update(['status' => 'cancelled', 'decided_at' => now()]);
             AgentRun::where('user_id', $request->user()->id)->whereIn('status', ['queued', 'awaiting_approval'])->update(['status' => 'cancelled', 'finished_at' => now()]);
             AgentRun::where('user_id', $request->user()->id)->where('status', 'running')->update(['status' => 'cancel_requested']);
+            if ($provider === 'openai' && Schema::hasTable('help_questions')) {
+                HelpQuestion::where('user_id', $request->user()->id)->whereIn('status', ['queued', 'running'])->update(['status' => 'cancelled', 'finished_at' => now()]);
+            }
             $connection->update(['status' => 'disconnected', 'credentials' => null, 'scopes' => [], 'metadata' => $provider === 'openai' ? array_merge(array_intersect_key($connection->metadata ?? [], array_flip(['issuer', 'client_id', 'auth_mode'])), ['plan_usage' => false]) : [], 'expires_at' => null]);
         });
         if ($provider === 'horus') {

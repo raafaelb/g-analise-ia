@@ -18,12 +18,19 @@ class OperationsTest extends TestCase
 
     public function test_health_detects_missing_scheduler_and_workers_and_recovers_with_heartbeats(): void
     {
+        $this->freezeTime();
         Queue::fake();
         $this->artisan('ganalise:health')->assertFailed();
         Cache::put('operations:scheduler', now()->timestamp, 300);
         (new OperationsHeartbeat('agents'))->handle();
         (new OperationsHeartbeat('documents'))->handle();
+        $this->artisan('ganalise:health')->assertFailed();
+        (new OperationsHeartbeat('help'))->handle();
         $this->artisan('ganalise:health')->assertSuccessful();
+        Cache::put('operations:worker:help', now()->subMinutes(6)->timestamp, 300);
+        $this->artisan('ganalise:health')->assertFailed();
+        (new OperationsHeartbeat('help'))->handle();
+        Queue::assertNothingPushed();
         Cache::put('operations:worker:agents', now()->subMinutes(21)->timestamp, 300);
         $this->artisan('ganalise:health')->assertFailed();
     }
