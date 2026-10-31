@@ -366,3 +366,29 @@ Os dois recursos fictícios foram removidos após conferir vínculos e guardar u
 Impacto no tour e tira-dúvidas: usar a âncora estável `table-presentation`. Orientar **Catálogo BI → Tabelas → Organizar nomes e formatos → Conferir alterações → Autorizar/Recusar → Ver tabela atualizada**, conforme perfil e tamanho de tela. Explicar nomes de exibição, padrões da tabela versus escolhas do dashboard, campos alterados, filtros/paginação, revisão vencida e resultado não confirmado. Alterar apresentação não equivale a alterar estrutura ou autorizar publicação. O guia de edição de tabelas acompanha esse fluxo e suas limitações, e pode ser encontrado na ajuda contextual.
 
 Validação final desta entrega: **571 testes de backend, com 3.294 asserções em SQLite e novamente em PostgreSQL isolado**; 61 testes de interface; TypeScript/build local; Pint; teste operacional e smoke do protocolo Codex sem inferência. Formulário e revisão foram conferidos em 390, 768 e 1440 px. O relato de rolagem na troca de dispositivos permanece na fila de compatibilidade descrita acima; a edição de tabelas não altera o visualizador externo.
+
+
+## Leitura específica de detalhes e desempenho do catálogo — 31/10/2026
+
+Abrir o detalhe de um recurso deixa de reconstruir o catálogo inteiro quando o inventário de 90 segundos vence. A consulta mantém a validação atual da sessão/tenant, lê a configuração do recurso e carrega apenas os tipos necessários aos seus vínculos. O `info` nativo já consulta o servidor; seu `fetch` anterior era redundante e foi retirado. Os YAMLs solicitados são carregados em lotes de até 100 referências no diretório descartável de leitura, sem substituir arquivos de autoria dos projetos.
+
+Nas mesas, a seleção usa a mesa informada nas listagens atuais ou um relatório nativo de dependentes com cobertura completa. A configuração dos membros é conferida. Cobertura parcial, identidade contraditória ou formato inesperado levam à leitura completa dos tipos envolvidos. Relatórios parciais de tabelas, ETLs e conexões não são tratados como inventário completo. Agendas, aplicações que usam uma tabela, ETLs de uma conexão, descrições, nomes de dashboards e contagens da mesa vinculada são preservados. Falta de acesso continua diferente de lista vazia; falha de atualização não confirma vínculos a partir de arquivos antigos. Uma mudança de sessão ou de acesso durante a consulta descarta a resposta.
+
+A comparação de leitura real no tenant de homologação usou o serviço anterior do commit `ced3d35` e a nova implementação, sem cache global prévio em cada caso. Todos os campos das quatro respostas foram comparados recursivamente e os hashes coincidiram:
+
+| Detalhe | Antes, sem cache | Depois, sem cache | Depois, com inventário recente |
+| --- | ---: | ---: | ---: |
+| Aplicação | 17,90 s | 2,00 s | 0,63 s |
+| Tabela e vínculos | 19,80 s | 12,45 s | 2,02 s |
+| Mesa de dados | 16,84 s | 2,65 s | 0,62 s |
+| Conexão e seus ETLs | 19,69 s | 5,63 s | 1,63 s |
+
+São medições pontuais sujeitas à latência do fornecedor e ao volume do ambiente. A abertura inicial e a atualização integral do catálogo continuam consultando todas as áreas. Tabelas com muitas aplicações e conexões com muitos ETLs precisam conferir esses vínculos e ainda podem demorar. A comparação não fez alterações, publicações, cargas ou exclusões no BI; o relatório detalhado permanece privado.
+
+A disputa entre duas consultas frias do catálogo também foi corrigida: o timeout do mutex retornava erro 500; agora retorna a orientação de operação em andamento, sem executar uma segunda reconstrução. Os testes cobrem esse erro reproduzido, os vínculos, contagens, isolamento de sessão, recusas de permissão, metadados indisponíveis, mesa vazia, relatório contraditório e preservação dos diretórios de autoria.
+
+Impacto no tour e tira-dúvidas: a versão `2026-10-31.1` mantém as âncoras do catálogo e explica a consulta por cartão, o carregamento inicial, **Atualizar catálogo** e o aviso para aguardar outra operação. Uma atualização do conteúdo não repete tours já vistos. Esta entrega não altera o iframe externo; a ocorrência de rolagem ao trocar de dispositivo continua no acompanhamento de compatibilidade.
+
+Validação automatizada desta revisão: **647 testes de backend e 3.741 asserções em SQLite e em PostgreSQL isolado**, 66 testes de interface, TypeScript/build local, Pint, teste operacional de configuração e smoke do Codex sem inferência.
+
+No navegador, a mesa de dados abriu com suas nove tabelas e nove ETLs, incluindo navegação e contagens. O texto atualizado do tour foi conferido em computador e em 390 × 844; o guia de ajuda abriu no celular sem transbordamento horizontal. A aba descartável foi fechada e somente os dois registros de tour criados nesta homologação foram removidos, preservando as abas originais e o primeiro acesso real do titular.

@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-30.1",
+  "version": "2026-10-31.1",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -193,7 +193,7 @@
         {
           "id": "catalog-search",
           "title": "Localize e confira",
-          "description": "Use a busca e os filtros. Abra um cartão para ver detalhes, vínculos, amostras, prévias e as ações disponíveis.",
+          "description": "Use a busca e os filtros. Abra um cartão para consultar o recurso escolhido, seus vínculos e as ações disponíveis. Se faltar acesso a alguma área, confira o motivo indicado.",
           "anchor": "catalog-search",
           "audience": "all"
         },
@@ -438,7 +438,7 @@
       "id": "find-dashboards",
       "title": "Onde encontro minhas dashboards?",
       "summary": "Encontre aplicações no catálogo ou retome seu projeto no portal.",
-      "body": "Abra **Catálogo BI**, escolha o **tenant** e a categoria **Aplicações**. Use busca, filtros de mesa e situação para localizar o recurso. Uma aplicação pode conter várias dashboards; abra seu detalhe para escolher a página e visualizar.\n\n**Minha Mesa** identifica os rascunhos privados retornados pela conta BI. **Publicadas** reúne as aplicações compartilhadas conforme as permissões das mesas. Já **Meus projetos** mostra os trabalhos organizados por você neste portal.\n\nFalta de permissão ou consulta indisponível é diferente de uma lista vazia. Confira o motivo apresentado antes de concluir que um recurso foi removido.",
+      "body": "Abra **Catálogo BI**, escolha o **tenant** e a categoria **Aplicações**. Use busca, filtros de mesa e situação para localizar o recurso. Uma aplicação pode conter várias dashboards; abra seu detalhe para escolher a página e visualizar.\n\n**Minha Mesa** identifica os rascunhos privados retornados pela conta BI. **Publicadas** reúne as aplicações compartilhadas conforme as permissões das mesas. Já **Meus projetos** mostra os trabalhos organizados por você neste portal.\n\nFalta de permissão ou consulta indisponível é diferente de uma lista vazia. Confira o motivo apresentado antes de concluir que um recurso foi removido.\n\nA primeira abertura ou **Atualizar catálogo** consulta o inventário do ambiente e pode demorar conforme o BI. Os cartões consultam os detalhes do recurso escolhido; tabelas e conexões com muitos vínculos podem levar mais tempo. Se outra operação estiver em andamento, aguarde e tente novamente. Use **Atualizar catálogo** para conferir mudanças recentes no inventário.",
       "pages": [
         "catalog",
         "projects",

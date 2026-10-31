@@ -7,7 +7,10 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\BiCatalog;
 use App\Services\LumoClient;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Mockery;
@@ -135,6 +138,22 @@ class CatalogTest extends TestCase
         $this->app->instance(LumoClient::class, $mock);
         $this->actingAs($a)->getJson('/api/catalog/321')->assertJsonPath('resources.app.0.id', (string) $a->id);
         $this->actingAs($b)->getJson('/api/catalog/321')->assertJsonPath('resources.app.0.id', (string) $b->id);
+    }
+
+    public function test_a_concurrent_cold_catalog_request_returns_422_with_a_clear_retry_message(): void
+    {
+        $user = User::factory()->create();
+        $connection = $this->connect($user);
+        $key = 'bi-catalog:v3:'.$connection->id.':initial:321';
+        $lock = Mockery::mock(Lock::class);
+        $lock->shouldReceive('block')->once()->andThrow(new LockTimeoutException);
+        Cache::shouldReceive('get')->once()->with($key)->andReturnNull();
+        Cache::shouldReceive('lock')->once()->with($key.':lock', 200)->andReturn($lock);
+        $lumo = $this->mock(LumoClient::class);
+        $lumo->shouldNotReceive('initialize');
+        $lumo->shouldNotReceive('run');
+
+        $this->actingAs($user)->getJson('/api/catalog/321')->assertUnprocessable()->assertJsonPath('errors.catalog.0', 'Outra operação do BI está em andamento nesta conta. Aguarde a conclusão e tente novamente.');
     }
 
     public function test_a_project_can_be_bound_to_an_authorized_resource_without_remote_mutation(): void
