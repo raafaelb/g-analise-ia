@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BiLoadExecution;
 use App\Models\Project;
 use App\Models\RefreshSchedule;
 use App\Models\User;
@@ -106,7 +107,11 @@ class RefreshCoverage
                     $execution = $this->execution($logs[$id], (int) $id, [$source['flow_id']]);
                     $record = $project ? RefreshSchedule::where('user_id', $user->id)->where('tenant_id', $tenant)->where('source_id', $source['resource'])->first() : null;
                     $test = $record?->metadata['test_request'] ?? null;
-                    if (is_array($test) && (string) ($test['schedule_id'] ?? '') === (string) $id) {
+                    $tracked = BiLoadExecution::where('user_id', $user->id)->where('tenant_id', $tenant)->where('schedule_id', (string) $id)->where('status', 'succeeded')->latest()->limit(100)->get()->first(fn ($load) => ($load->metadata['proof']['verified'] ?? false) === true && in_array((string) $source['flow_id'], array_column($load->metadata['bindings'] ?? [], 'flow_id'), true) && hash_equals((string) ($load->metadata['configuration_hash'] ?? ''), $this->signature($maps['schedule'][$id] ?? [], $documents)));
+                    if ($tracked && (! is_array($test) || empty($test['requested_at']) || $tracked->requested_at->greaterThan(Carbon::parse($test['requested_at'])))) {
+                        $source['test_execution'] = $tracked->metadata['proof'];
+                    }
+                    if (! isset($source['test_execution']) && is_array($test) && (string) ($test['schedule_id'] ?? '') === (string) $id) {
                         $configuration = $this->signature($maps['schedule'][$id] ?? [], $documents);
                         $sameConfiguration = ! empty($test['configuration_hash']) && hash_equals($test['configuration_hash'], $configuration);
                         if ($sameConfiguration) {

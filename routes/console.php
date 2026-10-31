@@ -1,16 +1,20 @@
 <?php
 
+use App\Jobs\ObserveBiLoadExecution;
 use App\Jobs\OperationsHeartbeat;
 use App\Models\AgentRun;
+use App\Models\BiLoadExecution;
 use App\Models\HelpQuestion;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\BiScheduleRuns;
 use App\Services\UserAccessRevocation;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 Artisan::command('horus:user {email} {--name=} {--role=editor}', function () {
@@ -70,6 +74,9 @@ Artisan::command('horus:user {email} {--name=} {--role=editor}', function () {
 })->purpose('Cria ou redefine um acesso local sem expor a senha nos argumentos.');
 Schedule::call(function () {
     Artisan::call('ganalise:expire-reviews');
+    if (Schema::hasTable('bi_load_executions')) {
+        BiLoadExecution::whereIn('status', BiScheduleRuns::OBSERVING)->where('updated_at', '<', now()->subMinutes(5))->limit(50)->get()->each(fn (BiLoadExecution $execution) => ObserveBiLoadExecution::dispatch($execution->id)->onQueue('agents'));
+    }
     HelpQuestion::interrupted()->update(['status' => 'failed', 'error_message' => 'O atendimento foi interrompido. Envie uma nova pergunta para continuar.', 'finished_at' => now()]);
     AgentRun::whereIn('status', ['running'])->where('heartbeat_at', '<', now()->subMinutes(5))->each(function ($run) {
         $run->update(['status' => 'failed', 'finished_at' => now(), 'error_code' => 'worker_lost', 'error_message' => 'O worker perdeu a conexão. Sua conversa foi preservada.']);

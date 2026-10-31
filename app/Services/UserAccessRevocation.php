@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AgentRun;
 use App\Models\Approval;
+use App\Models\BiLoadExecution;
 use App\Models\HelpQuestion;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,9 @@ class UserAccessRevocation
         $sessions->delete();
         if (Schema::hasTable('help_questions')) {
             HelpQuestion::where('user_id', $user->id)->whereIn('status', ['queued', 'running'])->update(['status' => 'cancelled', 'finished_at' => now()]);
+        }
+        if (Schema::hasTable('bi_load_executions')) {
+            BiLoadExecution::where('user_id', $user->id)->whereIn('status', BiScheduleRuns::OBSERVING)->update(['status' => 'access_changed']);
         }
         foreach (Approval::where('user_id', $user->id)->whereIn('status', ['pending', 'approved'])->lockForUpdate()->get() as $approval) {
             $approval->update(['status' => 'cancelled', 'decided_at' => now()]);

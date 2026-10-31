@@ -5,10 +5,10 @@ namespace App\Services\Agent;
 use App\Models\AgentRun;
 use App\Models\Approval;
 use App\Models\Artifact;
+use App\Models\BiLoadExecution;
 use App\Models\Connection;
 use App\Models\ManagedBiResource;
 use App\Models\Project;
-use App\Models\RefreshSchedule;
 use App\Models\User;
 use App\Services\ArtifactImages;
 use App\Services\Audit;
@@ -20,6 +20,7 @@ use App\Services\BiFlowExecution;
 use App\Services\BiMcpClient;
 use App\Services\BiPublications;
 use App\Services\BiResourceValidation;
+use App\Services\BiScheduleRuns;
 use App\Services\BiSchedules;
 use App\Services\BiTablePresentation;
 use App\Services\BiValidationFailure;
@@ -113,7 +114,7 @@ class ActionBroker
             ['name' => 'tenant_variables', 'description' => 'Lista nomes e referências das variáveis do tenant do projeto. Os valores são protegidos: nunca devolve senhas, chaves ou outros valores. Use a referência no recurso BI.', 'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'additionalProperties' => false]],
             ['name' => 'refresh_coverage', 'description' => 'Confere todas as fontes de uma aplicação no tenant do projeto, agendas diárias ou mais frequentes, resultados reais e a execução de teste correlacionada. Somente leitura remota; não cria agendas ou executa cargas.', 'inputSchema' => ['type' => 'object', 'properties' => ['resource' => ['type' => 'string', 'pattern' => '^app:[1-9][0-9]*$']], 'required' => ['resource'], 'additionalProperties' => false]],
             ['name' => 'project_image', 'description' => 'Devolve a imagem PNG de um dashboard exportado para análise visual somente após autorização explícita do usuário no portal para esse arquivo e esta conversa. Não gera nova imagem. Use o artifact_id retornado pelo export.', 'inputSchema' => ['type' => 'object', 'properties' => ['artifact_id' => ['type' => 'string']], 'required' => ['artifact_id'], 'additionalProperties' => false]],
-            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Para investigar o banco use list com kind credential e credential_schema; não peça ao usuário nomes técnicos de tabelas. run_flow_node executa uma etapa ETL em rascunho após revisão; flow_preview lê seu resultado já executado. app_link retorna a URL real da aplicação sem credenciais. preview é a conferência de dados de um app, nunca uma prévia de ETL. lint exige resource e devolve os erros do YAML para corrigir sem pedir intervenção técnica do usuário. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule', 'delete_draft']], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar', 'credential']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string', 'description' => 'internalId da etapa. Para new/table, prefira a origem com esquema capturado diretamente ligada à única inserção sem tabela existente.'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como nova (padrão) ou substituir a aplicação original na mesma mesa. Substituição exige revisão explícita do alvo.'], 'dashboard' => ['type' => 'integer'], 'schema' => ['type' => 'string', 'maxLength' => 128], 'search' => ['type' => 'string', 'maxLength' => 100, 'description' => 'Termo para localizar tabelas/colunas no PostgreSQL sem SQL.'], 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000000, 'description' => 'Use next_offset da resposta para continuar o catálogo.']], 'required' => ['action'], 'additionalProperties' => false]],
+            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Para investigar o banco use list com kind credential e credential_schema; não peça ao usuário nomes técnicos de tabelas. run_flow_node executa uma etapa ETL em rascunho após revisão; flow_preview lê seu resultado já executado. app_link retorna a URL real da aplicação sem credenciais. preview é a conferência de dados de um app, nunca uma prévia de ETL. lint exige resource e devolve os erros do YAML para corrigir sem pedir intervenção técnica do usuário. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'load_status', 'run_schedule', 'resume_schedule', 'delete_draft']], 'execution_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'ID do acompanhamento retornado por run_schedule; load_status apenas confere o resultado, sem reenviar a carga.'], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar', 'credential']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string', 'description' => 'internalId da etapa. Para new/table, prefira a origem com esquema capturado diretamente ligada à única inserção sem tabela existente.'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como nova (padrão) ou substituir a aplicação original na mesma mesa. Substituição exige revisão explícita do alvo.'], 'dashboard' => ['type' => 'integer'], 'schema' => ['type' => 'string', 'maxLength' => 128], 'search' => ['type' => 'string', 'maxLength' => 100, 'description' => 'Termo para localizar tabelas/colunas no PostgreSQL sem SQL.'], 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000000, 'description' => 'Use next_offset da resposta para continuar o catálogo.']], 'required' => ['action'], 'additionalProperties' => false]],
             ['name' => 'workspace_file', 'description' => 'Lista, lê e escreve arquivos YAML e notas do workspace. Não permite caminhos absolutos, arquivos internos, credenciais ou exclusões. Leia o arquivo antes de editar. Para substituir um arquivo existente, expected_sha256 é obrigatório e deve corresponder ao conteúdo lido; omita-o somente ao criar um arquivo novo.', 'inputSchema' => ['type' => 'object', 'properties' => ['operation' => ['type' => 'string', 'enum' => ['list', 'read', 'write']], 'path' => ['type' => 'string'], 'content' => ['type' => 'string'], 'expected_sha256' => ['type' => 'string']], 'required' => ['operation'], 'additionalProperties' => false]],
         ];
     }
@@ -170,6 +171,13 @@ class ActionBroker
         if ($tool !== 'horus_action') {
             throw new RuntimeException('Ferramenta não autorizada.');
         }
+        if (($arguments['action'] ?? '') === 'load_status') {
+            $id = $arguments['execution_id'] ?? '';
+            abort_unless(is_string($id) && Str::isUuid($id), 422, 'Informe o acompanhamento desta carga.');
+            $execution = BiLoadExecution::where('user_id', $user->id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->findOrFail($id);
+
+            return app(BiScheduleRuns::class)->observe($user, $execution->id);
+        }
         $command = $this->command($arguments, $project);
         app(TenantPolicy::class)->assertCommandAllowed((string) $project->tenant_id, $command, $connection);
         $action = $arguments['action'];
@@ -210,6 +218,9 @@ class ActionBroker
         }
         if ($approval->status !== 'executing' || $approval->expires_at->isPast()) {
             throw new RuntimeException('A autorização não está válida para execução.');
+        }
+        if (($approval->payload['action']['action'] ?? '') === 'run_schedule_now') {
+            return app(BiScheduleRuns::class)->executeApproved($approval);
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiSchedules::ACTIONS, true)) {
             return app(BiSchedules::class)->executeApproved($approval);
@@ -361,30 +372,16 @@ class ActionBroker
         if ($action === 'publish_app') {
             $approval->update(['payload' => [...$approval->payload, 'publication_attempt' => ['plan_sha256' => hash('sha256', json_encode($publication, JSON_THROW_ON_ERROR)), 'started_at' => now()->toIso8601String()]]]);
         }
-        $requestedAt = now()->toIso8601String();
-        $result = $this->lumo->run($connection, $command, $project, in_array($action, ['export', 'run_schedule'], true) ? 180 : 90);
+        if ($action === 'run_schedule') {
+            if (! $approval) {
+                throw new RuntimeException('A carga exige uma autorização atual.');
+            }
+
+            return app(BiScheduleRuns::class)->send($user, $connection, (string) $project->tenant_id, substr($arguments['resource'], 9), $approval, $approval->payload['revision']['load_plan'] ?? [], $project);
+        }
+        $result = $this->lumo->run($connection, $command, $project, $action === 'export' ? 180 : 90);
         if (array_key_exists('data', $result)) {
             $result['data'] = app(BiCatalog::class)->redact($result['data']);
-        }
-        if ($action === 'run_schedule') {
-            $documents = app(BiCatalog::class)->workingMetadata($project);
-            $schedule = $documents[$arguments['resource']] ?? [];
-            $ids = array_values(array_unique(array_map(fn ($binding) => (int) $binding['flow_etl_id'], $schedule['flows'] ?? [])));
-            $data = $result['data'] ?? [];
-            $runId = is_array($data) ? ($data['run_id'] ?? $data['runId'] ?? $data['execution']['run_id'] ?? null) : null;
-            $request = ['schedule_id' => (int) substr($arguments['resource'], 9), 'requested_at' => $requestedAt, 'expected_flow_ids' => $ids, 'run_id' => is_string($runId) ? $runId : null, 'verified' => false, 'configuration_hash' => app(RefreshCoverage::class)->signature($schedule, $documents)];
-            $result['execution_request'] = $request;
-            foreach ($ids as $flowId) {
-                $record = RefreshSchedule::firstOrNew(['user_id' => $user->id, 'tenant_id' => $project->tenant_id, 'source_id' => 'flow:'.$flowId]);
-                if (! $record->exists) {
-                    $record->project_id = $project->id;
-                    $record->name = 'Fonte #'.$flowId;
-                }
-                $record->remote_id = (string) $request['schedule_id'];
-                $record->status = 'pending_test';
-                $record->metadata = [...($record->metadata ?? []), 'test_request' => $request, 'test_verified' => false];
-                $record->save();
-            }
         }
         if (in_array($action, ['new', 'clone_app'], true)) {
             $result = $this->recordCreated($project, $arguments, $result);
@@ -698,6 +695,10 @@ class ActionBroker
                 throw new RuntimeException('A configuração da agenda está indisponível, alterada ou não sincronizada. Revise a agenda antes de executá-la.');
             }
             $revision['schedule'] = Arr::only($schedule, ['nome', 'ativo', 'tokenId', 'timezone', 'triggers', 'flows']);
+            if ($arguments['action'] === 'run_schedule') {
+                $revision['load_plan'] = app(BiScheduleRuns::class)->plan($connection, (string) $project->tenant_id, substr($ref, 9));
+                $revision['schedule'] = $revision['load_plan']['schedule'];
+            }
             foreach (['last_log', 'last_log_date'] as $key) {
                 unset($revision['info']['data']['payload'][$key],$revision['info']['data'][$key]);
             }

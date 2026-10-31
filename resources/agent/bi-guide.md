@@ -1,5 +1,7 @@
 # Guia de autoria do G-Analise BI
 
+Após run_schedule, use horus_action load_status com execution_id de execution_request para acompanhar a tentativa registrada. O envio não comprova conclusão. Nunca repita uma carga por timeout ou falta de histórico: consulte o acompanhamento. Vinculação unique_after_request é inferida do histórico; informe essa limitação. A carga só termina com resultado final de todas as fontes; erros e vínculo ambíguo devem ser relatados.
+
 Leia este guia antes de criar ou manter dashboards. As regras do usuário e do projeto continuam prioritárias.
 
 ## Ferramentas

@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.3",
+  "version": "2026-10-31.4",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -206,7 +206,7 @@
         {
           "id": "catalog-schedule",
           "title": "Agende os dados com revisão",
-          "description": "Nova agenda começa inativa. Escolha fontes pelo nome, confira agente, ordem e horários e revise antes de salvar. Reutilize agendas ativas e preserve frequências maiores. Salvar não comprova uma carga concluída.",
+          "description": "Nova agenda começa inativa. Escolha fontes e horários e revise antes de salvar. Para uma carga pontual, abra uma agenda ativa e use Atualizar agora: confira as fontes, autorize e acompanhe cada resultado. Pedido enviado ainda não é carga concluída.",
           "anchor": "catalog-create-schedule",
           "audience": "authors"
         },
@@ -597,7 +597,7 @@
       "id": "refresh",
       "title": "Como garanto a atualização dos dados?",
       "summary": "Confira todas as fontes, agenda ativa e execução concluída com sucesso.",
-      "body": "Abra **Atualização de dados** para verificar a cobertura do trabalho. Cada novo dashboard deve ter todas as fontes atualizadas pelo menos uma vez por dia; agendas mais frequentes devem ser preservadas. Prefira a madrugada no horário de Brasília e evite duplicar agendas para fontes compartilhadas.\n\n**Enfileirado** não significa sucesso. Confirme que a agenda está ativa e que a carga terminou com sucesso no BI. Histórico e detalhes ajudam a investigar falhas.\n\nUma fonte privada pode impedir o agendamento. Nessa situação, a publicação necessária deve ser apresentada para autorização; o trabalho não deve ser considerado concluído com atualização apenas manual sem explicar a pendência.\n\nNo **Catálogo BI → Agendas**, abra a agenda para conferir todos os gatilhos, horários e janelas de execução. Uma agenda pode ter mais de um horário. Agendas semanais e mensais têm dias específicos; o dia do mês não é um intervalo de meses. Uma janela de execução pode impedir que um intervalo alcance todos os dias.\n\n**Quando os dados mudarem** é uma sondagem condicional: verificar a origem a cada poucos segundos não significa carregar os dados nessa frequência nem garante uma carga diária. A revisão na conversa usa as mesmas descrições dos detalhes da agenda. Confira sempre também o resultado real das fontes.",
+      "body": "Abra **Atualização de dados** para verificar a cobertura do trabalho. Cada novo dashboard deve ter todas as fontes atualizadas pelo menos uma vez por dia; agendas mais frequentes devem ser preservadas. Prefira a madrugada no horário de Brasília e evite duplicar agendas para fontes compartilhadas.\n\n**Enfileirado** não significa sucesso. Confirme que a agenda está ativa e que a carga terminou com sucesso no BI. Histórico e detalhes ajudam a investigar falhas.\n\nUma fonte privada pode impedir o agendamento. Nessa situação, a publicação necessária deve ser apresentada para autorização; o trabalho não deve ser considerado concluído com atualização apenas manual sem explicar a pendência.\n\nNo **Catálogo BI → Agendas**, abra a agenda para conferir todos os gatilhos, horários e janelas de execução. Uma agenda pode ter mais de um horário. Agendas semanais e mensais têm dias específicos; o dia do mês não é um intervalo de meses. Uma janela de execução pode impedir que um intervalo alcance todos os dias.\n\n**Quando os dados mudarem** é uma sondagem condicional: verificar a origem a cada poucos segundos não significa carregar os dados nessa frequência nem garante uma carga diária. A revisão na conversa usa as mesmas descrições dos detalhes da agenda. Confira sempre também o resultado real das fontes.\n\nPara solicitar uma carga pontual, abra **Catálogo BI → Agendas → uma agenda ativa → Atualizar agora**. Revise as fontes pelo nome e autorize. O acompanhamento fica salvo para sua conta e continua após fechar a página. Na conversa, pedidos da IA usam o mesmo acompanhamento e mostram o resultado no cartão da autorização.",
       "pages": [
         "refresh",
         "project",
@@ -616,7 +616,7 @@
       "id": "schedule-editor",
       "title": "Como crio ou edito uma agenda de atualização?",
       "summary": "Escolha fontes, agente, ordem e horários no catálogo e confira a proposta antes de salvar.",
-      "body": "No **Catálogo BI**, escolha o ambiente e **Agendas**. Use **Nova agenda** ou abra uma agenda e escolha **Editar agenda**. Você não precisa iniciar uma conversa com IA para essa configuração.\n\n1. Informe o nome e o agente.\n2. Busque as fontes pelo nome e adicione-as. Ajuste a ordem pelas setas e a parte dos dados a atualizar, quando disponível.\n3. Escolha os horários de Brasília. Para carga diária, prefira a madrugada. Podem existir vários horários, dias da semana, dia do mês ou intervalos de horas/minutos.\n4. Uma agenda nova começa inativa. Marque **Ativar atualização automática** somente quando quiser permitir as cargas após a autorização.\n5. Use **Conferir alterações**, compare Atual e Proposto e autorize ou recuse. Aguarde a leitura de confirmação no BI.\n\nFontes privadas precisam de publicação com autorização própria. Todas as fontes da agenda precisam usar o mesmo agente. Uma fonte já carregada por outra agenda ativa deve reutilizar essa agenda: o portal impede cargas automáticas duplicadas. Frequências diárias ou maiores existentes são protegidas contra redução, desativação e remoção de fontes. A edição comum preserva as opções não alteradas da origem. Datas com fuso são convertidas automaticamente para o formato UTC exigido pelo BI, preservando o instante e mantendo a explicação dos horários em Brasília.\n\n**Quando os dados mudarem** usa uma consulta de detecção avançada; ela dispara apenas se o resultado mudar e não garante uma carga diária. A conexão e a consulta já existentes são preservadas até uma substituição explícita. Se precisar preparar uma nova consulta, peça ajuda à IA em um projeto. A tela também oferece avisos por e-mail e a opção avançada de fila paralela.\n\n**Agenda salva** confirma a configuração, sem executar uma carga de teste. Confira a execução e todas as fontes em **Atualização de dados** e nos detalhes/histórico. Se um envio ficar incerto, **Conferir envio no BI** compara a configuração atual sem repetir a gravação; **Ver agenda no catálogo** permite abrir o recurso, inclusive uma criação parcial. A falha original permanece no histórico.",
+      "body": "No **Catálogo BI**, escolha o ambiente e **Agendas**. Use **Nova agenda** ou abra uma agenda e escolha **Editar agenda**. Você não precisa iniciar uma conversa com IA para essa configuração.\n\n1. Informe o nome e o agente.\n2. Busque as fontes pelo nome e adicione-as. Ajuste a ordem pelas setas e a parte dos dados a atualizar, quando disponível.\n3. Escolha os horários de Brasília. Para carga diária, prefira a madrugada. Podem existir vários horários, dias da semana, dia do mês ou intervalos de horas/minutos.\n4. Uma agenda nova começa inativa. Marque **Ativar atualização automática** somente quando quiser permitir as cargas após a autorização.\n5. Use **Conferir alterações**, compare Atual e Proposto e autorize ou recuse. Aguarde a leitura de confirmação no BI.\n\nFontes privadas precisam de publicação com autorização própria. Todas as fontes da agenda precisam usar o mesmo agente. Uma fonte já carregada por outra agenda ativa deve reutilizar essa agenda: o portal impede cargas automáticas duplicadas. Frequências diárias ou maiores existentes são protegidas contra redução, desativação e remoção de fontes. A edição comum preserva as opções não alteradas da origem. Datas com fuso são convertidas automaticamente para o formato UTC exigido pelo BI, preservando o instante e mantendo a explicação dos horários em Brasília.\n\n**Quando os dados mudarem** usa uma consulta de detecção avançada; ela dispara apenas se o resultado mudar e não garante uma carga diária. A conexão e a consulta já existentes são preservadas até uma substituição explícita. Se precisar preparar uma nova consulta, peça ajuda à IA em um projeto. A tela também oferece avisos por e-mail e a opção avançada de fila paralela.\n\n**Agenda salva** confirma a configuração, sem executar uma carga de teste. Confira a execução e todas as fontes em **Atualização de dados** e nos detalhes/histórico. Se um envio ficar incerto, **Conferir envio no BI** compara a configuração atual sem repetir a gravação; **Ver agenda no catálogo** permite abrir o recurso, inclusive uma criação parcial. A falha original permanece no histórico.\n\nPara conferir uma carga real sem mudar a agenda, use **Atualizar agora** nos detalhes de uma agenda ativa. O pedido tem uma autorização própria e mostra o resultado de cada fonte. Não ative uma agenda inativa apenas para experimentar sem revisar seus horários e efeitos.",
       "pages": [
         "catalog",
         "refresh",
@@ -630,6 +630,29 @@
         {
           "page": "refresh",
           "label": "Conferir cargas"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "manual-load",
+      "title": "Como atualizo os dados agora e acompanho a carga?",
+      "summary": "Autorize uma carga pontual no catálogo e confira cada fonte sem perder o acompanhamento ao fechar a página.",
+      "body": "Abra **Catálogo BI → Agendas**, escolha uma agenda ativa e clique em **Atualizar agora**. O portal confere a configuração e as fontes pelo nome. Revise o ambiente, a ordem e a forma de carga antes de **Autorizar atualização**. Essa ação grava dados; a sincronização de exclusões também remove do destino os registros ausentes na origem. Ela preserva os horários e não publica recursos nem ativa agendas.\n\n**Pedido enviado** significa que o envio foi aceito, sem comprovar o término. **Atualização concluída** exige resultado final e sucesso de todas as fontes. Fontes em espera, falhas ou resultados incompletos não são exibidos como sucesso. Acompanhe cada fonte, horários e quantidades quando informados pelo BI. O histórico pode confirmar o término sem informar quantidades de linhas ou horários por fonte; esses valores ficam sem preenchimento.\n\nOs pedidos feitos por você ficam salvos no catálogo, no chat quando solicitados pela IA e em Atividade. Fechar a página não interrompe a carga. A consulta de resultado continua em segundo plano por até quatro horas; depois disso, um pedido sem confirmação exige conferência. **Conferir agora** apenas consulta, sem reenviar. Após troca de acesso ou restauração, esse botão também confere a visibilidade atual antes de retomar a consulta. Pausar o acompanhamento não cancela uma carga no BI.\n\nSe a conexão cair após o envio, o resultado fica em conferência e o portal não repete a carga automaticamente. Outro pedido das mesmas fontes fica bloqueado enquanto o resultado anterior estiver sem confirmação. Se o BI não informou um identificador no envio, o vínculo é inferido de uma única execução nova compatível iniciada nos cinco minutos seguintes ao pedido; isso é explicado em **Como o resultado foi conferido**. Se houver mais de uma candidata, o portal informa a ambiguidade sem escolher um resultado. Consulte também o histórico nativo e os eventos do agente. Não solicite várias cargas para resolver uma demora. Uma fila que atrase o início além dessa janela pode impedir a vinculação automática quando o envio não forneceu identificador; o portal mantém o resultado pendente em vez de atribuir uma carga automática posterior ao seu pedido.",
+      "pages": [
+        "catalog",
+        "refresh",
+        "activity",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir catálogo"
+        },
+        {
+          "page": "activity",
+          "label": "Ver atividade"
         }
       ],
       "audience": "authors"

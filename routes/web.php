@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiCredentialController;
 use App\Http\Controllers\BiDeskController;
+use App\Http\Controllers\BiLoadController;
 use App\Http\Controllers\BiMcpController;
 use App\Http\Controllers\BiScheduleController;
 use App\Http\Controllers\BiTablePresentationController;
@@ -36,6 +37,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/connections/bi-mcp/{tenant}/verify', [BiMcpController::class, 'verify'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
         Route::delete('/connections/bi-mcp/{tenant}', [BiMcpController::class, 'disconnect'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
         Route::post('/catalog/{tenant}/apps/{id}/mcp', [BiMcpController::class, 'query'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-mcp-query');
+        Route::get('/catalog/{tenant}/schedules/{id}/load', [BiLoadController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/schedules/{id}/loads', [BiLoadController::class, 'recent'])->whereNumber(['tenant', 'id']);
+        Route::post('/catalog/{tenant}/schedules/{id}/loads', [BiLoadController::class, 'prepare'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
+        Route::get('/bi-loads/{id}', [BiLoadController::class, 'show'])->whereUuid('id');
+        Route::post('/bi-loads/{id}/observe', [BiLoadController::class, 'observe'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/schedules/options', [BiScheduleController::class, 'options'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/schedules/{id}/configuration', [BiScheduleController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/schedules/actions', [BiScheduleController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');

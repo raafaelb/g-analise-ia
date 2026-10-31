@@ -87,7 +87,7 @@ class ExecuteApprovedAction implements ShouldQueue
                 app(ProjectPreviews::class)->recordCompletedChange($approval);
                 $cancelled = $run->fresh()->status === 'cancel_requested';
                 $run->update(['status' => $cancelled ? 'cancelled' : 'completed', 'finished_at' => now(), 'heartbeat_at' => now()]);
-                $message = Message::create(['conversation_id' => $run->conversation_id, 'role' => 'system', 'content' => ($approval->payload['action']['action'] === 'run_schedule' ? 'Solicitação de carga enviada ao BI; o resultado final ainda precisa ser correlacionado ao run_id. ' : 'Ação autorizada concluída: ').$approval->title.' ('.($approval->payload['action']['resource'] ?? 'recurso').').', 'status' => 'completed', 'metadata' => ['approval_id' => $approval->id, 'continuation' => true, 'tool_result' => $result, 'action' => $approval->payload['action']]]);
+                $message = Message::create(['conversation_id' => $run->conversation_id, 'role' => 'system', 'content' => ($approval->payload['action']['action'] === 'run_schedule' ? 'Pedido de carga registrado; use horus_action load_status com execution_id do resultado para conferir o vínculo e o término de todas as fontes, sem reenviar a carga. ' : 'Ação autorizada concluída: ').$approval->title.' ('.($approval->payload['action']['resource'] ?? 'recurso').').', 'status' => 'completed', 'metadata' => ['approval_id' => $approval->id, 'continuation' => true, 'tool_result' => $result, 'action' => $approval->payload['action']]]);
 
                 if ($cancelled) {
                     return null;
