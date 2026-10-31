@@ -73,6 +73,7 @@ class BiTablePresentation
 
                     return ['approval' => $existing, 'project' => null, 'reused' => true];
                 }
+                app(BiMutationGuard::class)->assertAvailable($user->id, $tenant, $data['resource']);
                 $revision = $this->withContext($connection, $environment, fn (Project $context): array => $this->revision($connection, $context, $data));
                 $approval = DB::transaction(function () use ($user, $tenant, $connection, $data, $revision, $requestHash): Approval {
                     $this->assertGeneration($connection, $revision['connection_generation']);
@@ -113,6 +114,7 @@ class BiTablePresentation
         [$connection, $environment] = $this->access($user, $tenant, $id);
         $this->assertGeneration($connection, $revision['connection_generation'] ?? null);
         $this->policy->assertCommandAllowed($tenant, ['push', $data['resource']], $connection);
+        app(BiMutationGuard::class)->assertAvailable($user->id, $tenant, $data['resource']);
         try {
             return Cache::lock('bi-table-presentation:'.$tenant.':'.$id, 630)->block(3, function () use ($user, $connection, $environment, $data, $revision, $approval): array {
                 return $this->withContext($connection, $environment, function (Project $context) use ($user, $connection, $data, $revision, $approval): array {

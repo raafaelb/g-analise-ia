@@ -24,6 +24,13 @@ test('the flow catalog offers deletion only for a portal-managed draft',async()=
  assert.doesNotMatch(await render(Manual,{...props,management:{can_delete_draft:false}}),/Excluir rascunho criado aqui/);
 });
 
+test('pending deletion disables new actions and explains how to reconcile it',async()=>{
+ const html=await render(Manual,{tenant:'100',tenantName:'Homologação',resource:{id:'2',kind:'flow',name:'Carga de teste'},desks:[],management:{deletion_pending:true,can_publish:false,can_delete_draft:false},request});
+ assert.match(html,/<button[^>]*disabled[^>]*>[\s\S]*?Duplicar ETL<\/button>/);
+ assert.match(html,/Use Conferir exclusão na conversa ou em Atividade/);
+ assert.doesNotMatch(html,/Publicar ETL<\/button>|Excluir rascunho criado aqui<\/button>/);
+});
+
 test('the deletion review names each table and discloses removal of loaded data',async()=>{
  const html=await render(Review,{approval:approval(),tenants});
  assert.match(html,/Excluir este ETL e 1 tabela de destino/);

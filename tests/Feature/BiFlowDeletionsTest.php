@@ -117,6 +117,9 @@ class BiFlowDeletionsTest extends TestCase
             }
             if ($args === ['rm', 'flow:2', '--force']) {
                 $state->sent++;
+                if ($state->unconfirmed_before_removal ?? false) {
+                    throw new RuntimeException('Resposta interrompida sem confirmação do envio.', 7);
+                }
                 if ($state->refused) {
                     throw new RuntimeException('Recusado por dependência.', 13);
                 }
@@ -403,5 +406,22 @@ class BiFlowDeletionsTest extends TestCase
         $this->expectException(ModelNotFoundException::class);
 
         app(ActionBroker::class)->execute($run, 'horus_action', ['action' => 'deletion_status', 'approval_id' => $approval->id]);
+    }
+
+    public function test_a_new_clone_cannot_be_prepared_while_the_source_deletion_is_unconfirmed(): void
+    {
+        Queue::fake();
+        [$user,, , $state] = $this->context();
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $state->unconfirmed_before_removal = true;
+        $this->execute($user, $approval);
+
+        $this->postJson('/api/catalog/100/flows/2/actions', ['action' => 'clone_flow', 'name' => 'Outra cópia', 'request_id' => (string) Str::uuid()])->assertUnprocessable()->assertJsonValidationErrors('operation');
+
+        $this->assertDatabaseCount('projects', 1);
+        $this->assertDatabaseCount('approvals', 1);
+        $this->assertSame(1, $state->sent);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'flow:2', 'status' => 'deletion_pending']);
     }
 }

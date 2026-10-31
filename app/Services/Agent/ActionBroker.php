@@ -22,6 +22,7 @@ use App\Services\BiFlowDeletions;
 use App\Services\BiFlowExecution;
 use App\Services\BiFlowWizard;
 use App\Services\BiMcpClient;
+use App\Services\BiMutationGuard;
 use App\Services\BiPublications;
 use App\Services\BiResourceValidation;
 use App\Services\BiScheduleRuns;
@@ -540,9 +541,6 @@ class ActionBroker
         if (in_array($action, $required, true) && $ref === '') {
             throw new RuntimeException('Informe o recurso que será operado.');
         }
-        if ($action === 'push' && ManagedBiResource::where('user_id', $project->user_id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->whereIn('status', ['deleted', 'deletion_pending'])->exists()) {
-            throw new RuntimeException('Este recurso foi excluído ou tem uma exclusão a conferir. Não recrie um recurso a partir de arquivos antigos; confira a operação e crie um novo rascunho quando necessário.');
-        }
         $kind = $arguments['kind'] ?? 'app';
         if ($action === 'scaffold') {
             if (! in_array($kind, ['app', 'flow', 'table', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar'], true)) {
@@ -616,7 +614,7 @@ class ActionBroker
         }
         $dashboard = isset($arguments['dashboard']) ? ['--dashboard', (string) (int) $arguments['dashboard']] : [];
 
-        return match ($action) {
+        $command = match ($action) {
             'list' => ['list', $kind, '--remote', '--limit', '500'], 'info' => ['info', $ref, ...(str_starts_with($ref, 'app:') ? ['--full'] : [])], 'columns' => ['columns', $ref], 'table_preview' => ['table', 'preview', $ref, '--limit', '20'], 'lint' => ['lint'], 'diff' => ['diff', $ref, '--include-remote'], 'refresh_resource' => ['pull', $ref],
             'scaffold' => ['scaffold', $kind],
             'new' => $this->newCommand($kind, $arguments),
@@ -634,6 +632,11 @@ class ActionBroker
             'schedule_info' => ['info', $ref], 'schedule_logs' => ['schedule', 'logs', $ref, '--tail', '50'], 'run_schedule' => ['schedule', 'run', $ref], 'resume_schedule' => ['schedule', 'resume', $ref],
             default => throw new RuntimeException('Ação G-Analise não permitida.'),
         };
+        if ($project->user_id !== null && $project->tenant_id !== null) {
+            app(BiMutationGuard::class)->command($project, $command);
+        }
+
+        return $command;
     }
 
     private function publicationDraft(Project $project, string $ref): void

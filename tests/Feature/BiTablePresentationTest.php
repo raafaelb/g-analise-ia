@@ -6,6 +6,8 @@ use App\Jobs\ExecuteApprovedAction;
 use App\Jobs\RunAgentTurn;
 use App\Models\Approval;
 use App\Models\Connection;
+use App\Models\ManagedBiResource;
+use App\Models\Project;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
 use App\Services\LumoClient;
@@ -154,6 +156,58 @@ class BiTablePresentationTest extends TestCase
         (new ExecuteApprovedAction($approval->id))->handle(app(ActionBroker::class));
 
         return $approval->refresh();
+    }
+
+    private function pendingSourceDeletion(User $user): Approval
+    {
+        $project = Project::create(['user_id' => $user->id, 'tenant_id' => '321', 'name' => 'ETL em conferência', 'source_ref' => 'flow:90']);
+        $plan = ['kind' => 'flow', 'resource' => 'flow:90', 'tables' => [['resource' => 'table:10']]];
+        $approval = Approval::create(['user_id' => $user->id, 'project_id' => $project->id, 'type' => 'manual', 'title' => 'Excluir ETL de teste', 'description' => 'Teste sintético', 'status' => 'failed', 'payload' => ['action' => ['action' => 'delete_draft', 'resource' => 'flow:90'], 'revision' => ['flow_deletion' => $plan]], 'fingerprint' => str_repeat('a', 64), 'expires_at' => now()->addMinutes(12)]);
+        ManagedBiResource::create(['user_id' => $user->id, 'project_id' => $project->id, 'tenant_id' => '321', 'resource' => 'flow:90', 'origin' => 'new', 'status' => 'deletion_pending', 'receipt' => ['deletion_attempt' => ['approval_id' => $approval->id, 'plan_sha256' => hash('sha256', json_encode($plan, JSON_THROW_ON_ERROR))]]]);
+
+        return $approval;
+    }
+
+    public function test_pending_source_deletion_allows_reading_but_returns_422_for_a_new_table_review(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->actor();
+        $state->body['_state'] = 'draft';
+        $state->body['deskId'] = null;
+        $this->native($state);
+        $this->pendingSourceDeletion($user);
+        $form = $this->read($user);
+
+        $this->actingAs($user)->postJson('/api/catalog/321/tables/10/presentation/actions', $this->input($form['version']))->assertUnprocessable()->assertJsonValidationErrors('table');
+
+        $this->assertSame(0, $state->push);
+        $this->assertDatabaseCount('approvals', 1);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_an_existing_table_review_is_recovered_but_cannot_execute_after_its_source_deletion_started(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->actor();
+        $state->body['_state'] = 'draft';
+        $state->body['deskId'] = null;
+        $this->native($state);
+        $original = $state->body;
+        $input = $this->input($this->read($user)['version']);
+        $approval = $this->prepare($user, $input);
+        $deletion = $this->pendingSourceDeletion($user);
+        $this->assertSame($approval->id, $this->prepare($user, $input)->id);
+
+        $approval = $this->execute($user, $approval);
+
+        $this->assertSame('failed', $approval->status);
+        $this->assertStringContainsString('exclusão em conferência', $approval->payload['execution']['message']);
+        $this->assertArrayNotHasKey('table_presentation_attempt', $approval->payload);
+        $this->assertSame('failed', $deletion->fresh()->status);
+        $this->assertSame(0, $state->push);
+        $this->assertSame($original, $state->body);
+        $this->assertDatabaseCount('approvals', 2);
+        Queue::assertPushed(ExecuteApprovedAction::class, 1);
     }
 
     public function test_configuration_exposes_friendly_fields_and_preserves_unknown_formats(): void

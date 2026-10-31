@@ -117,6 +117,9 @@ class LumoClient
         if ($project?->tenant_id) {
             app(TenantPolicy::class)->assertCommandAllowed((string) $project->tenant_id, $arguments, $connection);
         }
+        if ($project) {
+            app(BiMutationGuard::class)->command($project, $arguments);
+        }
         $home = $this->sessionHome($connection->user_id);
         $credentials = $connection->credentials;
         $generation = $connection->metadata['session_generation'] ?? null;

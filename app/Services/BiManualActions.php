@@ -50,6 +50,7 @@ class BiManualActions
                     return ['project' => Project::where('user_id', $user->id)->findOrFail($existing->project_id), 'approval' => $existing, 'reused' => true];
                 }
 
+                app(BiMutationGuard::class)->assertAvailable($user->id, $tenant, $arguments['resource']);
                 if (in_array($arguments['action'], ['clone_app', 'clone_flow'], true)) {
                     $project = new Project(['user_id' => $user->id, 'tenant_id' => $tenant, 'tenant_name' => $tenantItem['name'], 'name' => $arguments['name'], 'description' => 'Cópia de '.$arguments['resource'].' preparada pelo catálogo.', 'instructions' => 'A duplicação foi preparada pela interface. Confira o histórico de revisões e o recurso já criado antes de iniciar outra criação.']);
                     $project->id = (string) Str::uuid();
