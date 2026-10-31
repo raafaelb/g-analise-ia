@@ -13,6 +13,7 @@ use App\Services\Audit;
 use App\Services\BiBusy;
 use App\Services\BiCredentials;
 use App\Services\BiDesks;
+use App\Services\BiSchedules;
 use App\Services\BiTablePresentation;
 use App\Services\BiValidationFailure;
 use App\Services\ProjectPreviews;
@@ -20,6 +21,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -103,7 +105,8 @@ class ExecuteApprovedAction implements ShouldQueue
 
                 return;
             }
-            $this->failAction($approval, $e instanceof RuntimeException ? $e->getMessage() : 'Não foi possível confirmar o resultado da ação. Confira o recurso no BI antes de repetir.');
+            $message = $e instanceof RuntimeException ? $e->getMessage() : ($e instanceof ValidationException ? collect($e->errors())->flatten()->filter(fn (mixed $value): bool => is_string($value))->take(3)->implode(' ') : 'Não foi possível confirmar o resultado da ação. Confira o recurso no BI antes de repetir.');
+            $this->failAction($approval, $message);
             if ($e instanceof BiValidationFailure && ! $interrupted) {
                 $nextRun = $this->resumeValidation($approval, $e);
             }
@@ -113,6 +116,9 @@ class ExecuteApprovedAction implements ShouldQueue
             }
             if (in_array($approval->payload['action']['action'] ?? '', BiTablePresentation::ACTIONS, true)) {
                 app(BiTablePresentation::class)->cleanup($approval);
+            }
+            if (in_array($approval->payload['action']['action'] ?? '', BiSchedules::ACTIONS, true)) {
+                app(BiSchedules::class)->cleanup($approval);
             }
             if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
                 app(BiDesks::class)->cleanup($approval);
@@ -170,6 +176,9 @@ class ExecuteApprovedAction implements ShouldQueue
             }
             if (in_array($approval->payload['action']['action'] ?? '', BiTablePresentation::ACTIONS, true)) {
                 app(BiTablePresentation::class)->cleanup($approval);
+            }
+            if (in_array($approval->payload['action']['action'] ?? '', BiSchedules::ACTIONS, true)) {
+                app(BiSchedules::class)->cleanup($approval);
             }
             if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
                 app(BiDesks::class)->cleanup($approval);

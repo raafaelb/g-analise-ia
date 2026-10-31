@@ -25,6 +25,16 @@ class ScheduleReviewPresentationTest extends TestCase
         $this->assertDatabaseHas('approvals', ['id' => $approval->id, 'status' => 'completed', 'fingerprint' => str_repeat('a', 64)]);
     }
 
+    public function test_editor_reviews_explain_previous_timing_without_inserting_derived_text_into_the_payload(): void
+    {
+        $approval = new Approval(['payload' => ['revision' => ['schedule' => ['triggers' => [['type' => 'Week', 'period' => 1, 'start_when' => '03:00']]], 'schedule_edit' => ['previous' => ['triggers' => [['type' => 'Day', 'start_when' => '05:00']]]]]]]);
+        $payload = $approval->payload;
+
+        $this->assertSame('Diariamente às 05:00', $approval->toArray()['schedule_timing']['previous_frequency']);
+        $this->assertSame('Semanalmente, segunda-feira, às 03:00', $approval->toArray()['schedule_timing']['frequency']);
+        $this->assertSame($payload, $approval->payload);
+    }
+
     public function test_a_malformed_legacy_trigger_map_does_not_claim_readable_timing(): void
     {
         $approval = new Approval(['payload' => ['revision' => ['schedule' => ['triggers' => ['unexpected' => 'value']]]]]);

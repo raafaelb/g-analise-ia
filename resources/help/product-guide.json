@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.2",
+  "version": "2026-10-31.3",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -200,8 +200,15 @@
         {
           "id": "catalog-edit",
           "title": "Ações claras no próprio catálogo",
-          "description": "Você pode criar mesas e conexões quando autorizado. Nas tabelas, Organizar nomes e formatos altera a apresentação com revisão, preservando a estrutura. Nas aplicações, confira as prévias e as ações oferecidas para o recurso.",
+          "description": "Você pode criar mesas e conexões quando autorizado. Em Agendas, use Nova agenda ou Editar agenda para escolher fontes, agente e horários com revisão. Nas tabelas, Organizar nomes e formatos preserva a estrutura. As aplicações oferecem prévias e ações próprias.",
           "audience": "all"
+        },
+        {
+          "id": "catalog-schedule",
+          "title": "Agende os dados com revisão",
+          "description": "Nova agenda começa inativa. Escolha fontes pelo nome, confira agente, ordem e horários e revise antes de salvar. Reutilize agendas ativas e preserve frequências maiores. Salvar não comprova uma carga concluída.",
+          "anchor": "catalog-create-schedule",
+          "audience": "authors"
         },
         {
           "id": "catalog-menu",
@@ -276,7 +283,7 @@
         {
           "id": "refresh-plan",
           "title": "Planeje a atualização",
-          "description": "Planejar atualização abre o planejamento. A agenda e a execução precisam ser conferidas no BI; uma fonte privada pode exigir autorização de publicação.",
+          "description": "Planejar atualização abre o planejamento do trabalho. Para configurar manualmente, use Catálogo BI → Agendas → Nova agenda ou Editar agenda. Uma fonte privada exige publicação com autorização própria antes de ser agendada.",
           "anchor": "refresh-plan",
           "audience": "authors"
         },
@@ -604,6 +611,28 @@
         }
       ],
       "audience": "all"
+    },
+    {
+      "id": "schedule-editor",
+      "title": "Como crio ou edito uma agenda de atualização?",
+      "summary": "Escolha fontes, agente, ordem e horários no catálogo e confira a proposta antes de salvar.",
+      "body": "No **Catálogo BI**, escolha o ambiente e **Agendas**. Use **Nova agenda** ou abra uma agenda e escolha **Editar agenda**. Você não precisa iniciar uma conversa com IA para essa configuração.\n\n1. Informe o nome e o agente.\n2. Busque as fontes pelo nome e adicione-as. Ajuste a ordem pelas setas e a parte dos dados a atualizar, quando disponível.\n3. Escolha os horários de Brasília. Para carga diária, prefira a madrugada. Podem existir vários horários, dias da semana, dia do mês ou intervalos de horas/minutos.\n4. Uma agenda nova começa inativa. Marque **Ativar atualização automática** somente quando quiser permitir as cargas após a autorização.\n5. Use **Conferir alterações**, compare Atual e Proposto e autorize ou recuse. Aguarde a leitura de confirmação no BI.\n\nFontes privadas precisam de publicação com autorização própria. Todas as fontes da agenda precisam usar o mesmo agente. Uma fonte já carregada por outra agenda ativa deve reutilizar essa agenda: o portal impede cargas automáticas duplicadas. Frequências diárias ou maiores existentes são protegidas contra redução, desativação e remoção de fontes. A edição comum preserva as opções não alteradas da origem. Datas com fuso são convertidas automaticamente para o formato UTC exigido pelo BI, preservando o instante e mantendo a explicação dos horários em Brasília.\n\n**Quando os dados mudarem** usa uma consulta de detecção avançada; ela dispara apenas se o resultado mudar e não garante uma carga diária. A conexão e a consulta já existentes são preservadas até uma substituição explícita. Se precisar preparar uma nova consulta, peça ajuda à IA em um projeto. A tela também oferece avisos por e-mail e a opção avançada de fila paralela.\n\n**Agenda salva** confirma a configuração, sem executar uma carga de teste. Confira a execução e todas as fontes em **Atualização de dados** e nos detalhes/histórico. Se um envio ficar incerto, **Conferir envio no BI** compara a configuração atual sem repetir a gravação; **Ver agenda no catálogo** permite abrir o recurso, inclusive uma criação parcial. A falha original permanece no histórico.",
+      "pages": [
+        "catalog",
+        "refresh",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir catálogo"
+        },
+        {
+          "page": "refresh",
+          "label": "Conferir cargas"
+        }
+      ],
+      "audience": "authors"
     },
     {
       "id": "mcp",

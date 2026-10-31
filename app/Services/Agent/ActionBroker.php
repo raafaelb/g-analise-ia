@@ -20,6 +20,7 @@ use App\Services\BiFlowExecution;
 use App\Services\BiMcpClient;
 use App\Services\BiPublications;
 use App\Services\BiResourceValidation;
+use App\Services\BiSchedules;
 use App\Services\BiTablePresentation;
 use App\Services\BiValidationFailure;
 use App\Services\BiViewer;
@@ -209,6 +210,9 @@ class ActionBroker
         }
         if ($approval->status !== 'executing' || $approval->expires_at->isPast()) {
             throw new RuntimeException('A autorização não está válida para execução.');
+        }
+        if (in_array($approval->payload['action']['action'] ?? '', BiSchedules::ACTIONS, true)) {
+            return app(BiSchedules::class)->executeApproved($approval);
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiTablePresentation::ACTIONS, true)) {
             return app(BiTablePresentation::class)->executeApproved($approval);

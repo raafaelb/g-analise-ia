@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiCredentialController;
 use App\Http\Controllers\BiDeskController;
 use App\Http\Controllers\BiMcpController;
+use App\Http\Controllers\BiScheduleController;
 use App\Http\Controllers\BiTablePresentationController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ConnectionController;
@@ -35,6 +36,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/connections/bi-mcp/{tenant}/verify', [BiMcpController::class, 'verify'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
         Route::delete('/connections/bi-mcp/{tenant}', [BiMcpController::class, 'disconnect'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
         Route::post('/catalog/{tenant}/apps/{id}/mcp', [BiMcpController::class, 'query'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-mcp-query');
+        Route::get('/catalog/{tenant}/schedules/options', [BiScheduleController::class, 'options'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/schedules/{id}/configuration', [BiScheduleController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/schedules/actions', [BiScheduleController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::get('/catalog/{tenant}/tables/{id}/presentation', [BiTablePresentationController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/tables/{id}/presentation/actions', [BiTablePresentationController::class, 'prepare'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/users', [UserAccessController::class, 'index'])->name('users.index');
@@ -49,6 +53,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/catalog/{tenant}/credentials/{id}/inspect/{action}', [BiCredentialController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['test', 'schema'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/{id}/actions', [CatalogController::class, 'prepareAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
+        Route::post('/bi-actions/{id}/schedule-verification', [BiScheduleController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::post('/approvals/{id}/publication/verify', [CatalogController::class, 'reconcilePublication'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}', [CatalogController::class, 'snapshot'])->whereNumber('tenant')->middleware('throttle:catalog');
         Route::get('/catalog/{tenant}/variables/{id}', [CatalogController::class, 'variable'])->whereNumber('tenant')->where('id', '[a-f0-9]+');

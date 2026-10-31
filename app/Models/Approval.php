@@ -26,7 +26,7 @@ class Approval extends Model
             }
             $timing = app(BiScheduleTiming::class);
 
-            return ['frequency' => $timing->frequency($triggers), 'daily_or_more_frequent' => $timing->daily($triggers), 'triggers' => array_map(fn (mixed $trigger): string => $timing->frequency([$trigger]), array_slice($triggers, 0, 100))];
+            return ['frequency' => $timing->frequency($triggers), 'daily_or_more_frequent' => $timing->daily($triggers), 'triggers' => array_map(fn (mixed $trigger): string => $timing->frequency([$trigger]), array_slice($triggers, 0, 100)), 'previous_frequency' => is_array($this->payload['revision']['schedule_edit']['previous']['triggers'] ?? null) ? $timing->frequency($this->payload['revision']['schedule_edit']['previous']['triggers']) : null];
         });
     }
 
