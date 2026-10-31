@@ -11,6 +11,7 @@ Produto gratuito e aberto da Inovadora, complementar ao G-Analise BI. PHP 8.5/La
 - Login G-Analise BI, descoberta de todos os tenants e renovação nativa da sessão homologados. Senha não é armazenada; tokens ficam criptografados.
 - Formulários de criação/edição de conexões para oito tipos de banco, revisão protegida, teste de conectividade e consulta limitada de estrutura. Criação/retomada/limpeza real de conexões descartáveis homologadas na Inovadora.
 - Catálogo por tenant: aplicações, Minha Mesa, dashboards, mesas BI/DW, tabelas, ETL, agendas, agentes, apresentações, variáveis protegidas e tags. Falta de permissão é diferente de lista vazia. Credenciais são exibidas apenas com dados seguros, sem valores secretos.
+- Tabelas: edição de nomes, descrições e formatos numéricos por formulário, com revisão humana e leitura de confirmação; preservação de estrutura, dados e configurações fora da revisão.
 - Criação/clone de rascunhos, edição YAML, revisão, sincronização, consultas e PNG real. Exclusão limitada aos rascunhos registrados como criados pelo próprio projeto. A aplicação original não é excluída.
 - Gestão manual de aplicações: duplicar com nome confirmado, excluir somente rascunhos registrados e publicar com mesa nomeada e efeito explícito. Publicação como nova já homologada na conta real; substituição ainda depende do ciclo real correspondente.
 - Prévia PNG com histórico por projeto/dashboard e acompanhamento de novas versões. Visualizador nativo isolado no Chrome compatível, com alternativa PNG.

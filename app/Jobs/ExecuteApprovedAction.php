@@ -13,6 +13,7 @@ use App\Services\Audit;
 use App\Services\BiBusy;
 use App\Services\BiCredentials;
 use App\Services\BiDesks;
+use App\Services\BiTablePresentation;
 use App\Services\BiValidationFailure;
 use App\Services\ProjectPreviews;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -110,6 +111,9 @@ class ExecuteApprovedAction implements ShouldQueue
             if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
                 app(BiCredentials::class)->cleanup($approval);
             }
+            if (in_array($approval->payload['action']['action'] ?? '', BiTablePresentation::ACTIONS, true)) {
+                app(BiTablePresentation::class)->cleanup($approval);
+            }
             if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
                 app(BiDesks::class)->cleanup($approval);
             }
@@ -163,6 +167,9 @@ class ExecuteApprovedAction implements ShouldQueue
             $this->failAction($approval, 'O worker foi interrompido. Confira o estado do recurso no BI antes de repetir a ação; ela não será executada novamente automaticamente.');
             if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
                 app(BiCredentials::class)->cleanup($approval);
+            }
+            if (in_array($approval->payload['action']['action'] ?? '', BiTablePresentation::ACTIONS, true)) {
+                app(BiTablePresentation::class)->cleanup($approval);
             }
             if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
                 app(BiDesks::class)->cleanup($approval);

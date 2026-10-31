@@ -16,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => url('/login'));
         $mcpQuery = fn (Request $request): bool => $request->is('api/catalog/*/apps/*/mcp');
         $middleware->convertEmptyStringsToNull(except: [$mcpQuery]);
-        $middleware->trimStrings(except: ['values.password', 'values.JsonKey', 'values.odbcconnection', $mcpQuery]);
+        $middleware->trimStrings(except: ['values.password', 'values.JsonKey', 'values.odbcconnection', 'columns.*.key', $mcpQuery]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is('api/*') || $request->expectsJson());

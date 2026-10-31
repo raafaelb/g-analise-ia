@@ -322,4 +322,51 @@ class BiFlowExecutionTest extends TestCase
     {
         return ['root' => [''], 'suite subpath' => ['/ia-ganalise']];
     }
+
+    public function test_first_table_can_use_the_captured_source_connected_to_an_unbound_insert_node(): void
+    {
+        [$user, , $run] = $this->context();
+        $body = $this->flow();
+        $body['nodes']['Processors'][1]['options']['TableID'] = 0;
+        $this->catalog($body);
+        $lumo = $this->cli();
+        $lumo->shouldReceive('run')->once()->withArgs(fn ($c, $args) => $args === ['new', 'table', '--name', 'Mapa', '--from-flow', 'flow:30', '--node', 'source'])->andReturn(['exit_code' => 0, 'data' => ['id' => 501]]);
+        $result = app(ActionBroker::class)->execute($run, 'horus_action', ['action' => 'new', 'kind' => 'table', 'name' => 'Mapa', 'flow' => 'flow:30', 'node' => 'source']);
+        $this->assertSame('table:501', $result['managed_resource']);
+        $this->assertDatabaseHas('managed_bi_resources', ['user_id' => $user->id, 'resource' => 'table:501', 'status' => 'draft']);
+    }
+
+    #[DataProvider('unsafeSourceCreation')]
+    public function test_source_based_table_creation_refuses_ambiguous_missing_or_existing_destinations(string $scenario): void
+    {
+        [,, $run] = $this->context();
+        $body = $this->flow();
+        if ($scenario !== 'bound') {
+            $body['nodes']['Processors'][1]['options']['TableID'] = 0;
+        }
+        if ($scenario === 'no schema') {
+            $body['nodes']['Processors'][0]['metadata']['Fields'] = [];
+        } elseif ($scenario === 'not connected') {
+            $body['nodes']['Processors'][1]['inputs'] = ['another-source'];
+        } elseif ($scenario === 'ambiguous') {
+            $second = $body['nodes']['Processors'][1];
+            $second['internalId'] = 'dw-second';
+            $body['nodes']['Processors'][] = $second;
+        } elseif ($scenario === 'multiple inputs') {
+            $body['nodes']['Processors'][1]['inputs'][] = 'another-source';
+        } elseif ($scenario === 'published') {
+            $body['deskId'] = 10;
+        } elseif ($scenario === 'flow bound') {
+            $body['tableId'] = 500;
+        }
+        $this->catalog($body);
+        $this->cli()->shouldNotReceive('run')->withArgs(fn ($c, $args) => ($args[0] ?? '') === 'new');
+        $this->expectException(RuntimeException::class);
+        app(ActionBroker::class)->execute($run, 'horus_action', ['action' => 'new', 'kind' => 'table', 'name' => 'Mapa', 'flow' => 'flow:30', 'node' => 'source']);
+    }
+
+    public static function unsafeSourceCreation(): array
+    {
+        return array_map(fn ($scenario) => [$scenario], ['bound', 'flow bound', 'no schema', 'not connected', 'ambiguous', 'multiple inputs', 'published']);
+    }
 }

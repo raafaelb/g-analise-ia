@@ -31,10 +31,18 @@ class BiFlowExecution
     public function assertTableCreation(Connection $connection, Project $project, array $arguments): void
     {
         [$body, $node] = $this->snapshot($connection, $project, ['resource' => $arguments['flow'], 'node' => $arguments['node']]);
-        if (($body['deskId'] ?? null) !== null || ($body['_state'] ?? null) === 'published' || ($node['kind'] ?? '') !== 'InsertDatawarehouse') {
-            throw new RuntimeException('Crie a tabela somente a partir de uma etapa de inserção de um fluxo em rascunho.');
+        if (($body['deskId'] ?? null) !== null || ($body['_state'] ?? null) === 'published') {
+            throw new RuntimeException('Crie a tabela somente a partir de um fluxo em rascunho.');
         }
-        if (! empty($node['options']['TableID']) || ! empty($body['table']['id']) || ! empty($body['tableId'])) {
+        $destinations = collect($body['nodes']['Processors'])->filter(fn (mixed $candidate): bool => is_array($candidate) && ($candidate['kind'] ?? '') === 'InsertDatawarehouse');
+        if (($node['kind'] ?? '') !== 'InsertDatawarehouse') {
+            $references = array_filter([$node['internalId'] ?? null, $node['complete_id'] ?? null], is_string(...));
+            $matches = $destinations->filter(fn (array $candidate): bool => is_array($candidate['inputs'] ?? null) && count(array_intersect($references, $candidate['inputs'])) > 0);
+            if ($matches->count() !== 1 || count($matches->first()['inputs']) !== 1 || ! is_array($node['metadata']['Fields'] ?? null) || $node['metadata']['Fields'] === []) {
+                throw new RuntimeException('A etapa precisa de um esquema capturado e de uma única inserção diretamente vinculada. Confira o fluxo e teste a etapa de origem antes de criar a tabela.');
+            }
+        }
+        if ($destinations->contains(fn (array $candidate): bool => ! empty($candidate['options']['TableID'])) || ! empty($body['table']['id']) || ! empty($body['tableId'])) {
             throw new RuntimeException('Já existe uma tabela vinculada a este fluxo ou etapa. Consulte info, columns e table_preview para continuar sem recriar a tabela ou perder dados.');
         }
     }

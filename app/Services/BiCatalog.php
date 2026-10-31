@@ -254,6 +254,9 @@ class BiCatalog
         if (! is_array($body)) {
             throw new RuntimeException('Os detalhes do recurso não retornaram um formato reconhecido.');
         }
+        if ($kind === 'table' && array_key_exists('id', $body) && ((! is_int($body['id']) && ! is_string($body['id'])) || (string) $body['id'] !== $id)) {
+            throw new RuntimeException('O BI retornou detalhes de uma tabela diferente da solicitada.');
+        }
         if ($kind === 'app') {
             $header = is_array($payload['header'] ?? null) ? $payload['header'] : [];
             foreach (['id' => $id, 'kind' => $kind] as $field => $expected) {
@@ -273,6 +276,24 @@ class BiCatalog
                 $working = $this->workingMetadata($project)[$kind.':'.$id] ?? null;
                 if (is_array($working)) {
                     $body = array_replace($working, $body);
+                    if ($kind === 'table' && is_array($body['columns'] ?? null) && array_is_list($body['columns'])) {
+                        foreach ($body['columns'] as $index => $column) {
+                            if (! is_array($column) || ! is_string($column['column_name'] ?? null) || ! is_string($column['data_type'] ?? null)) {
+                                $metadataComplete = false;
+
+                                continue;
+                            }
+                            $key = $column['column_name'].' ('.$column['data_type'].')';
+                            $authoring = $working['columns'][$key] ?? null;
+                            if (! is_array($authoring)) {
+                                $metadataComplete = false;
+
+                                continue;
+                            }
+                            $presentation = array_intersect_key($authoring, array_flip(['label', 'description', 'human_description', 'mask', 'role', 'semantic_role', 'defaultBehavior']));
+                            $body['columns'][$index] = array_replace($column, $presentation);
+                        }
+                    }
                 } else {
                     $metadataComplete = false;
                 }

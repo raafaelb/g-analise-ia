@@ -8,7 +8,7 @@ Leia este guia antes de criar ou manter dashboards. As regras do usuário e do p
 - Use `scaffold` com `kind: widget` e `template: Kpi`, `Barline`, `Table`, `Svelte` etc. para obter a forma exata dos widgets na versão instalada.
 - Use `scaffold` com `kind: expression` e `template: contexts`, `variation`, `participation`, `yoy` ou `ytd` para obter exemplos de expressões.
 - `workspace_file` lê e edita os YAMLs locais. Use o hash retornado na leitura ao salvar um arquivo existente.
-- `info` de uma aplicação retorna o modelo e as expressões canônicas. `columns` confirma os IDs físicos de uma tabela. Não invente IDs.
+- `info` de uma aplicação retorna o modelo e as expressões canônicas. `columns` confere nomes, tipos e apresentação da tabela; `info` da tabela fornece os IDs físicos das colunas quando disponíveis no retorno nativo. Não invente IDs.
 - Se `push` ou outra ação retornar `awaiting_approval`, encerre o turno. O portal executa a revisão aprovada e retoma a conversa com o resultado. Não repita a criação ou a ação já aplicada.
 
 ## Ciclo de autoria
@@ -93,7 +93,7 @@ O usuário descreve o resultado de negócio; cabe à IA descobrir as tabelas, ca
 
 Para uma nova fonte, use `new` com `kind: flow`, obtenha o scaffold de nó, escreva consultas a partir da estrutura confirmada, limite diagnósticos e valide o YAML. Faça `push` e aguarde a revisão. Depois use `run_flow_node` com o fluxo e `node` (internalId): essa execução também precisa de revisão concreta, na conversa. O comando aguarda a conclusão da etapa; não repita uma execução por falta de prévia ou sincronização local. Confira `execution` e `workspace_refresh`.
 
-`flow_preview` visualiza o resultado de uma etapa já executada; `preview` confere widgets de uma aplicação. Não use um no lugar do outro. A prévia pode retornar nula no BI mesmo com um esquema capturado: não trate isso como ausência de dados. Use `credential_schema` para metadados e, após criar a tabela com `new`/`kind: table`/`flow`/`node`, execute o nó de inserção e confirme `columns` e `table_preview`. Não invente coordenadas, relacionamentos ou dados para completar um mapa.
+`flow_preview` visualiza o resultado de uma etapa já executada; `preview` confere widgets de uma aplicação. Não use um no lugar do outro. A prévia pode retornar nula no BI mesmo com um esquema capturado: não trate isso como ausência de dados. Use `credential_schema` para metadados e, ao criar a tabela com `new`/`kind: table`/`flow`/`node`, prefira o `internalId` da etapa de origem imediatamente ligada à inserção, com `metadata.Fields` já capturado por um teste concluído. Este caminho foi confirmado no Lumo instalado; o portal exige uma única inserção diretamente ligada e sem tabela existente. Depois execute o nó de inserção e confirme `columns` e `table_preview`. Não invente coordenadas, relacionamentos ou dados para completar um mapa.
 
 Um fluxo publicado precisa de uma cópia antes de testar nós. Para manutenção estrutural de aplicação publicada, use `clone_app`; a cópia vira o recurso de trabalho deste projeto. Preserve a original. Criação de ETL/tabela e teste não autorizam publicação: prepare a revisão de compartilhamento necessária e confira a atualização diária antes da entrega.
 

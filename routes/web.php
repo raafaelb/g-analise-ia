@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiCredentialController;
 use App\Http\Controllers\BiDeskController;
 use App\Http\Controllers\BiMcpController;
+use App\Http\Controllers\BiTablePresentationController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ConnectionController;
 use App\Http\Controllers\SuiteAuthController;
@@ -32,6 +33,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/connections/bi-mcp/{tenant}/verify', [BiMcpController::class, 'verify'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
         Route::delete('/connections/bi-mcp/{tenant}', [BiMcpController::class, 'disconnect'])->whereNumber('tenant')->middleware('throttle:bi-mcp-auth');
         Route::post('/catalog/{tenant}/apps/{id}/mcp', [BiMcpController::class, 'query'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-mcp-query');
+        Route::get('/catalog/{tenant}/tables/{id}/presentation', [BiTablePresentationController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/tables/{id}/presentation/actions', [BiTablePresentationController::class, 'prepare'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/users', [UserAccessController::class, 'index'])->name('users.index');
         Route::post('/users', [UserAccessController::class, 'store'])->middleware('throttle:bi-actions')->name('users.store');
         Route::patch('/users/{user}', [UserAccessController::class, 'update'])->whereNumber('user')->middleware('throttle:bi-actions')->name('users.update');
