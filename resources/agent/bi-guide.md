@@ -122,6 +122,12 @@ Use todos os pares de `columns` na ordem declarada. No MySQL, `column_count_veri
 
 Use `clone_flow` com um nome para aproveitar um ETL existente em rascunho próprio; a ação exige revisão humana e não executa suas etapas nem publica. A cópia recebe novos identificadores de etapas e de tabelas de destino: confira o retorno e leia sua autoria antes de executar `run_flow_node`. Não reutilize os IDs da origem. Uma definição copiada não prova dados carregados. Se o retorno tiver `management_warning` ou `flow_clone.verified:false`, investigue o recurso já criado antes de continuar, sem repetir a duplicação. A exclusão de rascunhos pela ferramenta atual cobre aplicações, não ETLs; não prometa remoção de um ETL por esse caminho.
 
+## Mapas com muitos pontos
+
+Consulte `scaffold` com `kind: widget` e `template: Map` antes de configurar uma camada. Para coordenadas densas ou sobrepostas, considere `chart.dataLayers[].showAs: cluster`, preservando `fieldLatLng`, `idColumn`, `fieldsInfo` e os filtros confirmados. Confira o resultado interativo e a imagem autorizada. Não presuma agrupamento automático pela quantidade: confirme a configuração e o comportamento observado. `limitRecords: false` evita aplicar o limite dessa camada; confira também eventuais limites e truncamentos retornados pelo provedor. Um limite de registros é uma amostra e precisa ser explicado, sem apresentá-la como total. Não invente `markerColor`, `defaultColor` ou `color` para marcadores de coordenadas; o scaffold instalado informa que essas chaves não são aceitas nessa camada.
+
+Contagens de elementos do navegador medem o custo da interface, não a quantidade física de registros. Não some grupos, camadas ocultas ou cópias de layout como se fossem linhas da tabela; reconcilie os indicadores e a fonte autorizada. Uma melhora em um mapa não confirma a solução geral de rolagem. Alterar agrupamento não exige repetir cargas nem publicar fontes; respeite a revisão da aplicação e o estado de rascunho/publicado.
+
 ## Navegação da prévia no portal
 
 Na prévia interativa, a roda sobre um mapa pode controlar o zoom em vez de rolar o documento. Oriente o usuário a usar a margem interna ou a barra do próprio dashboard e a ajuda ao lado de Recarregar. Entrar no dashboard direciona o foco ao iframe existente para uso do teclado, sem solicitar nova sessão. Uma falha de interação visual não autoriza repetir ETLs, criar tabelas ou publicar. Se também falhar fora do mapa, relate a pendência sem declarar que a captura da roda explica todos os casos.
