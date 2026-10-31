@@ -28,3 +28,7 @@ test('hidden mobile navigation or missing controls are skipped while the centere
  assert.deepEqual(visibleGuideSteps(steps,anchor=>anchor==='composer').map(step=>step.id),['intro','composer']);
  assert.deepEqual(visibleGuideSteps(steps,()=>false).map(step=>step.id),['intro']);
 });
+
+test('questions about scrolling over a map find the contextual navigation help',()=>{
+ assert.equal(searchGuideArticles(content.articles,'rolagem mapa','project')[0]?.id,'preview-navigation');
+});

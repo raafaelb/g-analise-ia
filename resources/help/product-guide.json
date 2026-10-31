@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.4",
+  "version": "2026-10-31.5",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -147,7 +147,7 @@
         {
           "id": "project-preview",
           "title": "Explore a prévia",
-          "description": "Prévia abre a visualização ao lado da conversa. Você pode ampliar a área, ajustar a altura disponível e simular computador, tablet ou celular.",
+          "description": "Prévia abre o dashboard para conferência. Amplie a área e simule computador, tablet ou celular. Na ajuda da prévia, confira como rolar sobre mapas e use Entrar no dashboard para direcionar o teclado ao visualizador.",
           "anchor": "chat-preview-toggle",
           "audience": "all"
         },
@@ -193,7 +193,7 @@
         {
           "id": "catalog-search",
           "title": "Localize e confira",
-          "description": "Use a busca e os filtros. Abra um cartão para consultar o recurso escolhido, seus vínculos e as ações disponíveis. Se faltar acesso a alguma área, confira o motivo indicado.",
+          "description": "Use a busca e os filtros. Abra um cartão para conferir vínculos e ações. Aplicações oferecem prévia interativa com ajuda de navegação. Se faltar acesso a uma área, confira o motivo indicado.",
           "anchor": "catalog-search",
           "audience": "all"
         },
@@ -552,7 +552,19 @@
       "id": "preview",
       "title": "Como visualizo e confiro uma prévia?",
       "summary": "Use o painel interativo, os dispositivos e a ampliação para explorar o dashboard.",
-      "body": "Na conversa de um projeto vinculado a uma aplicação, **Prévia** abre a visualização ao lado do chat. A divisão normal mantém metade da largura para cada lado. Amplie o painel ou recolha suas opções para aproveitar melhor a altura.\n\nUse os ícones de computador, tablet e celular para ajustar o tamanho simulado. Isso não cria outra dashboard nem confirma a experiência em todos os dispositivos reais. A prévia interativa permite explorar os filtros disponíveis; a prévia visual mostra uma imagem estática. **Abrir no BI** leva à aplicação completa.\n\nA sessão interativa é temporária e depende do navegador e das permissões. Recarregar inicia uma nova sessão. A ocorrência de rolagem intermitente na troca de dispositivos continua em verificação de compatibilidade. Se ocorrer, preserve o contexto e use Recarregar ou Abrir no BI para continuar a conferência.",
+      "body": "Na conversa de um projeto vinculado a uma aplicação, **Prévia** abre a visualização do dashboard. No computador, a divisão normal mantém metade da largura para cada lado; no celular, alterne entre a prévia e a conversa. Amplie o painel ou recolha suas opções para aproveitar melhor a altura.\n\nUse os ícones de computador, tablet e celular para ajustar o tamanho simulado. Isso não cria outra dashboard nem confirma a experiência em todos os dispositivos reais. A prévia interativa permite explorar os filtros disponíveis; a prévia visual mostra uma imagem estática. **Abrir no BI** leva à aplicação completa.\n\nO botão **Ajuda para rolar e navegar no dashboard**, junto de **Recarregar**, explica a rolagem e oferece **Entrar no dashboard** para direcionar o teclado ao visualizador. Ao trocar o tamanho, o foco pode continuar no botão de dispositivo; entrar na dashboard não recarrega a página nem inicia outra sessão.\n\nMapas e alguns gráficos podem usar a roda do mouse para zoom. Para rolar a página nesse caso, use a margem interna ou a barra de rolagem à direita, dentro da prévia. A área vazia fora da moldura do dispositivo não é o conteúdo da dashboard.\n\nA sessão interativa é temporária e depende do navegador e das permissões. Recarregar inicia uma nova sessão. A ocorrência de rolagem intermitente na troca de dispositivos continua em verificação de compatibilidade; identificar a captura do mouse em um mapa não comprova a solução de todas as falhas. Se a rolagem continuar indisponível também fora do mapa, use Recarregar ou Abrir no BI para prosseguir e informe o dashboard, o dispositivo e a região em que isso ocorreu.",
+      "pages": [
+        "project",
+        "catalog"
+      ],
+      "actions": [],
+      "audience": "all"
+    },
+    {
+      "id": "preview-navigation",
+      "title": "Por que a prévia não rola quando o mouse está sobre o mapa?",
+      "summary": "Mapas podem capturar a roda para zoom. Use a margem interna ou a barra da prévia e direcione o teclado ao dashboard quando necessário.",
+      "body": "Na prévia interativa, o mapa é um controle dentro da página: a roda do mouse pode mudar o zoom do mapa sem mover o restante do dashboard. Isso pode parecer uma rolagem travada. Teste a margem interna do dashboard, fora do mapa, ou arraste sua barra de rolagem à direita. No modo celular, a área vazia ao redor da moldura pertence ao portal e não rola o conteúdo do BI.\n\nUse o botão **Ajuda para rolar e navegar no dashboard**, ao lado de **Recarregar**, para consultar essas orientações. Ele também oferece **Entrar no dashboard**, que direciona o foco do teclado ao visualizador sem abrir outra sessão. O painel de ajuda ocupa espaço apenas enquanto estiver aberto; fechar ou entrar na dashboard devolve a área ao conteúdo.\n\nA troca de tamanho mantém a sessão e os filtros enquanto o mesmo visualizador estiver ativo. Recarregar e alternar o dashboard são ações diferentes e podem abrir outra sessão. Se a rolagem também falhar nas margens e na barra, essa ocorrência precisa de investigação: a captura do mouse pelo mapa não explica todos os casos. **Abrir no BI** continua sendo a alternativa para conferir o sistema completo.",
       "pages": [
         "project",
         "catalog"
