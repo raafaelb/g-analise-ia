@@ -19,7 +19,7 @@ class TenantPolicyTest extends TestCase
     {
         config(['horus.read_only_tenants' => ['1234']]);
         $policy = app(TenantPolicy::class);
-        foreach ([['new', 'app'], ['push', 'app:1'], ['app', 'publish', 'app:1'], ['flow', 'run', 'flow:1'], ['schedule', 'resume', 'schedule:1'], ['schedule', 'run', 'schedule:1'], ['table', 'truncate', 'table:1'], ['rm', 'app:1'], ['query', 'DROP TABLE example']] as $command) {
+        foreach ([['new', 'app'], ['push', 'app:1'], ['app', 'publish', 'app:1'], ['flow', 'run', 'flow:1'], ['schedule', 'resume', 'schedule:1'], ['schedule', 'run', 'schedule:1'], ['table', 'truncate', 'table:1'], ['rm', 'app:1'], ['query', 'DROP TABLE example'], ['writeback', 'import', 'writeback:1', 'input.xlsx'], ['writeback', 'rollback-import', 'writeback:1', 'batch'], ['writeback', 'publish', 'writeback:1', '--desk', '2']] as $command) {
             try {
                 $policy->assertCommandAllowed('1234', $command);
                 $this->fail('Mutação no tenant protegido foi aceita.');
@@ -33,7 +33,7 @@ class TenantPolicyTest extends TestCase
     {
         config(['horus.read_only_tenants' => ['1234']]);
         $policy = app(TenantPolicy::class);
-        foreach ([['list', 'app', '--remote'], ['info', 'app:1', '--full'], ['app', 'dashboard-preview', 'app:1'], ['schedule', 'logs', 'schedule:1'], ['table', 'preview', 'table:1']] as $command) {
+        foreach ([['list', 'app', '--remote'], ['info', 'app:1', '--full'], ['app', 'dashboard-preview', 'app:1'], ['schedule', 'logs', 'schedule:1'], ['table', 'preview', 'table:1'], ['writeback', 'preview', 'writeback:1'], ['writeback', 'imports', 'writeback:1'], ['writeback', 'export', 'writeback:1', '--output', '/tmp/test.xlsx']] as $command) {
             $policy->assertCommandAllowed('1234', $command);
             $this->addToAssertionCount(1);
         }

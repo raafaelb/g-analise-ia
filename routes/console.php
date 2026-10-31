@@ -8,6 +8,7 @@ use App\Models\HelpQuestion;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\BiScheduleRuns;
+use App\Services\BiWritebackExports;
 use App\Services\UserAccessRevocation;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -91,3 +92,5 @@ Schedule::call(function () {
     OperationsHeartbeat::dispatch('help');
 })->everyMinute()->name('operations-heartbeat')->withoutOverlapping();
 Schedule::command('ganalise:retention --apply')->dailyAt('03:40')->timezone('America/Sao_Paulo')->withoutOverlapping();
+
+Schedule::call(fn () => app(BiWritebackExports::class)->purgeStale())->hourly()->name('ganalise.downloads.cleanup')->withoutOverlapping();

@@ -63,3 +63,7 @@ test('creating an ETL without SQL finds its guided creation workflow',()=>{
 test('a pending ETL step finds the guide for checking the existing result without repeating it',()=>{
  assert.equal(searchGuideArticles(content.articles,'etapa ETL pendente','project')[0]?.id,'etl-recovery');
 });
+
+test('cadastro questions find the dedicated read and export guide',()=>{
+ assert.equal(searchGuideArticles(content.articles,'exportar planilha de cadastro','catalog')[0]?.id,'writeback-data');
+});

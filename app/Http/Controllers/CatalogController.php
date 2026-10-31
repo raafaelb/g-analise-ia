@@ -11,6 +11,7 @@ use App\Services\BiManualActions;
 use App\Services\BiPublications;
 use App\Services\BiViewer;
 use App\Services\BiWorkspaceSync;
+use App\Services\BiWritebackExports;
 use App\Services\RefreshCoverage;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class CatalogController extends Controller
@@ -102,7 +104,7 @@ class CatalogController extends Controller
     public function inspect(Request $request, string $tenant, string $kind, string $id, string $action, BiInspector $inspector): JsonResponse
     {
         try {
-            return response()->json($inspector->inspect($request->user(), $tenant, $kind, $id, $action));
+            return response()->json($inspector->inspect($request->user(), $tenant, $kind, $id, $action))->header('Cache-Control', 'private, no-store');
         } catch (HttpExceptionInterface $e) {
             throw $e;
         } catch (RuntimeException $e) {
@@ -125,6 +127,28 @@ class CatalogController extends Controller
         } catch (RuntimeException $e) {
             throw ValidationException::withMessages(['preview' => $e->getMessage()]);
         }
+    }
+
+    public function exportWriteback(Request $request, string $tenant, string $id, BiWritebackExports $exports): StreamedResponse
+    {
+        if ($request->query() !== []) {
+            throw ValidationException::withMessages(['export' => 'A exportação inclui todos os registros e colunas permitidos. Filtros e limites da amostra não se aplicam a esta planilha.']);
+        }
+        try {
+            $file = $exports->prepare($request->user(), $tenant, $id);
+        } catch (HttpExceptionInterface $error) {
+            throw $error;
+        } catch (RuntimeException $error) {
+            throw ValidationException::withMessages(['export' => $error->getMessage()]);
+        }
+
+        return response()->streamDownload(function () use ($file): void {
+            try {
+                fpassthru($file['stream']);
+            } finally {
+                fclose($file['stream']);
+            }
+        }, $file['filename'], ['Content-Type' => BiWritebackExports::MIME, 'Content-Length' => (string) $file['size'], 'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff']);
     }
 
     public function image(Request $request, string $tenant, string $id, BiCatalog $catalog): BinaryFileResponse

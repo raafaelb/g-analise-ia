@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.12",
+  "version": "2026-10-31.13",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -202,6 +202,13 @@
           "title": "Localize e confira",
           "description": "Use a busca e os filtros. Abra um cartão para conferir vínculos e ações. As prévias disponíveis dependem das permissões da conta. Se faltar acesso a uma área, confira o motivo indicado.",
           "anchor": "catalog-search",
+          "audience": "all"
+        },
+        {
+          "id": "catalog-writebacks",
+          "title": "Consulte os dados de Cadastros",
+          "description": "Cadastros guardam informações preenchidas manualmente no BI, como metas. Abra um cadastro para conferir uma amostra dos registros, consultar importações ou solicitar a planilha completa permitida à sua conta. A exportação depende do acesso liberado pelo BI.",
+          "anchor": "catalog-writebacks",
           "audience": "all"
         },
         {
@@ -878,6 +885,22 @@
         }
       ],
       "audience": "authors"
+    },
+    {
+      "id": "writeback-data",
+      "title": "Como consulto registros de Cadastros e exporto a planilha?",
+      "summary": "Confira uma amostra, consulte importações e solicite o XLSX com as permissões da sua conta BI.",
+      "body": "Abra **Catálogo BI → Cadastros** e selecione o cadastro. Cadastros são tabelas de informações preenchidas manualmente no BI, como metas, classificações ou observações. O cadastro das pessoas que entram no G-Analise IA fica em **Usuários e acessos**.\n\nEm **Registros e importações**, **Amostra dos registros** consulta até 20 registros. O BI pode precisar sincronizar alterações recentes antes de mostrá-las nessa consulta. Uma amostra vazia não confirma uma importação; confira o histórico e as mensagens retornadas.\n\n**Histórico de importações** mostra até 100 lotes retornados pelo BI. Na fila e Em execução ainda não são conclusão. Mesmo quando o lote aparece como Concluída no BI, confira as quantidades e a amostra; esse estado registra o término informado pelo provedor. Concluída com ocorrências exige conferência. Desfeita indica um lote revertido. Sem confirmação significa que o formato recebido não comprova o estado. Essa janela consulta o histórico; não importa arquivos nem desfaz lotes.\n\n**Exportar XLSX** solicita uma planilha com **todos os registros e colunas permitidos pela sua conta**, além das 20 linhas da amostra. A instalação limita o tamanho do arquivo; um resultado acima desse limite é recusado, sem truncar a planilha. Mantenha a janela aberta enquanto a planilha é preparada. Fechar ou trocar o recurso antes da entrega descarta o download tardio.\n\nUma negativa de download do BI é exibida na mesma janela. Confira as permissões do cadastro e do serviço de arquivos com o administrador do BI. A capacidade de registros de Cadastros pertence à configuração do BI; se uma importação informar falta de espaço, confira esse limite antes de tentar novamente. Consultar e exportar por esses botões não inicia uma tarefa de IA. A criação, importação e edição cotidiana de linhas ainda não têm formulário próprio nesta área.",
+      "pages": [
+        "catalog"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir Catálogo BI"
+        }
+      ],
+      "audience": "all"
     }
   ]
 }

@@ -27,6 +27,12 @@ def interrupted(signum, frame):
     raise KeyboardInterrupt
 
 
+def private_tar_arguments(root="/var/www/html/storage/app"):
+    return ["-C", str(root), "--exclude=private/runtime-sessions", "--exclude=private/bi-downloads",
+            "--exclude=private/workspaces/*/catalog-*", "--exclude=private/codex/*/*/tmp",
+            "--exclude=private/testing", "-czf", "-", "private"]
+
+
 def main():
     os.umask(0o077)
     signal.signal(signal.SIGTERM, interrupted)
@@ -97,9 +103,7 @@ def main():
                 with (stage / "database.dump").open("wb") as target:
                     run(compose + ["exec", "-T", "postgres", "pg_dump", "-U", args.db_user, "-Fc", args.database], stdout=target, stderr=subprocess.PIPE)
                 with (stage / "private.tar.gz").open("wb") as target:
-                    run(compose + ["exec", "-T", "app", "tar", "-C", "/var/www/html/storage/app",
-                                   "--exclude=private/runtime-sessions", "--exclude=private/workspaces/*/catalog-*",
-                                   "--exclude=private/codex/*/*/tmp", "--exclude=private/testing", "-czf", "-", "private"], stdout=target, stderr=subprocess.PIPE)
+                    run(compose + ["exec", "-T", "app", "tar"] + private_tar_arguments(), stdout=target, stderr=subprocess.PIPE)
                 shutil.copyfile(env_file, stage / "config.env")
                 (stage / "config.env").chmod(0o600)
                 manifest = {"format": 1, "created_at": datetime.now(timezone.utc).isoformat(), "database": args.database, "state": state}

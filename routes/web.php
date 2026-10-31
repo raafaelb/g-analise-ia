@@ -70,6 +70,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/approvals/{id}/publication/verify', [CatalogController::class, 'reconcilePublication'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}', [CatalogController::class, 'snapshot'])->whereNumber('tenant')->middleware('throttle:catalog');
         Route::get('/catalog/{tenant}/variables/{id}', [CatalogController::class, 'variable'])->whereNumber('tenant')->where('id', '[a-f0-9]+');
+        Route::get('/catalog/{tenant}/writebacks/{id}/export', [CatalogController::class, 'exportWriteback'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/resources/{kind}/{id}/inspect/{action}', [CatalogController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['data', 'status', 'history', 'health', 'events'])->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/resources/{kind}/{id}', [CatalogController::class, 'detail'])->whereNumber(['tenant', 'id']);
         Route::post('/catalog/{tenant}/apps/{id}/viewer', [CatalogController::class, 'viewer'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-viewer');

@@ -163,6 +163,10 @@ class LumoClient
                     }
                     throw new RuntimeException('Sua sessão não tem acesso a este recurso. Confira as permissões no G-Analise BI.', 6);
                 }
+                $classified = BiNativeFailure::detect($arguments, $process->getExitCode(), $output, $process->getErrorOutput());
+                if ($classified !== null) {
+                    throw $classified;
+                }
                 throw new RuntimeException('O Lumo não concluiu a operação (código '.$process->getExitCode().'). Confira permissões, estado do recurso e parâmetros.', $process->getExitCode());
             }
             $decoded = json_decode($output, true);

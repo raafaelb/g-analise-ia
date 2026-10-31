@@ -13,6 +13,8 @@ class BiInspector
     public function inspect(User $user, string $tenant, string $kind, string $id, string $action): array
     {
         $arguments = match ($kind.':'.$action) {
+            'writeback:data' => ['writeback', 'preview', 'writeback:'.$id, '--limit', '20'],
+            'writeback:history' => ['writeback', 'imports', 'writeback:'.$id],
             'table:data' => ['table', 'preview', 'table:'.$id, '--limit', '20'],
             'flow:status' => ['flow', 'status', 'flow:'.$id],
             'flow:history' => ['flow', 'logs', 'flow:'.$id, '--tail', '20'],
@@ -31,6 +33,8 @@ class BiInspector
 
         return [...$report, ...match ($kind.':'.$action) {
             'table:data' => $this->table($result),
+            'writeback:data' => $this->writeback($result, $detail),
+            'writeback:history' => $this->imports($result),
             'flow:status' => ['history' => [$this->execution($result)]],
             'flow:history' => ['history' => array_map($this->execution(...), $this->rows($result))],
             'schedule:history' => ['history' => array_map($this->scheduleExecution(...), $this->rows($result))],
@@ -58,6 +62,53 @@ class BiInspector
         }
 
         return ['table' => ['columns' => array_keys($columns), 'rows' => $rows, 'limit' => 20], 'message' => 'Amostra de até 20 linhas; não representa a contagem total da tabela.'];
+    }
+
+    private function writeback(array $data, array $detail): array
+    {
+        abort_if(($data['success'] ?? null) === false || ! empty($data['error']) || ! empty($data['errors']), 422, 'O BI informou uma falha ao consultar os registros do cadastro. A amostra não foi confirmada.');
+        $report = $this->table($data);
+        $labels = [];
+        if (($detail['metadata_complete'] ?? false) === true) {
+            $fields = $detail['details']['fields'] ?? [];
+            foreach (is_array($fields) ? $fields : [] as $field) {
+                if (is_array($field) && is_string($field['alias'] ?? null) && is_string($field['label'] ?? null)) {
+                    $labels[mb_substr($field['alias'], 0, 150)] = mb_substr($field['label'], 0, 150);
+                }
+            }
+        }
+        $report['table']['column_labels'] = $labels;
+        $report['message'] = 'Amostra de até 20 registros do BI. Alterações recentes no cadastro podem aguardar sincronização; a amostra não representa a contagem total.';
+
+        return $report;
+    }
+
+    private function imports(array $data): array
+    {
+        $rows = array_is_list($data) ? $data : ($data['imports'] ?? null);
+        abort_unless(is_array($rows) && array_is_list($rows), 422, 'O BI não retornou o histórico de importações em formato reconhecido.');
+        $imports = [];
+        foreach (array_slice($rows, 0, 100) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $status = strtolower(is_string($row['status'] ?? null) ? $row['status'] : '');
+            $errors = $this->number($row['error_rows'] ?? $row['rows_failed'] ?? null);
+            $state = match ($status) {
+                'done', 'completed' => $errors !== null && $errors > 0 ? 'partial' : 'completed',
+                'failed', 'error' => 'failed', 'pending', 'queued' => 'queued',
+                'running', 'processing', 'importing' => 'running',
+                'rolled_back', 'reverted' => 'reverted', default => 'unknown'
+            };
+            $file = $row['filename'] ?? $row['file_name'] ?? null;
+            $file = is_string($file) ? basename(str_replace('\\', '/', (string) parse_url($file, PHP_URL_PATH))) : null;
+            $id = $row['id'] ?? $row['import_id'] ?? null;
+            $id = is_int($id) ? (string) $id : $id;
+            $id = is_string($id) && preg_match('/^[A-Za-z0-9:_-]{1,100}$/D', $id) ? $id : null;
+            $imports[] = ['id' => $id, 'state' => $state, 'mode' => in_array($row['mode'] ?? null, ['append', 'replace'], true) ? $row['mode'] : null, 'filename' => $this->text($file === null ? null : mb_substr($file, 0, 200)), 'created_at' => $this->date($row['created_at'] ?? null), 'finished_at' => $this->date($row['finished_at'] ?? $row['completed_at'] ?? null), 'rows_total' => $this->number($row['total_rows'] ?? $row['rows_total'] ?? null), 'rows_inserted' => $this->number($row['inserted_rows'] ?? $row['rows_inserted'] ?? null), 'rows_superseded' => $this->number($row['superseded_rows'] ?? $row['rows_superseded'] ?? null), 'rows_failed' => $errors];
+        }
+
+        return ['imports' => $imports, 'limit' => 100, 'has_more' => count($rows) > 100, 'message' => 'Até 100 importações retornadas pelo BI. Esta consulta não importa registros nem desfaz lotes.'];
     }
 
     private function rows(array $data): array

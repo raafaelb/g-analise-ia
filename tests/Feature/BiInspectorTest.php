@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Models\Connection;
 use App\Models\User;
 use App\Services\LumoClient;
+use App\Services\WorkspaceFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Mockery;
+use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 class BiInspectorTest extends TestCase
@@ -30,13 +32,13 @@ class BiInspectorTest extends TestCase
         parent::tearDown();
     }
 
-    private function connect(array $report, string $kind, string $action, int $responseTenant = 321): User
+    private function connect(array $report, string $kind, string $action, int $responseTenant = 321, array $metadata = []): User
     {
         $user = User::factory()->create();
         Connection::create(['user_id' => $user->id, 'provider' => 'horus', 'status' => 'connected', 'credentials' => ['auth' => ['token' => 'test']], 'metadata' => ['tenants' => [['id' => '321', 'name' => 'Teste']]]]);
         $mock = Mockery::mock(LumoClient::class);
         $mock->shouldReceive('initialize')->andReturnNull();
-        $mock->shouldReceive('run')->andReturnUsing(function ($connection, $args) use ($report, $kind, $action, $responseTenant) {
+        $mock->shouldReceive('run')->andReturnUsing(function ($connection, $args, $project = null) use ($report, $kind, $action, $responseTenant, $metadata) {
             if ($args[0] === 'info') {
                 return ['data' => ['payload' => ['header' => ['tenantId' => $responseTenant], 'body' => ['nome' => 'Recurso autorizado']]]];
             }
@@ -49,6 +51,12 @@ class BiInspectorTest extends TestCase
                 return ['data' => []];
             }
             if ($args[0] === 'pull') {
+                if ($metadata !== []) {
+                    $folder = app(WorkspaceFiles::class)->path($project).'/writebacks';
+                    File::ensureDirectoryExists($folder, 0700, true);
+                    File::put($folder.'/cadastro--10.yaml', Yaml::dump(['kind' => 'writeback', 'id' => 10, 'tenantId' => $responseTenant, 'lumo' => 'v2'])."---\n".Yaml::dump($metadata, 15));
+                }
+
                 return ['data' => []];
             }
             $this->assertSame($kind, $args[0]);
@@ -103,5 +111,50 @@ class BiInspectorTest extends TestCase
         $this->actingAs($user)->getJson('/api/catalog/321/resources/table/10/inspect/data')->assertUnprocessable();
         $this->getJson('/api/catalog/321/resources/table/10/inspect/history')->assertUnprocessable();
         $this->getJson('/api/catalog/999/resources/table/10/inspect/data')->assertForbidden();
+    }
+
+    public function test_writeback_sample_is_bounded_redacted_and_uses_field_labels_when_available(): void
+    {
+        $user = $this->connect(['rows' => array_fill(0, 25, ['META' => 1200, 'password' => 'private-value']), 'sql' => 'private-query'], 'writeback', 'preview', 321, ['name' => 'Metas', 'deskId' => null, 'fields' => [['alias' => 'META', 'label' => 'Meta (R$)', 'type' => 'number']]]);
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/writeback/10/inspect/data')->assertOk()->assertHeaderContains('Cache-Control', 'no-store')->assertJsonCount(20, 'table.rows')->assertJsonPath('table.rows.0.password', '[protegido]')->assertJsonPath('table.column_labels.META', 'Meta (R$)')->assertJsonMissingPath('sql');
+        $this->assertStringNotContainsString('private-value', $response->getContent());
+        $this->assertStringNotContainsString('private-query', $response->getContent());
+    }
+
+    public function test_writeback_empty_history_is_a_valid_read_only_result(): void
+    {
+        $user = $this->connect([], 'writeback', 'imports');
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/writeback/10/inspect/history')->assertOk()->assertJsonCount(0, 'imports')->assertJsonPath('has_more', false);
+    }
+
+    public function test_writeback_history_differentiates_terminal_partial_and_pending_batches_without_private_urls(): void
+    {
+        $user = $this->connect([['id' => 1, 'status' => 'done', 'inserted_rows' => 2, 'error_rows' => 0, 'mode' => 'append', 'filename' => 'https://example.invalid/metas.xlsx?token=private-value', 'created_at' => '2026-10-31T05:00:00Z', 'download_url' => 'private-value'], ['id' => 2, 'status' => 'done', 'error_rows' => 1], ['id' => 3, 'status' => 'queued', 'success' => true], ['id' => 4, 'status' => 'rolled_back'], ['id' => 5, 'status' => 'unrecognized']], 'writeback', 'imports');
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/writeback/10/inspect/history')->assertOk()->assertJsonPath('imports.0.state', 'completed')->assertJsonPath('imports.0.filename', 'metas.xlsx')->assertJsonPath('imports.0.rows_inserted', 2)->assertJsonPath('imports.1.state', 'partial')->assertJsonPath('imports.2.state', 'queued')->assertJsonPath('imports.3.state', 'reverted')->assertJsonPath('imports.4.state', 'unknown')->assertJsonMissingPath('imports.0.download_url');
+        $this->assertStringNotContainsString('private-value', $response->getContent());
+    }
+
+    public function test_writeback_history_explicitly_limits_the_returned_batches(): void
+    {
+        $user = $this->connect(array_fill(0, 101, ['status' => 'queued']), 'writeback', 'imports');
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/writeback/10/inspect/history')->assertOk()->assertJsonCount(100, 'imports')->assertJsonPath('has_more', true);
+    }
+
+    public function test_writeback_data_with_an_explicit_native_error_is_not_reported_as_empty(): void
+    {
+        $user = $this->connect(['rows' => [], 'error' => 'private-query-error'], 'writeback', 'preview');
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/writeback/10/inspect/data')->assertUnprocessable()->assertJsonPath('message', 'O BI informou uma falha ao consultar os registros do cadastro. A amostra não foi confirmada.');
+    }
+
+    public function test_writeback_unrecognized_history_is_rejected_with_422(): void
+    {
+        $user = $this->connect(['message' => 'private-provider-error'], 'writeback', 'imports');
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/writeback/10/inspect/history')->assertUnprocessable()->assertJsonPath('message', 'O BI não retornou o histórico de importações em formato reconhecido.');
     }
 }

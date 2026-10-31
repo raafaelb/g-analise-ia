@@ -4,6 +4,7 @@ return [
     'preview' => (bool) env('LOCAL_PREVIEW', false),
     'read_only_tenants' => array_values(array_filter(array_map('trim', explode(',', (string) env('BI_READ_ONLY_TENANT_IDS', ''))))),
     'registration' => (bool) env('ALLOW_REGISTRATION', false),
+    'downloads' => ['root' => storage_path('app/private/bi-downloads'), 'max_bytes' => (int) env('BI_EXPORT_MAX_BYTES', 50_000_000)],
     'workspace_root' => storage_path('app/private/workspaces'),
     'openai' => [
         'enabled' => (bool) env('OPENAI_SIGN_IN_ENABLED', false),
