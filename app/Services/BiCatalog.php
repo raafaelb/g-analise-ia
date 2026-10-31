@@ -34,6 +34,11 @@ class BiCatalog
         }
     }
 
+    public function invalidate(string $tenant, Connection $connection): void
+    {
+        Cache::forget($this->snapshotKey($connection, $tenant));
+    }
+
     public function connection(User $user): Connection
     {
         $connection = Connection::where('user_id', $user->id)->where('provider', 'horus')->where('status', 'connected')->first();

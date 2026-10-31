@@ -11,7 +11,7 @@ function bytes(value:unknown){return typeof value==='number'?(value/1024/1024).t
 function date(value:string|null){if(!value)return '—';return new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});}
 function state(value:string){return ({succeeded:'Concluída com sucesso',failed:'Falha',running:'Em execução',queued:'Na fila',cancelled:'Cancelada',unknown:'Sem confirmação',ok:'Disponível',degraded:'Degradado',offline:'Offline',MISSED:'Não iniciou',LATE:'Atraso',ERROR:'Erro',CRASHED:'Interrompida'} as Record<string,string>)[value]??value;}
 async function inspect(action:string){const version=++generation;selected.value=action;busy.value=true;error.value='';result.value=null;try{const report=await props.request(`/catalog/${props.tenant}/resources/${props.resource.kind}/${props.resource.id}/inspect/${action}`);if(version===generation)result.value=report;}catch(e){if(version===generation)error.value=(e as Error).message;}finally{if(version===generation)busy.value=false;}}
-watch(()=>[props.tenant,props.resource.ref],()=>{generation++;result.value=null;error.value='';busy.value=false;selected.value='';});
+watch([()=>props.tenant,()=>props.resource.ref],()=>{generation++;result.value=null;error.value='';busy.value=false;selected.value='';});
 onUnmounted(()=>generation++);
 </script>
 <template>

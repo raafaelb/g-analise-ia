@@ -1,0 +1,17 @@
+<script setup lang="ts">
+import {nextTick,onMounted,onUnmounted,ref} from 'vue';
+import {X,Workflow} from 'lucide-vue-next';
+import BiFlowWizard from './BiFlowWizard.vue';
+const props=defineProps<{tenant:string;tenantName:string;projectId?:string|null;request:(path:string,method?:string,data?:unknown)=>Promise<any>}>();
+const emit=defineEmits<{close:[];updated:[];project:[id:string]}>();
+const dialog=ref<HTMLElement|null>(null);let previous:HTMLElement|null=null;
+function keydown(event:KeyboardEvent){if(event.key==='Escape'){event.preventDefault();event.stopPropagation();emit('close');return;}if(event.key!=='Tab')return;const items=[...dialog.value?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,a[href],[tabindex="0"]')??[]].filter(el=>el.getClientRects().length);const first=items[0],last=items.at(-1);if(!first){event.preventDefault();return;}if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}
+onMounted(async()=>{previous=document.activeElement as HTMLElement|null;await nextTick();dialog.value?.querySelector<HTMLElement>('.flow-dialog-close')?.focus();});
+onUnmounted(()=>previous?.isConnected&&previous.focus({preventScroll:true}));
+</script>
+<template>
+ <Teleport to="body"><div class="modal-backdrop flow-wizard-backdrop" @click.self="emit('close')"><section ref="dialog" class="flow-wizard-dialog" role="dialog" aria-modal="true" aria-label="Assistente de criação de ETL" @keydown="keydown"><header class="flow-dialog-heading"><span><Workflow :size="23"/></span><div><small>SEUS DADOS, PASSO A PASSO</small><h2>{{projectId?'Assistente do ETL':'Novo ETL'}}</h2><p>{{tenantName}} · G-Analise BI</p></div><button class="icon-button flow-dialog-close" aria-label="Fechar assistente de ETL" @click="emit('close')"><X :size="20"/></button></header><div class="flow-dialog-content"><BiFlowWizard :tenant="tenant" :tenant-name="tenantName" :project-id="projectId" :request="request" @updated="emit('updated')" @project="emit('project',$event)"/></div></section></div></Teleport>
+</template>
+<style scoped>
+.flow-wizard-backdrop{z-index:125}.flow-wizard-dialog{width:min(1120px,calc(100vw - 40px));max-height:calc(100dvh - 40px);display:flex;flex-direction:column;background:#fff;border:1px solid #e0e8f5;border-radius:18px;box-shadow:0 24px 100px #14263d26;overflow:hidden}.flow-dialog-heading{display:flex;gap:14px;align-items:flex-start;padding:26px 30px;border-bottom:1px solid #e6edf7;flex-shrink:0}.flow-dialog-heading>span{display:grid;place-items:center;width:45px;height:45px;background:#edf4ff;color:#1163e9;border-radius:11px;flex-shrink:0}.flow-dialog-heading>div{min-width:0}.flow-dialog-heading small{font-size:9px;letter-spacing:2px;color:#8295af}.flow-dialog-heading h2{font-size:22px;margin:7px 0;color:#233f65}.flow-dialog-heading p{font-size:12px;color:#8092aa;margin:0}.flow-dialog-close{margin-left:auto;flex-shrink:0}.flow-dialog-content{padding:26px 30px;overflow:auto;overscroll-behavior:contain;min-height:0}.flow-wizard-dialog button:focus-visible{outline:2px solid #1163e9;outline-offset:3px}@media(max-width:600px){.flow-wizard-dialog{width:calc(100vw - 22px);max-height:calc(100dvh - 24px);border-radius:13px}.flow-dialog-heading{padding:18px;gap:10px}.flow-dialog-heading h2{font-size:18px}.flow-dialog-heading small{font-size:8px;letter-spacing:1.5px}.flow-dialog-content{padding:18px}}
+</style>

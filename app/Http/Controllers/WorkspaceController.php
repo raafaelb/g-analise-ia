@@ -17,6 +17,7 @@ use App\Models\RefreshSchedule;
 use App\Services\ArtifactImages;
 use App\Services\Audit;
 use App\Services\BiCredentials;
+use App\Services\BiFlowWizard;
 use App\Services\BiMcpIdentity;
 use App\Services\LocalPreview;
 use App\Services\OpenAiIdentity;
@@ -53,6 +54,12 @@ class WorkspaceController extends Controller
     {
         $uid = $request->user()->id;
         $projects = Project::where('user_id', $uid)->where('status', '!=', 'archived')->withCount('conversations')->latest('updated_at')->get();
+        $wizardProjects = Approval::where('user_id', $uid)->whereIn('project_id', $projects->modelKeys())->where('payload->action->action', BiFlowWizard::ACTIONS[0])->distinct()->pluck('project_id')->flip();
+        foreach ($projects as $project) {
+            if ($wizardProjects->has($project->id)) {
+                $project->setAttribute('flow_wizard', true);
+            }
+        }
         $connections = Connection::where('user_id', $uid)->get();
         $lumoGeneration = $connections->firstWhere('provider', 'horus')?->metadata['session_generation'] ?? null;
         foreach ($connections as $connection) {

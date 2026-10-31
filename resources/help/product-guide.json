@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.9",
+  "version": "2026-10-31.10",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -132,6 +132,13 @@
           "audience": "all"
         },
         {
+          "id": "project-flow-wizard",
+          "title": "Retome as etapas do ETL",
+          "description": "Nos projetos criados pelo assistente, Assistente de ETL reabre as revisões e o acompanhamento. Fechar a janela não cancela uma operação autorizada. Uma criação sem resultado confirmado precisa de conferência antes de repetir. A conversa com IA continua disponível para transformações adicionais.",
+          "anchor": "project-flow-wizard",
+          "audience": "authors"
+        },
+        {
           "id": "project-request",
           "title": "Peça o resultado em suas palavras",
           "description": "Explique o que deseja criar ou melhorar e envie referências quando necessário. Na conversa vazia de um ETL, Conferir este ETL preenche um pedido de análise; revise o texto antes de enviar. A IA deve conferir as fontes reais antes de concluir.",
@@ -202,6 +209,13 @@
           "title": "Explore as tabelas e seus vínculos",
           "description": "Em Conexões de dados, abra a fonte e use Ver tabelas e colunas. Buscar na fonte e Próxima consultam outras partes da estrutura quando o conector permite. Campos parciais indicam que a tabela continua. Ver relacionamentos confere vínculos declarados; nenhum desses controles inicia carga.",
           "anchor": "catalog-types",
+          "audience": "authors"
+        },
+        {
+          "id": "catalog-create-flow",
+          "title": "Crie um ETL passo a passo",
+          "description": "Em Fontes / ETL, Novo ETL permite escolher uma conexão, tabela e campos. Revise separadamente a configuração, o teste de extração, a tabela privada e a carga. A carga de teste começa limitada; confira a amostra antes de usar indicadores. O assistente não publica nem agenda automaticamente.",
+          "anchor": "catalog-create-flow",
           "audience": "authors"
         },
         {
@@ -599,7 +613,7 @@
       "id": "etl-tables",
       "title": "Qual a diferença entre ETL e tabela?",
       "summary": "O ETL prepara a carga; a tabela recebe os dados usados nas aplicações.",
-      "body": "Um **ETL** é o fluxo que extrai e prepara informações. A **tabela** recebe os dados resultantes no ambiente analítico. As aplicações usam essas informações para apresentar indicadores.\n\nA IA pode investigar as conexões autorizadas, analisar a estrutura e preparar um novo fluxo. Testar uma etapa pode exigir revisão. A criação de uma tabela não comprova que seus dados foram carregados: é preciso executar a inserção e conferir o conteúdo.\n\nMudanças de estrutura devem seguir o fluxo de origem. Recriar uma tabela existente pode apagar dados e não deve ser usado para corrigir apenas nomes ou formatos. Fluxos publicados exigem cuidado próprio e uma cópia para testes de nós.",
+      "body": "Um **ETL** é o fluxo que extrai e prepara informações. A **tabela** recebe os dados resultantes no ambiente analítico. As aplicações usam essas informações para apresentar indicadores.\n\nEm **Catálogo BI → Fontes / ETL → Novo ETL**, o assistente prepara uma nova origem sem pedir SQL. Veja a ajuda de criação de ETLs para conferir suas etapas e limites.\n\nA IA pode investigar as conexões autorizadas, analisar a estrutura e preparar um novo fluxo. Testar uma etapa pode exigir revisão. A criação de uma tabela não comprova que seus dados foram carregados: é preciso executar a inserção e conferir o conteúdo.\n\nMudanças de estrutura devem seguir o fluxo de origem. Recriar uma tabela existente pode apagar dados e não deve ser usado para corrigir apenas nomes ou formatos. Fluxos publicados exigem cuidado próprio e uma cópia para testes de nós.",
       "pages": [
         "catalog",
         "project"
@@ -829,6 +843,23 @@
           "label": "Abrir Catálogo BI"
         }
       ]
+    },
+    {
+      "id": "etl-wizard",
+      "title": "Como crio um ETL sem escrever consultas?",
+      "summary": "Escolha a conexão, tabela e campos pelo catálogo e autorize cada etapa separadamente.",
+      "body": "Abra **Catálogo BI → Fontes / ETL → Novo ETL**. Escolha uma conexão já disponível. Use **Buscar na fonte** para encontrar tabelas por seu nome ou por um campo; essa busca consulta apenas a estrutura visível, sem registros de negócio. Escolha uma tabela e selecione até 200 campos. A seleção permanece ao passar pelas páginas de campos.\n\nInforme o nome e confira o limite. O padrão é uma **carga de teste de até 100 registros por extração**. Essa amostra limita a futura tabela e não representa automaticamente os totais do negócio. Desmarcar o limite consulta todos os registros dos campos escolhidos nas etapas de extração e carga; confira se o volume é adequado.\n\nHá quatro revisões: **configurar o ETL privado**, **testar a extração**, **criar uma nova tabela privada** a partir do esquema capturado e **carregar a tabela**. A primeira etapa não executa a consulta; o teste de extração consulta os registros, mas não carrega a tabela. A criação da tabela não comprova carga. A última etapa extrai novamente e substitui apenas o conteúdo da tabela própria criada neste assistente. Cada etapa exige sua autorização; uma resposta na fila não é conclusão.\n\nUse **Conferir a tabela carregada** e **Amostra dos dados** para verificar registros e indicadores. Se a extração não retornar campos ou a carga não confirmar registros, a conferência continua pendente. Uma tabela vazia também pode ser um resultado válido da origem; não repita a carga automaticamente.\n\nÉ possível fechar e retomar em **Projetos → projeto criado → Assistente de ETL**. Fechar não cancela uma execução autorizada. Se uma criação já começou e seu resultado ficou incerto, confira o recibo e o recurso pelo projeto antes de criar novamente. Alterações de origem, configuração, sessão ou destino podem exigir nova revisão ou continuação pelo projeto.\n\nEsta versão usa **PostgreSQL, MySQL e SQL Server**, uma tabela de origem e carga total. Outros conectores, combinações entre tabelas, renomeações, transformações e cargas incrementais continuam pela autoria do projeto com IA. O assistente opera rascunhos privados, não recria destinos existentes, não publica, não cria dashboard e não agenda automaticamente. Publicação, agendas e a verificação de atualização diária dos dashboards precisam de suas próprias etapas. Não é necessário usar a IA para percorrer o assistente.",
+      "pages": [
+        "catalog",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Criar ETL pelo catálogo"
+        }
+      ],
+      "audience": "authors"
     }
   ]
 }

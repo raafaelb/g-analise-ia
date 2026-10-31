@@ -13,9 +13,12 @@ class BiSourceSchema
     public function __construct(private LumoClient $lumo) {}
 
     /** @return array<string, mixed> */
-    public function inspect(Connection $connection, Project $context, string $resource, string $driver, ?string $schema, ?string $search, int $offset): array
+    public function inspect(Connection $connection, Project $context, string $resource, string $driver, ?string $schema, ?string $search, int $offset, ?string $exactTable = null, ?array $selectedColumns = null): array
     {
-        $query = $this->query($driver, $schema, $search, $offset);
+        if ($selectedColumns !== null && ($exactTable === null || ! array_is_list($selectedColumns) || $selectedColumns === [] || count($selectedColumns) > 200 || array_any($selectedColumns, fn (mixed $column): bool => ! is_string($column) || $column === '' || strlen($column) > 1024) || count(array_unique($selectedColumns, SORT_STRING)) !== count($selectedColumns))) {
+            throw new RuntimeException('Seleção de campos inválida para conferir a fonte.');
+        }
+        $query = $this->query($driver, $schema, $search, $offset, $exactTable, $selectedColumns);
         $data = $this->lumo->run($connection, ['credential', 'query', $resource, '--sql', $query, '--limit', (string) (self::PAGE_SIZE + 1), '--timeout', '45s'], $context, 60)['data'] ?? null;
         if (! is_array($data) || ! $this->successful($data) || ! is_array($data['rows'] ?? null) || ! array_is_list($data['rows']) || count($data['rows']) > self::PAGE_SIZE + 1) {
             throw new RuntimeException('A fonte não retornou uma consulta de estrutura confirmada.');
@@ -95,19 +98,28 @@ class BiSourceSchema
         return true;
     }
 
-    private function query(string $driver, ?string $schema, ?string $search, int $offset): string
+    private function query(string $driver, ?string $schema, ?string $search, int $offset, ?string $exactTable, ?array $selectedColumns): string
     {
         if ($driver === 'sqlserver') {
             $base = "SELECT sn.name AS schema_name, o.name AS table_name, c.name AS column_name,\n CASE WHEN t.is_user_defined = 1 THEN SCHEMA_NAME(t.schema_id) + '.' + t.name ELSE t.name END AS data_type,\n CASE WHEN c.is_nullable = 1 THEN 'YES' ELSE 'NO' END AS is_nullable, c.column_id AS ordinal_position,\n COUNT(*) OVER (PARTITION BY o.object_id) AS visible_column_count\nFROM sys.objects o\nJOIN sys.schemas sn ON sn.schema_id = o.schema_id\nJOIN sys.columns c ON c.object_id = o.object_id\nJOIN sys.types t ON t.user_type_id = c.user_type_id\nWHERE o.type IN ('U', 'V') AND o.is_ms_shipped = 0";
             if ($schema !== null) {
                 $base .= ' AND sn.name = '.$this->literal($schema, $driver);
             }
+            if ($exactTable !== null) {
+                $base .= ' AND o.name = '.$this->literal($exactTable, $driver);
+            }
             if ($search !== null) {
                 $term = $this->searchLiteral($search, $driver);
                 $base .= " AND (LOWER(o.name) LIKE LOWER($term) ESCAPE '!' OR EXISTS (SELECT 1 FROM sys.columns mc WHERE mc.object_id = o.object_id AND LOWER(mc.name) LIKE LOWER($term) ESCAPE '!'))";
             }
 
-            return $base.' ORDER BY sn.name, o.name, c.column_id OFFSET '.$offset.' ROWS FETCH NEXT '.(self::PAGE_SIZE + 1).' ROWS ONLY';
+            $order = 'sn.name, o.name, c.column_id';
+            if ($selectedColumns !== null) {
+                $base = $this->selected($base, $selectedColumns, $driver);
+                $order = 'schema_name, table_name, ordinal_position';
+            }
+
+            return $base.' ORDER BY '.$order.' OFFSET '.$offset.' ROWS FETCH NEXT '.(self::PAGE_SIZE + 1).' ROWS ONLY';
         }
         if (! in_array($driver, ['postgres', 'mysql'], true)) {
             throw new RuntimeException('Este conector não oferece consulta paginada da estrutura.');
@@ -119,12 +131,26 @@ class BiSourceSchema
         if ($schema !== null) {
             $base .= ' AND c.table_schema = '.$this->literal($schema, $driver);
         }
+        if ($exactTable !== null) {
+            $base .= ' AND c.table_name = '.$this->literal($exactTable, $driver);
+        }
         if ($search !== null) {
             $term = $this->searchLiteral($search, $driver);
             $base .= " AND (LOWER(c.table_name) LIKE LOWER($term) ESCAPE '!' OR EXISTS (SELECT 1 FROM information_schema.columns mc WHERE mc.table_catalog = c.table_catalog AND mc.table_schema = c.table_schema AND mc.table_name = c.table_name AND LOWER(mc.column_name) LIKE LOWER($term) ESCAPE '!'))";
         }
 
-        return $base.' ORDER BY c.table_schema, c.table_name, c.ordinal_position LIMIT '.(self::PAGE_SIZE + 1).' OFFSET '.$offset;
+        $order = 'c.table_schema, c.table_name, c.ordinal_position';
+        if ($selectedColumns !== null) {
+            $base = $this->selected($base, $selectedColumns, $driver);
+            $order = 'schema_name, table_name, ordinal_position';
+        }
+
+        return $base.' ORDER BY '.$order.' LIMIT '.(self::PAGE_SIZE + 1).' OFFSET '.$offset;
+    }
+
+    private function selected(string $query, array $columns, string $driver): string
+    {
+        return 'SELECT * FROM ('.$query.') AS selected_structure WHERE column_name IN ('.implode(', ', array_map(fn (string $column): string => $this->literal($column, $driver), $columns)).')';
     }
 
     private function searchLiteral(string $value, string $driver): string

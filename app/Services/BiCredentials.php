@@ -248,6 +248,24 @@ class BiCredentials
         });
     }
 
+    /** Runs a trusted server-side callback in the temporary private source workspace. */
+    public function withSource(User $user, string $tenant, string $id, callable $operation): array
+    {
+        [$connection, $item] = $this->access($user, $tenant);
+
+        return $this->withContext($connection, $item, function (Project $context) use ($connection, $id, $operation): array {
+            $ref = 'credential:'.$id;
+            $this->assertListed($connection, $context, $ref);
+            $generation = $connection->metadata['session_generation'] ?? null;
+            [, $body] = $this->document($connection, $context, $ref);
+            $this->assertInspectionAccess($connection, $context, $generation);
+            $result = $operation($connection, $context, $body);
+            $this->assertInspectionAccess($connection, $context, $generation);
+
+            return $result;
+        });
+    }
+
     public function cleanup(Approval $approval): void
     {
         $this->drafts->forget($approval);

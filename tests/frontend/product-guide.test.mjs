@@ -53,3 +53,8 @@ test('structure discovery help distinguishes remote searches from local result f
  const matches=searchGuideArticles(content.articles,'buscar tabelas colunas conexão','catalog');
  assert.equal(matches[0].id,'source-structure');
 });
+
+
+test('creating an ETL without SQL finds its guided creation workflow',()=>{
+ assert.equal(searchGuideArticles(content.articles,'crio ETL sem escrever consultas','catalog')[0]?.id,'etl-wizard');
+});

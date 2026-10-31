@@ -19,6 +19,7 @@ use App\Services\BiCredentials;
 use App\Services\BiDesks;
 use App\Services\BiFlowClones;
 use App\Services\BiFlowExecution;
+use App\Services\BiFlowWizard;
 use App\Services\BiMcpClient;
 use App\Services\BiPublications;
 use App\Services\BiResourceValidation;
@@ -257,6 +258,9 @@ class ActionBroker
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiDesks::ACTIONS, true)) {
             return app(BiDesks::class)->executeApproved($approval);
+        }
+        if (in_array($approval->payload['action']['action'] ?? '', BiFlowWizard::ACTIONS, true)) {
+            return app(BiFlowWizard::class)->executeApproved($approval);
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
             return app(BiCredentials::class)->executeApproved($approval);

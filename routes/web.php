@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiCredentialController;
 use App\Http\Controllers\BiDeskController;
+use App\Http\Controllers\BiFlowWizardController;
 use App\Http\Controllers\BiLoadController;
 use App\Http\Controllers\BiMcpController;
 use App\Http\Controllers\BiScheduleController;
@@ -58,6 +59,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/catalog/{tenant}/credentials/actions', [BiCredentialController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::post('/catalog/{tenant}/credentials/{id}/inspect/{action}', [BiCredentialController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['test', 'schema', 'relationships'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/{id}/actions', [CatalogController::class, 'prepareAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
+        Route::get('/catalog/{tenant}/flow-wizard/options', [BiFlowWizardController::class, 'options'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/flow-wizard/fields', [BiFlowWizardController::class, 'fields'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/flow-wizard/actions', [BiFlowWizardController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
+        Route::get('/projects/{id}/flow-wizard', [BiFlowWizardController::class, 'status'])->whereUuid('id');
         Route::post('/catalog/{tenant}/flows/{id}/actions', [CatalogController::class, 'prepareFlowAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
         Route::post('/bi-actions/{id}/schedule-verification', [BiScheduleController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
