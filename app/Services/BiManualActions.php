@@ -26,8 +26,8 @@ class BiManualActions
         abort_unless(in_array($kind, ['app', 'flow'], true) && ctype_digit($resourceId) && (int) $resourceId > 0, 422, 'Recurso inválido.');
         [$connection, $tenantItem] = $this->catalog->access($user, $tenant);
         $action = $data['action'];
-        abort_unless(in_array($action, $kind === 'flow' ? ['clone_flow', 'publish_flow'] : ['clone_app', 'delete_draft', 'publish_app'], true), 422, 'Ação manual não permitida.');
-        $this->policy->assertCommandAllowed($tenant, [$action === 'delete_draft' ? 'rm' : $kind, in_array($action, ['clone_app', 'clone_flow'], true) ? 'clone' : (in_array($action, ['publish_app', 'publish_flow'], true) ? 'publish' : 'app:'.$resourceId)], $connection);
+        abort_unless(in_array($action, $kind === 'flow' ? ['clone_flow', 'delete_draft', 'publish_flow'] : ['clone_app', 'delete_draft', 'publish_app'], true), 422, 'Ação manual não permitida.');
+        $this->policy->assertCommandAllowed($tenant, [$action === 'delete_draft' ? 'rm' : $kind, in_array($action, ['clone_app', 'clone_flow'], true) ? 'clone' : (in_array($action, ['publish_app', 'publish_flow'], true) ? 'publish' : $kind.':'.$resourceId)], $connection);
         $arguments = ['action' => $action, 'resource' => $kind.':'.$resourceId];
         if (in_array($action, ['clone_app', 'clone_flow'], true)) {
             $arguments['name'] = trim($data['name']);
@@ -66,7 +66,9 @@ class BiManualActions
                     abort_unless($managed, 422, 'Esta ação exige um rascunho criado e registrado pelo portal.');
                     $project = Project::where('user_id', $user->id)->where('tenant_id', $tenant)->findOrFail($managed->project_id);
                 }
-                $revision = $this->broker->manualRevision($user, $project, $arguments);
+                $revision = $arguments['action'] === 'delete_draft' && str_starts_with($arguments['resource'], 'flow:')
+                    ? Cache::lock('project:'.$project->id, 630)->block(3, fn (): array => $this->broker->manualRevision($user, $project, $arguments))
+                    : $this->broker->manualRevision($user, $project, $arguments);
                 if (! $project->exists && $arguments['action'] === 'publish_flow') {
                     $project->name = mb_substr((string) $revision['publication']['source']['name'], 0, 150);
                 } elseif (! $project->exists) {

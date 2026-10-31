@@ -67,6 +67,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/catalog/{tenant}/flows/{id}/actions', [CatalogController::class, 'prepareFlowAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
         Route::post('/bi-actions/{id}/schedule-verification', [BiScheduleController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
+        Route::post('/approvals/{id}/deletion/verify', [CatalogController::class, 'reconcileDeletion'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::post('/approvals/{id}/publication/verify', [CatalogController::class, 'reconcilePublication'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}', [CatalogController::class, 'snapshot'])->whereNumber('tenant')->middleware('throttle:catalog');
         Route::get('/catalog/{tenant}/variables/{id}', [CatalogController::class, 'variable'])->whereNumber('tenant')->where('id', '[a-f0-9]+');

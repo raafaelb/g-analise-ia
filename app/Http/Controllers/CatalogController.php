@@ -6,6 +6,7 @@ use App\Models\Conversation;
 use App\Models\Project;
 use App\Services\Audit;
 use App\Services\BiCatalog;
+use App\Services\BiFlowDeletions;
 use App\Services\BiInspector;
 use App\Services\BiManualActions;
 use App\Services\BiPublications;
@@ -40,7 +41,7 @@ class CatalogController extends Controller
 
     public function prepareFlowAction(Request $request, string $tenant, string $id, BiManualActions $actions): JsonResponse
     {
-        $data = $request->validate(['action' => ['required', 'in:clone_flow,publish_flow'], 'name' => ['required_if:action,clone_flow', 'nullable', 'string', 'max:100', 'not_regex:/[\x00-\x1F\x7F]/'], 'desk' => ['required_if:action,publish_flow', 'nullable', 'integer', 'min:1'], 'publish_mode' => ['required_if:action,publish_flow', 'nullable', 'in:new,replace'], 'copy_data' => ['sometimes', 'boolean'], 'request_id' => ['required', 'uuid']]);
+        $data = $request->validate(['action' => ['required', 'in:clone_flow,delete_draft,publish_flow'], 'name' => ['required_if:action,clone_flow', 'nullable', 'string', 'max:100', 'not_regex:/[\x00-\x1F\x7F]/'], 'desk' => ['required_if:action,publish_flow', 'nullable', 'integer', 'min:1'], 'publish_mode' => ['required_if:action,publish_flow', 'nullable', 'in:new,replace'], 'copy_data' => ['sometimes', 'boolean'], 'request_id' => ['required', 'uuid']]);
         try {
             $result = $actions->prepare($request->user(), $tenant, $id, $data, 'flow');
 
@@ -65,6 +66,17 @@ class CatalogController extends Controller
             throw $e;
         } catch (RuntimeException $e) {
             throw ValidationException::withMessages(['publication' => $e->getMessage()]);
+        }
+    }
+
+    public function reconcileDeletion(Request $request, string $id, BiFlowDeletions $deletions): JsonResponse
+    {
+        try {
+            return response()->json($deletions->reconcile($request->user(), $id));
+        } catch (ModelNotFoundException|HttpExceptionInterface $error) {
+            throw $error;
+        } catch (RuntimeException $error) {
+            throw ValidationException::withMessages(['deletion' => $error->getMessage()]);
         }
     }
 

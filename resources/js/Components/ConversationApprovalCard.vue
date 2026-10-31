@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import BiLoadStatus from './BiLoadStatus.vue';
+import DeletionRecovery from './DeletionRecovery.vue';
 import {computed,onMounted,onUnmounted,ref,watch} from 'vue';
 import {AlertCircle,Check,CheckCircle2,ChevronDown,Clock3,LoaderCircle,RefreshCw,ShieldCheck,X} from 'lucide-vue-next';
 import ApprovalReview from './ApprovalReview.vue';
@@ -40,6 +41,7 @@ onUnmounted(()=>{guard.invalidate();if(timer)clearInterval(timer);});
   <p class="conversation-review-description" :role="working?'status':undefined">{{explanation}}</p>
   <p v-if="pending&&approval.description" class="conversation-review-context">{{approval.description}}</p>
   <ApprovalReview v-if="detailsVisible" :approval="approval" :tenants="tenants"/><BiLoadStatus v-if="approval.payload?.load_execution_id" :execution-id="approval.payload.load_execution_id" :request="request"/>
+  <DeletionRecovery :approval="approval" :request="request" @confirmed="emit('refresh')"/>
   <div v-if="error" class="conversation-review-error" role="alert"><AlertCircle :size="17"/><p>{{error}}</p><button type="button" :disabled="!!busy" @click="emit('refresh')"><RefreshCw :size="14"/>Atualizar revisão</button></div>
   <div v-if="pending" class="conversation-review-footer"><span><Clock3 :size="14"/>Válida até {{date(approval.expires_at)}} · Brasília</span><div><button type="button" class="secondary-button" :disabled="!!busy||uncertain" @click="decide('rejected')"><LoaderCircle v-if="busy==='rejected'" :size="16" class="spin"/><X v-else :size="16"/>Recusar</button><button type="button" class="primary-button" :class="{'conversation-review-delete':action.destructive}" :disabled="!!busy||uncertain" @click="decide('approved')"><LoaderCircle v-if="busy==='approved'" :size="16" class="spin"/><Check v-else :size="17"/>{{action.label}}</button></div></div>
   <button v-else-if="state==='unavailable'" type="button" class="secondary-button" @click="emit('refresh')"><RefreshCw :size="15"/>Atualizar revisão</button>

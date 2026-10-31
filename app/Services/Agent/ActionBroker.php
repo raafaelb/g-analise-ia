@@ -18,6 +18,7 @@ use App\Services\BiCloneNames;
 use App\Services\BiCredentials;
 use App\Services\BiDesks;
 use App\Services\BiFlowClones;
+use App\Services\BiFlowDeletions;
 use App\Services\BiFlowExecution;
 use App\Services\BiFlowWizard;
 use App\Services\BiMcpClient;
@@ -69,7 +70,7 @@ class ActionBroker
             }
             $this->lumo->initialize($connection, $project);
         }
-        $revision = $this->revision($connection, in_array($arguments['action'], ['publish_app', 'publish_flow'], true) ? $project : $context, $arguments);
+        $revision = $this->revision($connection, in_array($arguments['action'], ['publish_app', 'publish_flow', 'delete_draft'], true) ? $project : $context, $arguments);
         $latest = $connection->fresh();
         if ($latest->status !== 'connected' || ($latest->metadata['session_generation'] ?? null) !== ($connection->metadata['session_generation'] ?? null)) {
             throw new RuntimeException('A conexão mudou durante a preparação. Atualize seus acessos e abra uma nova revisão.');
@@ -134,7 +135,7 @@ class ActionBroker
             ['name' => 'tenant_variables', 'description' => 'Lista nomes e referências das variáveis do tenant do projeto. Os valores são protegidos: nunca devolve senhas, chaves ou outros valores. Use a referência no recurso BI.', 'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'additionalProperties' => false]],
             ['name' => 'refresh_coverage', 'description' => 'Confere todas as fontes de uma aplicação no tenant do projeto, agendas diárias ou mais frequentes, resultados reais e a execução de teste correlacionada. Somente leitura remota; não cria agendas ou executa cargas.', 'inputSchema' => ['type' => 'object', 'properties' => ['resource' => ['type' => 'string', 'pattern' => '^app:[1-9][0-9]*$']], 'required' => ['resource'], 'additionalProperties' => false]],
             ['name' => 'project_image', 'description' => 'Devolve a imagem PNG de um dashboard exportado para análise visual somente após autorização explícita do usuário no portal para esse arquivo e esta conversa. Não gera nova imagem. Use o artifact_id retornado pelo export.', 'inputSchema' => ['type' => 'object', 'properties' => ['artifact_id' => ['type' => 'string']], 'required' => ['artifact_id'], 'additionalProperties' => false]],
-            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Para investigar o banco use list com kind credential, credential_schema e credential_relationships para conferir vínculos declarados; não peça ao usuário nomes técnicos de tabelas. clone_flow cria uma cópia privada do ETL após revisão, com novos IDs de etapas/tabelas; dados exigem teste de carga separado. run_flow_node executa uma etapa ETL em rascunho após revisão; flow_preview lê seu resultado já executado. app_link retorna a URL real da aplicação sem credenciais. publication_status confere uma publicação já autorizada neste projeto com approval_id, sem publicar novamente. preview é a conferência de dados de um app, nunca uma prévia de ETL. lint exige resource e devolve os erros do YAML para corrigir sem pedir intervenção técnica do usuário. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'clone_flow', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'credential_relationships', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'load_status', 'publication_status', 'run_schedule', 'resume_schedule', 'delete_draft']], 'execution_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'ID do acompanhamento retornado por run_schedule; load_status apenas confere o resultado, sem reenviar a carga.'], 'approval_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'Revisão de publicação já autorizada neste projeto. publication_status apenas confere o resultado existente, sem reenviar a publicação.'], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar', 'credential']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string', 'description' => 'internalId da etapa. Para new/table, prefira a origem com esquema capturado diretamente ligada à única inserção sem tabela existente.'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como novo recurso (padrão) ou substituir o original na mesma mesa. ETLs usam mesas de dados. Substituição exige revisão explícita do alvo.'], 'copy_data' => ['type' => 'boolean', 'description' => 'Somente publish_flow em modo replace: solicita copiar também os dados da tabela da cópia para a original; padrão false. Exige revisão específica do efeito nos dados.'], 'dashboard' => ['type' => 'integer'], 'schema' => ['type' => 'string', 'maxLength' => 128], 'search' => ['type' => 'string', 'maxLength' => 100, 'description' => 'Busca na estrutura; em credential_relationships filtra nomes das tabelas, schemas ou do vínculo, preservando todos os seus campos.'], 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000000, 'description' => 'Use next_offset da resposta para continuar o catálogo.']], 'required' => ['action'], 'additionalProperties' => false]],
+            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente aplicações ou ETLs em rascunho criados por este projeto e registrados pelo sistema; ETLs incluem suas tabelas privadas e dados de teste na revisão. Recursos preexistentes são recusados. deletion_status confere uma tentativa já autorizada de exclusão de ETL com approval_id, sem reenviar a remoção. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Para investigar o banco use list com kind credential, credential_schema e credential_relationships para conferir vínculos declarados; não peça ao usuário nomes técnicos de tabelas. clone_flow cria uma cópia privada do ETL após revisão, com novos IDs de etapas/tabelas; dados exigem teste de carga separado. run_flow_node executa uma etapa ETL em rascunho após revisão; flow_preview lê seu resultado já executado. app_link retorna a URL real da aplicação sem credenciais. publication_status confere uma publicação já autorizada neste projeto com approval_id, sem publicar novamente. preview é a conferência de dados de um app, nunca uma prévia de ETL. lint exige resource e devolve os erros do YAML para corrigir sem pedir intervenção técnica do usuário. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'clone_flow', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'credential_relationships', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'load_status', 'publication_status', 'deletion_status', 'run_schedule', 'resume_schedule', 'delete_draft']], 'execution_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'ID do acompanhamento retornado por run_schedule; load_status apenas confere o resultado, sem reenviar a carga.'], 'approval_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'Revisão já autorizada neste projeto. publication_status confere uma publicação e deletion_status confere a exclusão de um ETL; ambas apenas consultam o resultado existente, sem reenviar a operação.'], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar', 'credential']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string', 'description' => 'internalId da etapa. Para new/table, prefira a origem com esquema capturado diretamente ligada à única inserção sem tabela existente.'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como novo recurso (padrão) ou substituir o original na mesma mesa. ETLs usam mesas de dados. Substituição exige revisão explícita do alvo.'], 'copy_data' => ['type' => 'boolean', 'description' => 'Somente publish_flow em modo replace: solicita copiar também os dados da tabela da cópia para a original; padrão false. Exige revisão específica do efeito nos dados.'], 'dashboard' => ['type' => 'integer'], 'schema' => ['type' => 'string', 'maxLength' => 128], 'search' => ['type' => 'string', 'maxLength' => 100, 'description' => 'Busca na estrutura; em credential_relationships filtra nomes das tabelas, schemas ou do vínculo, preservando todos os seus campos.'], 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000000, 'description' => 'Use next_offset da resposta para continuar o catálogo.']], 'required' => ['action'], 'additionalProperties' => false]],
             ['name' => 'workspace_file', 'description' => 'Lista, lê e escreve arquivos YAML e notas do workspace. Não permite caminhos absolutos, arquivos internos, credenciais ou exclusões. Leia o arquivo antes de editar. Para substituir um arquivo existente, expected_sha256 é obrigatório e deve corresponder ao conteúdo lido; omita-o somente ao criar um arquivo novo.', 'inputSchema' => ['type' => 'object', 'properties' => ['operation' => ['type' => 'string', 'enum' => ['list', 'read', 'write']], 'path' => ['type' => 'string'], 'content' => ['type' => 'string'], 'expected_sha256' => ['type' => 'string']], 'required' => ['operation'], 'additionalProperties' => false]],
         ];
     }
@@ -198,6 +199,13 @@ class ActionBroker
             $result = app(BiPublications::class)->reconcileForAgent($run, $id);
 
             return ['status' => 'confirmed', 'approval_id' => $id, 'publication' => $result['approval']->payload['execution']['result']['publication'], 'remote_read_only' => true, 'message' => 'Resultado da publicação conferido sem novo envio. A confirmação de configuração não comprova carga ou atualização dos dados.'];
+        }
+        if (($arguments['action'] ?? '') === 'deletion_status') {
+            $id = $arguments['approval_id'] ?? '';
+            abort_unless(is_string($id) && Str::isUuid($id), 422, 'Informe a revisão de exclusão deste projeto.');
+            $result = app(BiFlowDeletions::class)->reconcile($user, $id, $run);
+
+            return ['status' => 'confirmed', 'approval_id' => $id, 'deletion' => $result['approval']->payload['execution']['result']['deletion'], 'remote_read_only' => true];
         }
         if (($arguments['action'] ?? '') === 'load_status') {
             $id = $arguments['execution_id'] ?? '';
@@ -384,6 +392,13 @@ class ActionBroker
 
             return ['resource' => $arguments['resource'], 'url' => $url, 'desk_id' => $detail['resource']['desk_id'] ?? null, 'state' => $detail['resource']['state'] ?? null, 'preview_path' => $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id], absolute: false).'?preview=interactive'.(isset($arguments['dashboard']) ? '&dashboard='.$arguments['dashboard'] : '') : null, 'message' => 'URL oficial sem credenciais. Quem abrir usará o próprio login BI. Para a prévia dentro da conversa, use preview_path.'];
         }
+        if ($action === 'delete_draft' && str_starts_with($arguments['resource'], 'flow:')) {
+            if (! $approval) {
+                throw new RuntimeException('A exclusão do ETL exige revisão autorizada.');
+            }
+
+            return app(BiFlowDeletions::class)->execute($approval, $connection, $project, $approval->payload['revision']['flow_deletion'] ?? []);
+        }
         $this->assertRefreshBeforePublish($user, $project, $arguments);
         if (in_array($action, ['publish_app', 'publish_flow'], true) && (! $approval || ! is_array($publication) || ($publication['source']['resource'] ?? null) !== $arguments['resource'] || ($publication['destination']['id'] ?? null) !== $arguments['desk'] || ($publication['mode'] ?? null) !== ($arguments['publish_mode'] ?? 'new'))) {
             throw new RuntimeException('A publicação exige uma revisão atual do destino e do efeito esperado.');
@@ -525,6 +540,9 @@ class ActionBroker
         if (in_array($action, $required, true) && $ref === '') {
             throw new RuntimeException('Informe o recurso que será operado.');
         }
+        if ($action === 'push' && ManagedBiResource::where('user_id', $project->user_id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->whereIn('status', ['deleted', 'deletion_pending'])->exists()) {
+            throw new RuntimeException('Este recurso foi excluído ou tem uma exclusão a conferir. Não recrie um recurso a partir de arquivos antigos; confira a operação e crie um novo rascunho quando necessário.');
+        }
         $kind = $arguments['kind'] ?? 'app';
         if ($action === 'scaffold') {
             if (! in_array($kind, ['app', 'flow', 'table', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar'], true)) {
@@ -541,7 +559,10 @@ class ActionBroker
         if (! in_array($kind, ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'credential'], true)) {
             throw new RuntimeException('Tipo de recurso inválido.');
         }
-        $appActions = ['clone_app', 'preview', 'export', 'app_link', 'publish_app', 'delete_draft'];
+        $appActions = ['clone_app', 'preview', 'export', 'app_link', 'publish_app'];
+        if ($action === 'delete_draft' && ! preg_match('/^(app|flow):[1-9][0-9]*$/D', $ref)) {
+            throw new RuntimeException('A exclusão de rascunhos aceita somente aplicações e ETLs criados pelo projeto.');
+        }
         $flowActions = ['clone_flow', 'publish_flow', 'flow_status', 'flow_logs', 'flow_preview', 'run_flow_node'];
         $scheduleActions = ['schedule_info', 'schedule_logs', 'run_schedule', 'resume_schedule'];
         if ((in_array($action, $appActions, true) && ! str_starts_with($ref, 'app:')) || (in_array($action, $flowActions, true) && ! str_starts_with($ref, 'flow:')) || (in_array($action, $scheduleActions, true) && ! str_starts_with($ref, 'schedule:')) || (in_array($action, ['columns', 'table_preview'], true) && ! str_starts_with($ref, 'table:'))) {
@@ -630,8 +651,8 @@ class ActionBroker
     private function managed(Project $project, string $ref): ManagedBiResource
     {
         $managed = ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->where('status', 'draft')->first();
-        if (! $managed || ! str_starts_with($ref, 'app:')) {
-            throw new RuntimeException('A exclusão permite somente aplicações em rascunho criadas e registradas por este projeto. Recursos preexistentes não podem ser excluídos.');
+        if (! $managed || ! preg_match('/^(app|flow):[1-9][0-9]*$/D', $ref)) {
+            throw new RuntimeException('A exclusão permite somente aplicações ou ETLs em rascunho criados e registrados por este projeto. Recursos preexistentes não podem ser excluídos.');
         }
 
         return $managed;
@@ -640,6 +661,9 @@ class ActionBroker
     private function assertDeletable(Connection $connection, Project $project, string $ref): void
     {
         $this->managed($project, $ref);
+        if (str_starts_with($ref, 'flow:')) {
+            return;
+        }
         $result = $this->lumo->run($connection, ['info', $ref], $project);
         $payload = $result['data']['payload'] ?? $result['data'];
         $body = $payload['body'] ?? $payload;
@@ -762,6 +786,9 @@ class ActionBroker
     private function revision(Connection $connection, Project $project, array $arguments): array
     {
         $ref = $arguments['resource'];
+        if ($arguments['action'] === 'delete_draft' && str_starts_with($ref, 'flow:')) {
+            return app(BiFlowDeletions::class)->revision($connection, $project, $ref);
+        }
         if ($arguments['action'] === 'clone_flow') {
             return app(BiFlowClones::class)->revision($connection, $project, $ref);
         }

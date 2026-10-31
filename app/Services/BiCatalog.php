@@ -379,7 +379,7 @@ class BiCatalog
             $managed = ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $tenant)->where('resource', $ref)->where('status', 'draft')->whereIn('project_id', Project::where('user_id', $user->id)->where('tenant_id', $tenant)->select('id'))->first();
             if ($managed || $kind === 'flow') {
                 $ownerProject = $managed ? Project::find($managed->project_id) : Project::where('user_id', $user->id)->where('tenant_id', $tenant)->where('source_ref', $ref)->where('status', '!=', 'archived')->first();
-                $management = ['project_id' => $ownerProject?->id, 'can_delete_draft' => $kind === 'app' && $managed !== null, 'can_publish' => $metadataComplete && $ownerProject?->status !== 'archived' && ($kind === 'flow' || $ownerProject?->source_ref === $ref), 'publication_origin' => null];
+                $management = ['project_id' => $ownerProject?->id, 'can_delete_draft' => $managed !== null, 'can_publish' => $metadataComplete && $ownerProject?->status !== 'archived' && ($kind === 'flow' || $ownerProject?->source_ref === $ref), 'publication_origin' => null];
                 $origin = $body['cloned_from'] ?? $body['_state']['cloned_from'] ?? null;
                 $original = collect($snapshot['resources'][$kind] ?? [])->first(fn (array $row): bool => (string) $row['id'] === (string) $origin && $row['state'] === 'published' && ! empty($row['desk_id']));
                 if ($original && ($kind === 'app' || (isset($body['originalTableId']) && (string) $body['originalTableId'] === (string) ($metadata[$original['ref']]['table']['id'] ?? '')))) {

@@ -190,7 +190,7 @@ class BiFlowClonesTest extends TestCase
 
     public static function invalidActions(): array
     {
-        return [['clone_app', 'action'], ['publish_flow', 'desk'], ['delete_draft', 'action']];
+        return [['clone_app', 'action'], ['publish_flow', 'desk'], ['delete_schedule', 'action']];
     }
 
     public function test_missing_authoring_metadata_cannot_be_replaced_by_a_summary(): void
