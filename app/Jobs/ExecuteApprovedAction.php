@@ -109,6 +109,8 @@ class ExecuteApprovedAction implements ShouldQueue
             $this->failAction($approval, $message);
             if ($e instanceof BiValidationFailure && ! $interrupted) {
                 $nextRun = $this->resumeValidation($approval, $e);
+            } elseif (! $interrupted && in_array($approval->payload['action']['action'] ?? '', ['publish_app', 'publish_flow'], true) && isset($approval->payload['publication_attempt']['started_at'])) {
+                $nextRun = $this->resumePublication($approval);
             }
         } finally {
             if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
@@ -132,6 +134,29 @@ class ExecuteApprovedAction implements ShouldQueue
         if ($nextRun) {
             RunAgentTurn::dispatch($nextRun->id)->onQueue('agents');
         }
+    }
+
+    private function resumePublication(Approval $approval): ?AgentRun
+    {
+        $run = AgentRun::find($approval->agent_run_id);
+        $user = User::find($approval->user_id);
+        $input = $run?->input_message_id ? Message::find($run->input_message_id) : null;
+        $sameApproval = ($input?->metadata['publication_recovery_approval_id'] ?? null) === $approval->id;
+        $attempt = $sameApproval ? (int) ($input->metadata['publication_recovery_attempt'] ?? 0) + 1 : 1;
+        if (! $run || ! $user?->canStartWork() || $user->role === 'viewer' || ! $approval->permitsUserAccess($user) || $attempt > 1 || in_array($run->fresh()->status, ['cancelled', 'cancel_requested'], true) || Connection::where('user_id', $user->id)->whereIn('provider', ['horus', 'openai'])->where('status', 'connected')->count() !== 2) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($run, $approval, $attempt): ?AgentRun {
+            $run->conversation()->lockForUpdate()->firstOrFail();
+            if (AgentRun::where('conversation_id', $run->conversation_id)->whereIn('status', ['queued', 'running', 'awaiting_approval', 'cancel_requested'])->exists()) {
+                return null;
+            }
+            $message = Message::create(['conversation_id' => $run->conversation_id, 'role' => 'system', 'content' => 'O envio da publicação autorizada teve resultado incerto. A IA retomará uma vez somente para conferir o resultado existente: use horus_action publication_status com approval_id '.$approval->id.'. Não publique novamente nem altere recursos enquanto essa conferência estiver pendente. Se continuar sem confirmação, explique a pendência e encerre a tarefa.', 'status' => 'completed', 'metadata' => ['approval_id' => $approval->id, 'continuation' => true, 'publication_recovery_approval_id' => $approval->id, 'publication_recovery_attempt' => $attempt, 'tool_result' => ['status' => 'publication_pending', 'approval_id' => $approval->id, 'remote_read_only_check' => true], 'action' => $approval->payload['action']]]);
+            Audit::record($approval->user_id, 'agent.publication_check.queued', 'IA retomada para conferir uma publicação já autorizada, sem reenviar a operação.', $approval->project_id, ['approval_id' => $approval->id, 'attempt' => $attempt]);
+
+            return AgentRun::create(['conversation_id' => $run->conversation_id, 'user_id' => $run->user_id, 'input_message_id' => $message->id]);
+        });
     }
 
     private function resumeValidation(Approval $approval, BiValidationFailure $failure): ?AgentRun

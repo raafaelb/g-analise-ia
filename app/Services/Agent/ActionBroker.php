@@ -8,6 +8,7 @@ use App\Models\Artifact;
 use App\Models\BiLoadExecution;
 use App\Models\Connection;
 use App\Models\ManagedBiResource;
+use App\Models\Message;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\ArtifactImages;
@@ -47,10 +48,10 @@ class ActionBroker
 
     public function manualRevision(User $user, Project $project, array $arguments): array
     {
-        if ($project->user_id !== $user->id || $user->role === 'viewer' || (in_array($arguments['action'] ?? '', ['clone_app', 'clone_flow', 'publish_app'], true) && $project->status === 'archived')) {
+        if ($project->user_id !== $user->id || $user->role === 'viewer' || (in_array($arguments['action'] ?? '', ['clone_app', 'clone_flow', 'publish_app', 'publish_flow'], true) && $project->status === 'archived')) {
             throw new RuntimeException('Este projeto não está disponível para alterações.');
         }
-        if (! in_array($arguments['action'] ?? '', ['clone_app', 'clone_flow', 'delete_draft', 'publish_app'], true)) {
+        if (! in_array($arguments['action'] ?? '', ['clone_app', 'clone_flow', 'delete_draft', 'publish_app', 'publish_flow'], true)) {
             throw new RuntimeException('Ação manual não permitida.');
         }
         $connection = app(BiCatalog::class)->connection($user);
@@ -60,14 +61,14 @@ class ActionBroker
             $this->lumo->initialize($connection, $project, true);
             $this->assertDeletable($connection, $project, $arguments['resource']);
         }
-        if ($arguments['action'] === 'publish_app') {
-            $this->managed($project, $arguments['resource']);
-            if ($project->source_ref !== $arguments['resource']) {
+        if (in_array($arguments['action'], ['publish_app', 'publish_flow'], true)) {
+            $this->publicationDraft($project, $arguments['resource']);
+            if ($arguments['action'] === 'publish_app' && $project->source_ref !== $arguments['resource']) {
                 throw new RuntimeException('O recurso do projeto mudou. Confira a aplicação antes de publicar.');
             }
             $this->lumo->initialize($connection, $project);
         }
-        $revision = $this->revision($connection, $arguments['action'] === 'publish_app' ? $project : $context, $arguments);
+        $revision = $this->revision($connection, in_array($arguments['action'], ['publish_app', 'publish_flow'], true) ? $project : $context, $arguments);
         $latest = $connection->fresh();
         if ($latest->status !== 'connected' || ($latest->metadata['session_generation'] ?? null) !== ($connection->metadata['session_generation'] ?? null)) {
             throw new RuntimeException('A conexão mudou durante a preparação. Atualize seus acessos e abra uma nova revisão.');
@@ -75,6 +76,22 @@ class ActionBroker
         $revision['connection_generation'] = $latest->metadata['session_generation'] ?? null;
 
         return $revision;
+    }
+
+    private function assertPublicationRecovery(AgentRun $run, Project $project, string $tool, array $arguments): void
+    {
+        $message = $run->input_message_id ? Message::find($run->input_message_id) : null;
+        $id = $message?->role === 'system' ? ($message->metadata['publication_recovery_approval_id'] ?? null) : null;
+        if (! is_string($id) || ! Str::isUuid($id)) {
+            return;
+        }
+        $approval = Approval::where('user_id', $run->user_id)->where('project_id', $project->id)->findOrFail($id);
+        if ($approval->status === 'completed' && ($approval->payload['execution']['result']['publication']['verified'] ?? false) === true) {
+            return;
+        }
+        if ($tool !== 'horus_action' || ($arguments['action'] ?? '') !== 'publication_status' || ($arguments['approval_id'] ?? null) !== $id) {
+            throw new RuntimeException('Esta retomada permite somente conferir a publicação autorizada com publication_status e approval_id. Não envie outra publicação nem altere recursos enquanto o resultado estiver pendente.');
+        }
     }
 
     private function manualScope(User $user, Project $project, array $arguments, Connection $connection): Project
@@ -96,7 +113,7 @@ class ActionBroker
             throw new RuntimeException('Revisão fora do contexto autorizado.');
         }
         $action = $arguments['action'];
-        if ($run === null && ! in_array($action, ['clone_app', 'clone_flow', 'delete_draft', 'publish_app'], true)) {
+        if ($run === null && ! in_array($action, ['clone_app', 'clone_flow', 'delete_draft', 'publish_app', 'publish_flow'], true)) {
             throw new RuntimeException('Ação manual não permitida.');
         }
         $payload = ['action' => $arguments, 'revision' => $revision];
@@ -116,7 +133,7 @@ class ActionBroker
             ['name' => 'tenant_variables', 'description' => 'Lista nomes e referências das variáveis do tenant do projeto. Os valores são protegidos: nunca devolve senhas, chaves ou outros valores. Use a referência no recurso BI.', 'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'additionalProperties' => false]],
             ['name' => 'refresh_coverage', 'description' => 'Confere todas as fontes de uma aplicação no tenant do projeto, agendas diárias ou mais frequentes, resultados reais e a execução de teste correlacionada. Somente leitura remota; não cria agendas ou executa cargas.', 'inputSchema' => ['type' => 'object', 'properties' => ['resource' => ['type' => 'string', 'pattern' => '^app:[1-9][0-9]*$']], 'required' => ['resource'], 'additionalProperties' => false]],
             ['name' => 'project_image', 'description' => 'Devolve a imagem PNG de um dashboard exportado para análise visual somente após autorização explícita do usuário no portal para esse arquivo e esta conversa. Não gera nova imagem. Use o artifact_id retornado pelo export.', 'inputSchema' => ['type' => 'object', 'properties' => ['artifact_id' => ['type' => 'string']], 'required' => ['artifact_id'], 'additionalProperties' => false]],
-            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Para investigar o banco use list com kind credential e credential_schema; não peça ao usuário nomes técnicos de tabelas. clone_flow cria uma cópia privada do ETL após revisão, com novos IDs de etapas/tabelas; dados exigem teste de carga separado. run_flow_node executa uma etapa ETL em rascunho após revisão; flow_preview lê seu resultado já executado. app_link retorna a URL real da aplicação sem credenciais. preview é a conferência de dados de um app, nunca uma prévia de ETL. lint exige resource e devolve os erros do YAML para corrigir sem pedir intervenção técnica do usuário. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'clone_flow', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'load_status', 'run_schedule', 'resume_schedule', 'delete_draft']], 'execution_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'ID do acompanhamento retornado por run_schedule; load_status apenas confere o resultado, sem reenviar a carga.'], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar', 'credential']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string', 'description' => 'internalId da etapa. Para new/table, prefira a origem com esquema capturado diretamente ligada à única inserção sem tabela existente.'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como nova (padrão) ou substituir a aplicação original na mesma mesa. Substituição exige revisão explícita do alvo.'], 'dashboard' => ['type' => 'integer'], 'schema' => ['type' => 'string', 'maxLength' => 128], 'search' => ['type' => 'string', 'maxLength' => 100, 'description' => 'Termo para localizar tabelas/colunas no PostgreSQL sem SQL.'], 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000000, 'description' => 'Use next_offset da resposta para continuar o catálogo.']], 'required' => ['action'], 'additionalProperties' => false]],
+            ['name' => 'horus_action', 'description' => 'Opera somente o tenant do projeto pela sessão G-Analise do usuário. Use para listar, inspecionar, criar rascunhos, clonar, validar, sincronizar, gerar prévia e publicar após revisão humana. delete_draft exclui somente rascunhos criados por este projeto e registrados pelo sistema; recursos preexistentes são recusados. refresh_resource recebe a versão atual do BI somente se não houver edições locais pendentes; nunca descarta arquivos ou força conflitos. Para investigar o banco use list com kind credential e credential_schema; não peça ao usuário nomes técnicos de tabelas. clone_flow cria uma cópia privada do ETL após revisão, com novos IDs de etapas/tabelas; dados exigem teste de carga separado. run_flow_node executa uma etapa ETL em rascunho após revisão; flow_preview lê seu resultado já executado. app_link retorna a URL real da aplicação sem credenciais. publication_status confere uma publicação já autorizada neste projeto com approval_id, sem publicar novamente. preview é a conferência de dados de um app, nunca uma prévia de ETL. lint exige resource e devolve os erros do YAML para corrigir sem pedir intervenção técnica do usuário. Nunca execute lumo pelo shell.', 'inputSchema' => ['type' => 'object', 'properties' => ['action' => ['type' => 'string', 'enum' => ['list', 'info', 'columns', 'table_preview', 'lint', 'diff', 'refresh_resource', 'scaffold', 'new', 'clone_app', 'clone_flow', 'push', 'preview', 'export', 'app_link', 'flow_preview', 'run_flow_node', 'credential_schema', 'publish_app', 'publish_flow', 'flow_status', 'flow_logs', 'schedule_info', 'schedule_logs', 'load_status', 'publication_status', 'run_schedule', 'resume_schedule', 'delete_draft']], 'execution_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'ID do acompanhamento retornado por run_schedule; load_status apenas confere o resultado, sem reenviar a carga.'], 'approval_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'Revisão de publicação já autorizada neste projeto. publication_status apenas confere o resultado existente, sem reenviar a publicação.'], 'kind' => ['type' => 'string', 'enum' => ['app', 'table', 'flow', 'schedule', 'bi-desk', 'dw-desk', 'agent', 'widget', 'expression', 'node', 'fact', 'report', 'calendar', 'credential']], 'resource' => ['type' => 'string'], 'name' => ['type' => 'string'], 'template' => ['type' => 'string', 'description' => 'Variante do scaffold, por exemplo Kpi, Barline, contexts ou postgresql.'], 'flow' => ['type' => 'string'], 'node' => ['type' => 'string', 'description' => 'internalId da etapa. Para new/table, prefira a origem com esquema capturado diretamente ligada à única inserção sem tabela existente.'], 'agent' => ['type' => 'integer'], 'desk' => ['type' => 'integer'], 'publish_mode' => ['type' => 'string', 'enum' => ['new', 'replace'], 'description' => 'Publicar como novo recurso (padrão) ou substituir o original na mesma mesa. ETLs usam mesas de dados. Substituição exige revisão explícita do alvo.'], 'copy_data' => ['type' => 'boolean', 'description' => 'Somente publish_flow em modo replace: solicita copiar também os dados da tabela da cópia para a original; padrão false. Exige revisão específica do efeito nos dados.'], 'dashboard' => ['type' => 'integer'], 'schema' => ['type' => 'string', 'maxLength' => 128], 'search' => ['type' => 'string', 'maxLength' => 100, 'description' => 'Termo para localizar tabelas/colunas no PostgreSQL sem SQL.'], 'offset' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 1000000, 'description' => 'Use next_offset da resposta para continuar o catálogo.']], 'required' => ['action'], 'additionalProperties' => false]],
             ['name' => 'workspace_file', 'description' => 'Lista, lê e escreve arquivos YAML e notas do workspace. Não permite caminhos absolutos, arquivos internos, credenciais ou exclusões. Leia o arquivo antes de editar. Para substituir um arquivo existente, expected_sha256 é obrigatório e deve corresponder ao conteúdo lido; omita-o somente ao criar um arquivo novo.', 'inputSchema' => ['type' => 'object', 'properties' => ['operation' => ['type' => 'string', 'enum' => ['list', 'read', 'write']], 'path' => ['type' => 'string'], 'content' => ['type' => 'string'], 'expected_sha256' => ['type' => 'string']], 'required' => ['operation'], 'additionalProperties' => false]],
         ];
     }
@@ -142,6 +159,7 @@ class ActionBroker
         if (! $connection) {
             throw new RuntimeException('A conexão G-Analise foi removida ou expirou.');
         }
+        $this->assertPublicationRecovery($run, $project, $tool, $arguments);
         if ($tool === 'bi_data') {
             if (array_diff(array_keys($arguments), ['operation', 'arguments']) !== [] || ! is_string($arguments['operation'] ?? null) || ! is_array($arguments['arguments'] ?? null) || ! preg_match('/^app:([1-9][0-9]*)$/D', (string) $project->source_ref, $match)) {
                 throw new RuntimeException('Vincule uma aplicação ao projeto e informe uma consulta MCP válida.');
@@ -172,6 +190,13 @@ class ActionBroker
         }
         if ($tool !== 'horus_action') {
             throw new RuntimeException('Ferramenta não autorizada.');
+        }
+        if (($arguments['action'] ?? '') === 'publication_status') {
+            $id = $arguments['approval_id'] ?? '';
+            abort_unless(is_string($id) && Str::isUuid($id), 422, 'Informe a revisão de publicação deste projeto.');
+            $result = app(BiPublications::class)->reconcileForAgent($run, $id);
+
+            return ['status' => 'confirmed', 'approval_id' => $id, 'publication' => $result['approval']->payload['execution']['result']['publication'], 'remote_read_only' => true, 'message' => 'Resultado da publicação conferido sem novo envio. A confirmação de configuração não comprova carga ou atualização dos dados.'];
         }
         if (($arguments['action'] ?? '') === 'load_status') {
             $id = $arguments['execution_id'] ?? '';
@@ -249,15 +274,15 @@ class ActionBroker
         if ($manual && in_array($arguments['action'] ?? '', ['clone_app', 'clone_flow'], true) && ($project->status === 'archived' || $project->source_ref !== null)) {
             throw new RuntimeException('O projeto mudou após a revisão. Prepare uma nova operação.');
         }
-        $allowed = $manual ? ['clone_app', 'clone_flow', 'delete_draft', 'publish_app'] : ['clone_flow', 'push', 'publish_app', 'publish_flow', 'run_schedule', 'run_flow_node', 'resume_schedule', 'delete_draft'];
+        $allowed = $manual ? ['clone_app', 'clone_flow', 'delete_draft', 'publish_app', 'publish_flow'] : ['clone_flow', 'push', 'publish_app', 'publish_flow', 'run_schedule', 'run_flow_node', 'resume_schedule', 'delete_draft'];
         if (! in_array($arguments['action'] ?? '', $allowed, true)) {
             throw new RuntimeException('Ação de revisão inválida.');
         }
-        if ($manual && ($arguments['action'] ?? '') === 'publish_app') {
-            if ($project->status === 'archived' || $project->source_ref !== ($arguments['resource'] ?? null)) {
+        if ($manual && in_array($arguments['action'] ?? '', ['publish_app', 'publish_flow'], true)) {
+            if ($project->status === 'archived' || ($arguments['action'] === 'publish_app' && $project->source_ref !== ($arguments['resource'] ?? null))) {
                 throw new RuntimeException('O projeto mudou após a revisão. Prepare uma nova publicação.');
             }
-            $this->managed($project, $arguments['resource']);
+            $this->publicationDraft($project, $arguments['resource']);
         }
         $revision = $approval->payload['revision'] ?? [];
         $fingerprint = hash('sha256', json_encode([$user->id, $project->id, $project->tenant_id, $arguments, $revision], JSON_THROW_ON_ERROR));
@@ -286,7 +311,7 @@ class ActionBroker
 
             return $this->perform($user, $project, $connection, $arguments, $manual, $currentRevision['publication'] ?? null, $approval);
         };
-        if (($arguments['action'] ?? '') === 'publish_app' && ($revision['publication']['mode'] ?? '') === 'replace') {
+        if (in_array($arguments['action'] ?? '', ['publish_app', 'publish_flow'], true) && ($revision['publication']['mode'] ?? '') === 'replace') {
             $target = $revision['publication']['target']['resource'];
 
             return Cache::lock('bi-publish:'.$project->tenant_id.':'.$target, 630)->block(5, $execute);
@@ -355,7 +380,7 @@ class ActionBroker
             return ['resource' => $arguments['resource'], 'url' => $url, 'desk_id' => $detail['resource']['desk_id'] ?? null, 'state' => $detail['resource']['state'] ?? null, 'preview_path' => $project->source_ref === $arguments['resource'] ? route('workspace', ['section' => 'project/'.$project->id], absolute: false).'?preview=interactive'.(isset($arguments['dashboard']) ? '&dashboard='.$arguments['dashboard'] : '') : null, 'message' => 'URL oficial sem credenciais. Quem abrir usará o próprio login BI. Para a prévia dentro da conversa, use preview_path.'];
         }
         $this->assertRefreshBeforePublish($user, $project, $arguments);
-        if ($action === 'publish_app' && (! $approval || ! is_array($publication) || ($publication['source']['resource'] ?? null) !== $arguments['resource'] || ($publication['destination']['id'] ?? null) !== $arguments['desk'] || ($publication['mode'] ?? null) !== ($arguments['publish_mode'] ?? 'new'))) {
+        if (in_array($action, ['publish_app', 'publish_flow'], true) && (! $approval || ! is_array($publication) || ($publication['source']['resource'] ?? null) !== $arguments['resource'] || ($publication['destination']['id'] ?? null) !== $arguments['desk'] || ($publication['mode'] ?? null) !== ($arguments['publish_mode'] ?? 'new'))) {
             throw new RuntimeException('A publicação exige uma revisão atual do destino e do efeito esperado.');
         }
         if ($action === 'delete_draft') {
@@ -371,7 +396,10 @@ class ActionBroker
         if ($action === 'export') {
             File::delete(app(WorkspaceFiles::class)->path($project).'/exports/dashboard.png');
         }
-        if ($action === 'publish_app') {
+        if (in_array($action, ['publish_app', 'publish_flow'], true)) {
+            if (isset($approval->payload['publication_attempt'])) {
+                throw new RuntimeException('Uma tentativa desta publicação já foi iniciada. Confira o resultado sem reenviar a operação.');
+            }
             $approval->update(['payload' => [...$approval->payload, 'publication_attempt' => ['plan_sha256' => hash('sha256', json_encode($publication, JSON_THROW_ON_ERROR)), 'started_at' => now()->toIso8601String()]]]);
         }
         if ($action === 'run_schedule') {
@@ -429,7 +457,7 @@ class ActionBroker
                 $project->update(['source_ref' => null]);
             }
         }
-        if ($action === 'publish_app') {
+        if (in_array($action, ['publish_app', 'publish_flow'], true)) {
             $approval->update(['payload' => [...$approval->payload, 'publication_attempt' => [...$approval->payload['publication_attempt'], 'native_accepted_at' => now()->toIso8601String()]]]);
             Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
             $managed = ManagedBiResource::where('user_id', $user->id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $arguments['resource'])->first();
@@ -447,6 +475,9 @@ class ActionBroker
             $result['publication'] = $confirmation;
             $result['published_resource'] = $confirmation['resource'];
             $result['confirmed_name'] = $confirmation['name'];
+            if ($action === 'publish_flow') {
+                $result['data'] = ['published_resource' => $confirmation['resource']];
+            }
         }
         if ($action === 'info') {
             $managed = ManagedBiResource::where('user_id', $user->id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $arguments['resource'])->first();
@@ -533,12 +564,22 @@ class ActionBroker
             $this->managed($project, $ref);
         }
         $publicationFlags = [];
-        if ($action === 'publish_app') {
+        if (in_array($action, ['publish_app', 'publish_flow'], true)) {
             $mode = $arguments['publish_mode'] ?? 'new';
             if (! in_array($mode, ['new', 'replace'], true)) {
                 throw new RuntimeException('Modo de publicação inválido.');
             }
-            $publicationFlags = $mode === 'new' ? ['--new'] : ['--force'];
+            if ($action === 'publish_flow') {
+                if (isset($arguments['copy_data']) && ! is_bool($arguments['copy_data'])) {
+                    throw new RuntimeException('A escolha de copiar dados deve ser verdadeira ou falsa.');
+                }
+                if (($arguments['copy_data'] ?? false) && $mode !== 'replace') {
+                    throw new RuntimeException('Copiar dados só é permitido ao substituir a versão original.');
+                }
+                $publicationFlags = [...($mode === 'new' ? ['--new'] : []), ...(($arguments['copy_data'] ?? false) ? ['--copy-data'] : [])];
+            } else {
+                $publicationFlags = $mode === 'new' ? ['--new'] : ['--force'];
+            }
         }
         $cloneName = trim((string) ($arguments['name'] ?? ''));
         if (mb_strlen($cloneName) > 150) {
@@ -561,12 +602,24 @@ class ActionBroker
             'app_link' => ['app', 'open', $ref, '--no-browser', ...$dashboard],
             'preview' => ['app', 'dashboard-preview', $ref, '--limit', '20', ...$dashboard],
             'export' => ['app', 'export', $ref, '--image-format', 'png', '--output', app(WorkspaceFiles::class)->path($project).'/exports/dashboard.png', ...$dashboard],
-            'publish_app' => ['app', 'publish', $ref, '--desk', (string) $arguments['desk'], ...$publicationFlags], 'publish_flow' => ['flow', 'publish', $ref, '--desk', (string) $arguments['desk']],
+            'publish_app' => ['app', 'publish', $ref, '--desk', (string) $arguments['desk'], ...$publicationFlags], 'publish_flow' => ['flow', 'publish', $ref, '--desk', (string) $arguments['desk'], ...$publicationFlags],
             'delete_draft' => ['rm', $ref, '--force'],
             'flow_status' => ['flow', 'status', $ref], 'flow_logs' => ['flow', 'logs', $ref],
             'schedule_info' => ['info', $ref], 'schedule_logs' => ['schedule', 'logs', $ref, '--tail', '50'], 'run_schedule' => ['schedule', 'run', $ref], 'resume_schedule' => ['schedule', 'resume', $ref],
             default => throw new RuntimeException('Ação G-Analise não permitida.'),
         };
+    }
+
+    private function publicationDraft(Project $project, string $ref): void
+    {
+        if (str_starts_with($ref, 'app:')) {
+            $this->managed($project, $ref);
+
+            return;
+        }
+        if (! preg_match('/^flow:[1-9][0-9]*$/D', $ref) || ($project->source_ref !== $ref && ! ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->where('status', 'draft')->exists())) {
+            throw new RuntimeException('Abra o projeto deste ETL antes de preparar a publicação.');
+        }
     }
 
     private function managed(Project $project, string $ref): ManagedBiResource
@@ -719,6 +772,15 @@ class ActionBroker
             }
 
             return ['tenant_id' => $project->tenant_id, 'resource' => $ref, 'info' => ['data' => ['id' => substr($ref, 4), 'nome' => $body['nome'] ?? $body['name'] ?? $ref, 'dashboard_count' => count($body['dashboards'])]], 'changes' => [], 'source_sha256' => hash('sha256', json_encode($body, JSON_THROW_ON_ERROR))];
+        }
+        if ($arguments['action'] === 'publish_flow') {
+            $publication = app(BiPublications::class)->plan($connection, $project, $arguments);
+            $diff = $this->lumo->run($connection, ['diff', $ref, '--include-remote'], $project);
+            if (($diff['data']['workingVsServer']['equal'] ?? false) !== true) {
+                throw new RuntimeException('Sincronize e confira as alterações do rascunho do ETL antes de preparar a publicação.');
+            }
+
+            return ['tenant_id' => $project->tenant_id, 'resource' => $ref, 'info' => ['data' => ['id' => substr($ref, 5), 'nome' => $publication['source']['name']]], 'changes' => [], 'publication' => $publication];
         }
         $info = $this->lumo->run($connection, ['info', $ref, ...($arguments['action'] === 'publish_app' ? ['--full'] : [])], $project);
         $needsDiff = str_starts_with($arguments['action'], 'publish') || in_array($arguments['action'], ['push', 'run_schedule', 'resume_schedule'], true);

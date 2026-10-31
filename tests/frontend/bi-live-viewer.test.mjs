@@ -8,7 +8,7 @@ let server;
 let Viewer;
 
 before(async () => {
-    server = await createServer({configFile: false, plugins: [vue()], server: {middlewareMode: true, watch: null, hmr: false}, appType: 'custom', logLevel: 'error'});
+    server = await createServer({configFile: false, plugins: [vue()], server: {middlewareMode: true, watch: null, hmr: false, ws: false}, appType: 'custom', logLevel: 'error'});
     Viewer = (await server.ssrLoadModule('/resources/js/Components/BiLiveViewer.vue')).default;
 });
 

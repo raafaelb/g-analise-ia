@@ -180,17 +180,17 @@ class BiFlowClonesTest extends TestCase
     }
 
     #[DataProvider('invalidActions')]
-    public function test_the_flow_endpoint_cannot_publish_delete_or_clone_an_app(string $action): void
+    public function test_the_flow_endpoint_validates_actions_and_publication_destinations_before_native_reads(string $action, string $field): void
     {
         [$user] = $this->context();
         $this->mock(LumoClient::class)->shouldNotReceive('run');
-        $this->actingAs($user)->postJson('/api/catalog/100/flows/1/actions', [...$this->data(), 'action' => $action])->assertUnprocessable()->assertJsonValidationErrors('action');
+        $this->actingAs($user)->postJson('/api/catalog/100/flows/1/actions', [...$this->data(), 'action' => $action])->assertUnprocessable()->assertJsonValidationErrors($field);
         $this->assertDatabaseCount('approvals', 0);
     }
 
     public static function invalidActions(): array
     {
-        return [['clone_app'], ['publish_flow'], ['delete_draft']];
+        return [['clone_app', 'action'], ['publish_flow', 'desk'], ['delete_draft', 'action']];
     }
 
     public function test_missing_authoring_metadata_cannot_be_replaced_by_a_summary(): void

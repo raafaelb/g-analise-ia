@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Events\WorkspaceChanged;
+use App\Models\AgentRun;
 use App\Models\Approval;
 use App\Models\Connection;
 use App\Models\ManagedBiResource;
@@ -22,6 +23,9 @@ class BiPublications
     /** @return array<string, mixed> */
     public function plan(Connection $connection, Project $project, array $arguments): array
     {
+        if (str_starts_with((string) ($arguments['resource'] ?? ''), 'flow:')) {
+            return app(BiFlowPublications::class)->plan($connection, $project, $arguments);
+        }
         $generation = $connection->metadata['session_generation'] ?? null;
         $ref = $arguments['resource'] ?? '';
         $mode = $arguments['publish_mode'] ?? 'new';
@@ -72,6 +76,9 @@ class BiPublications
     /** @return array<string, mixed> */
     public function verify(Connection $connection, Project $project, array $plan, bool $requireOriginalSession = true): array
     {
+        if (($plan['kind'] ?? null) === 'flow') {
+            return app(BiFlowPublications::class)->verify($connection, $project, $plan, $requireOriginalSession);
+        }
         $generation = $connection->metadata['session_generation'] ?? null;
         [$context, $apps] = $this->context($connection, $project);
         $ref = $plan['target']['resource'] ?? '';
@@ -97,16 +104,37 @@ class BiPublications
     /** @return array{project: Project, approval: Approval} */
     public function reconcile(User $user, string $id): array
     {
+        return $this->reconcileScoped($user, $id);
+    }
+
+    /** Called with the project lock held by RunAgentTurn.
+     * @return array{project: Project, approval: Approval}
+     */
+    public function reconcileForAgent(AgentRun $run, string $id): array
+    {
+        $run->refresh();
+        $project = $run->conversation->project;
+        abort_unless($run->status === 'running' && $project->user_id === $run->user_id, 409, 'A tarefa não está disponível para esta conferência.');
+
+        return $this->reconcileScoped(User::findOrFail($run->user_id), $id, $run);
+    }
+
+    /** @return array{project: Project, approval: Approval} */
+    private function reconcileScoped(User $user, string $id, ?AgentRun $run = null): array
+    {
         abort_if($user->role === 'viewer', 403, 'Seu perfil permite somente leitura.');
-        $approval = Approval::where('user_id', $user->id)->whereIn('type', ['manual', 'publish'])->findOrFail($id);
+        $approval = Approval::where('user_id', $user->id)->whereIn('type', ['manual', 'publish'])->when($run, fn ($query) => $query->where('project_id', $run->conversation->project_id))->findOrFail($id);
         try {
-            $result = Cache::lock('project:'.$approval->project_id, 630)->block(3, function () use ($user, $approval): array {
+            $operation = function () use ($user, $approval, $run): array {
                 $approval->refresh();
                 $project = Project::where('user_id', $user->id)->findOrFail($approval->project_id);
+                if ($run) {
+                    abort_unless($run->fresh()?->status === 'running' && $project->tenant_id === $run->conversation->project->tenant_id, 409, 'A tarefa ou o ambiente mudou durante a conferência.');
+                }
                 $arguments = $approval->payload['action'] ?? [];
                 $revision = $approval->payload['revision'] ?? [];
                 $plan = $revision['publication'] ?? null;
-                abort_unless(($arguments['action'] ?? '') === 'publish_app' && is_array($plan) && $approval->decided_at !== null, 422, 'Esta revisão não contém uma publicação autorizada para conferir.');
+                abort_unless(in_array($arguments['action'] ?? '', ['publish_app', 'publish_flow'], true) && is_array($plan) && ($plan['source']['resource'] ?? null) === ($arguments['resource'] ?? null) && (($arguments['action'] === 'publish_flow') === (($plan['kind'] ?? null) === 'flow')) && $approval->decided_at !== null, 422, 'Esta revisão não contém uma publicação autorizada para conferir.');
                 abort_unless(in_array($approval->status, ['failed', 'completed'], true), 409, 'Aguarde a execução terminar antes de conferir o resultado.');
                 $fingerprint = hash('sha256', json_encode([$user->id, $project->id, $project->tenant_id, $arguments, $revision], JSON_THROW_ON_ERROR));
                 abort_unless(hash_equals($approval->fingerprint, $fingerprint), 409, 'A revisão ou o contexto mudou. A conferência não pode usar estes dados.');
@@ -117,10 +145,10 @@ class BiPublications
                 }
                 [$connection] = $this->catalog->access($user, (string) $project->tenant_id);
                 $confirmation = $this->verify($connection, $project, $plan, requireOriginalSession: false);
-                DB::transaction(function () use ($approval, $project, $confirmation, $arguments, $fingerprint): void {
+                DB::transaction(function () use ($approval, $project, $confirmation, $arguments, $fingerprint, $run): void {
                     $currentProject = Project::where('user_id', $approval->user_id)->lockForUpdate()->findOrFail($project->id);
                     $current = Approval::where('user_id', $approval->user_id)->lockForUpdate()->findOrFail($approval->id);
-                    abort_unless($currentProject->tenant_id === $project->tenant_id && $current->status === $approval->status && hash_equals($fingerprint, $current->fingerprint) && $current->payload === $approval->payload, 409, 'O contexto mudou durante a conferência. Atualize a operação e confira novamente.');
+                    abort_unless(($run === null || $run->fresh()?->status === 'running') && $currentProject->tenant_id === $project->tenant_id && $current->status === $approval->status && hash_equals($fingerprint, $current->fingerprint) && $current->payload === $approval->payload, 409, 'O contexto mudou durante a conferência. Atualize a operação e confira novamente.');
                     $this->recordVerified($currentProject, $arguments['resource'], $confirmation);
                     $previous = $current->payload['execution'] ?? [];
                     $current->update(['status' => 'completed', 'payload' => [...$current->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => ['publication' => $confirmation, 'published_resource' => $confirmation['resource'], 'confirmed_name' => $confirmation['name']]], 'reconciliation' => ['checked_at' => $confirmation['checked_at'], 'previous_status' => $approval->status, 'previous_message' => $previous['message'] ?? null, 'remote_read_only' => true]]]);
@@ -130,7 +158,8 @@ class BiPublications
                 Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
 
                 return ['project' => $project->refresh(), 'approval' => $approval->refresh()];
-            });
+            };
+            $result = $run ? $operation() : Cache::lock('project:'.$approval->project_id, 630)->block(3, $operation);
         } catch (LockTimeoutException) {
             throw ValidationException::withMessages(['publication' => 'Outra tarefa deste projeto está em andamento. Aguarde para conferir a publicação.']);
         }

@@ -36,3 +36,8 @@ test('questions about scrolling over a map find the contextual navigation help',
 test('questions about duplicating ETLs find the reviewed copy workflow',()=>{
  assert.equal(searchGuideArticles(content.articles,'duplicar etl','catalog')[0]?.id,'etl-clones');
 });
+
+
+test('questions about publishing ETLs find data desks and explicit publication review',()=>{
+ assert.equal(searchGuideArticles(content.articles,'publicar etl','catalog')[0]?.id,'etl-publications');
+});

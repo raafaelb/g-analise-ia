@@ -38,7 +38,7 @@ class CatalogController extends Controller
 
     public function prepareFlowAction(Request $request, string $tenant, string $id, BiManualActions $actions): JsonResponse
     {
-        $data = $request->validate(['action' => ['required', 'in:clone_flow'], 'name' => ['required', 'string', 'max:100', 'not_regex:/[\x00-\x1F\x7F]/'], 'request_id' => ['required', 'uuid']]);
+        $data = $request->validate(['action' => ['required', 'in:clone_flow,publish_flow'], 'name' => ['required_if:action,clone_flow', 'nullable', 'string', 'max:100', 'not_regex:/[\x00-\x1F\x7F]/'], 'desk' => ['required_if:action,publish_flow', 'nullable', 'integer', 'min:1'], 'publish_mode' => ['required_if:action,publish_flow', 'nullable', 'in:new,replace'], 'copy_data' => ['sometimes', 'boolean'], 'request_id' => ['required', 'uuid']]);
         try {
             $result = $actions->prepare($request->user(), $tenant, $id, $data, 'flow');
 

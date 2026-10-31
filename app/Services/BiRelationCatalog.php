@@ -92,7 +92,7 @@ class BiRelationCatalog
         $types = match ($kind) {
             'app' => ['table', 'bi-desk', ...($origin !== null ? ['app'] : [])],
             'table' => ['flow', 'schedule', 'app', 'dw-desk'],
-            'flow' => ['table', 'schedule', 'credential', 'agent', 'dw-desk'],
+            'flow' => ['table', 'schedule', 'credential', 'agent', 'dw-desk', ...($origin !== null ? ['flow'] : [])],
             'schedule' => ['flow', 'agent', 'dw-desk'],
             'credential' => ['flow', 'credential'],
             'agent' => ['flow', 'schedule'],
@@ -100,7 +100,7 @@ class BiRelationCatalog
             'bi-desk' => ['app'],
             default => [],
         };
-        if (empty($body['deskId']) && ! ($kind === 'app' && $origin !== null)) {
+        if (empty($body['deskId']) && ! (in_array($kind, ['app', 'flow'], true) && $origin !== null)) {
             $types = array_values(array_diff($types, ['bi-desk', 'dw-desk']));
         }
         if (in_array($kind, ['flow', 'schedule'], true) && empty($body['tokenId'])) {
@@ -119,7 +119,7 @@ class BiRelationCatalog
         $plan = match ($kind) {
             'app' => $warm ? [] : ['table' => array_column($body['tables'] ?? [], 'tableId'), 'bi-desk' => [$body['deskId'] ?? null], 'app' => [$origin]],
             'table' => ['app' => null, 'schedule' => null, ...($warm ? [] : ['flow' => [$body['originFlowId'] ?? null], 'dw-desk' => [$body['deskId'] ?? null]])],
-            'flow' => ['table' => null, 'schedule' => null, ...($warm ? [] : ['credential' => null, 'agent' => [$body['tokenId'] ?? null], 'dw-desk' => [$body['deskId'] ?? null]])],
+            'flow' => ['table' => null, 'schedule' => null, 'flow' => [$origin], ...($warm ? [] : ['credential' => null, 'agent' => [$body['tokenId'] ?? null], 'dw-desk' => [$body['deskId'] ?? null]])],
             'schedule' => $warm ? [] : ['flow' => array_column($body['flows'] ?? [], 'flow_etl_id'), 'agent' => [$body['tokenId'] ?? null], 'dw-desk' => [$body['deskId'] ?? null]],
             'credential' => ['flow' => null, ...($warm ? [] : ['credential' => null])],
             'agent' => ['flow' => null, 'schedule' => null],

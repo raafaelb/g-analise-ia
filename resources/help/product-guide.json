@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.6",
+  "version": "2026-10-31.7",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -200,7 +200,7 @@
         {
           "id": "catalog-edit",
           "title": "Ações claras no próprio catálogo",
-          "description": "Crie mesas e conexões quando autorizado. Em Fontes / ETL, abra um recurso e use Duplicar ETL para preparar uma cópia com projeto próprio. Agendas e tabelas têm formulários próprios; confira sempre a revisão antes de autorizar.",
+          "description": "Crie mesas e conexões quando autorizado. Em Fontes / ETL, use Duplicar ETL para preparar uma cópia. Nos rascunhos, Publicar ETL permite escolher a mesa de dados e revisar o efeito antes de compartilhar. Agendas e tabelas têm formulários próprios.",
           "audience": "authors"
         },
         {
@@ -314,13 +314,13 @@
         {
           "id": "activity-review",
           "title": "Autorização e execução são etapas diferentes",
-          "description": "Autorizar permite executar somente a proposta apresentada. Nas agendas, confira fontes, todos os horários e as janelas. Aguarde o resultado confirmado antes de repetir.",
+          "description": "Autorizar permite executar somente a proposta apresentada. Nas publicações de ETL, confira mesa, versão substituída, tabelas e efeito nos dados. Nas agendas, confira fontes e horários. Resultado incerto deve ser conferido antes de repetir.",
           "audience": "all"
         },
         {
           "id": "activity-history",
           "title": "Use o histórico para investigar",
-          "description": "Os registros ajudam a entender falhas e conferir ações manuais. Nas conversas, as solicitações de autorização também ficam disponíveis no próprio chat.",
+          "description": "Abra Ver revisão desta operação para conferir a proposta e o efeito da decisão. A publicação conferida mostra o destino e as próximas verificações dos dados. Nas conversas, as solicitações também ficam no próprio chat.",
           "anchor": "activity-history",
           "audience": "all"
         },
@@ -768,6 +768,19 @@
       "title": "Como duplico um ETL para trabalhar em uma cópia?",
       "summary": "No Catálogo BI, abra Fontes / ETL, escolha o recurso e use Duplicar ETL. A cópia terá seu próprio projeto.",
       "body": "Um ETL prepara os dados que alimentam as tabelas e os dashboards. Para aproveitar um trabalho existente, abra **Catálogo BI → Fontes / ETL**, escolha a origem e selecione **Duplicar ETL**. Informe o nome da cópia e prepare a revisão.\n\nConfira o ambiente, a origem, o nome e o efeito antes de autorizar. A operação usa sua conexão BI e não inicia uma tarefa de IA. Depois, abra o projeto da cópia para continuar o trabalho. Ele identifica o contexto como ETL. Na conversa vazia, **Conferir este ETL** preenche um pedido de análise sem cargas ou alterações; confira e envie o texto quando quiser. O botão sozinho não inicia uma tarefa de IA. Projetos de ETL não mostram o botão de prévia de dashboard: confira suas etapas e seu histórico de cargas no catálogo ou pela conversa. O acompanhamento também fica em **Atividade**. Enquanto a operação manual estiver aberta, use os controles da própria seção; o caminho de criar um projeto para o recurso original fica oculto para evitar confundir origem e cópia.\n\nO novo ETL tem identificadores próprios para as etapas e para suas tabelas de destino. Uma cópia da definição não comprova que os dados já estejam carregados. No projeto, peça à IA para conferir a cópia e testar suas etapas; uma carga depende de outra revisão. A duplicação também não autoriza publicar nem substituir as fontes de dashboards existentes.\n\nSe a cópia aparecer com conferência pendente ou a operação falhar após o envio, confira o catálogo e o projeto antes de solicitar outra duplicação. O portal não repete automaticamente uma tentativa sem confirmação. O editor visual completo de ETLs e as demais ações de gestão continuam em evolução.",
+      "pages": [
+        "catalog",
+        "project",
+        "activity"
+      ],
+      "actions": [],
+      "audience": "authors"
+    },
+    {
+      "id": "etl-publications",
+      "title": "Como publico um ETL e suas tabelas?",
+      "summary": "Abra um rascunho em Fontes / ETL, escolha Publicar ETL e confira a mesa de dados, as tabelas e o efeito antes de autorizar.",
+      "body": "Um ETL publicado compartilha a preparação dos dados e suas tabelas com as pessoas autorizadas de uma **mesa de dados**. Uma mesa de aplicações tem outra finalidade: organiza as dashboards.\n\nNo **Catálogo BI → Fontes / ETL**, abra um rascunho e selecione **Publicar ETL**. Você pode publicar também um rascunho existente da sua conta, quando o BI permite ler sua configuração completa. O portal usa o projeto de trabalho correspondente ou prepara um projeto para guardar a revisão e o acompanhamento; isso não duplica o ETL nem inicia uma tarefa de IA. Recursos existentes não recebem permissão automática de exclusão.\n\n**Como um novo ETL** mantém as versões existentes e compartilha esta versão na mesa de dados escolhida. **Substituir a versão original** só aparece quando a origem e sua mesa foram identificadas. A revisão confirma essa associação novamente, apresenta o nome da versão que será substituída e informa os campos adicionados, removidos ou com tipos alterados. Se o BI não fornecer a associação completa dos destinos, a substituição não é executada.\n\nNa substituição, **Copiar também os dados da versão de teste** é uma escolha separada, desmarcada inicialmente. Confira primeiro se a tabela de teste contém os dados pretendidos. A escolha solicita a cópia desses dados para a tabela original; não representa uma nova extração da fonte. Sem essa escolha, a publicação não solicita essa cópia. Mudanças de estrutura podem exigir nova carga e afetar a apresentação dos campos. Confira o efeito antes de autorizar. A incorporação da cópia também pode fazer aplicações que usam sua tabela voltarem a usar a tabela original.\n\nA publicação precisa da sua decisão na revisão. Ela não inicia carga nem cria uma agenda. Depois de compartilhar, confira os dados, os rótulos e formatos dos campos, a atualização automática e uma execução concluída. **Publicação conferida** comprova a configuração e os destinos retornados pelo BI; não comprova sozinha que os dados estejam atualizados ou que uma cópia de dados tenha terminado.\n\nSe o resultado ficar incerto, use **Conferir publicação** na operação ou em Atividade. Essa ação consulta o BI, não publica novamente e não inicia inferência. Quando a publicação foi solicitada pela conversa, com as conexões ainda ativas, a IA pode retomar uma vez para conferir esse resultado. Essa retomada fica limitada à conferência enquanto a publicação não for confirmada; ela não repete o envio. Se ainda não houver confirmação, a pendência continua visível. O histórico preserva a tentativa anterior. Em Atividade, **Ver revisão desta operação** permite reler a proposta; uma publicação conferida apresenta o destino e as verificações dos dados que ainda são necessárias. Se necessário, reconecte o BI antes de conferir.",
       "pages": [
         "catalog",
         "project",

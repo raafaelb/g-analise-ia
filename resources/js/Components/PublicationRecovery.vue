@@ -5,7 +5,7 @@ type Item=Record<string,any>;
 const props=defineProps<{approval:Item;request:(path:string,method?:string,data?:unknown)=>Promise<any>}>();
 const emit=defineEmits<{confirmed:[result:Item]}>();
 const busy=ref(false);const error=ref('');
-const available=computed(()=>props.approval.status==='failed'&&props.approval.payload?.action?.action==='publish_app'&&!!props.approval.payload?.publication_attempt?.started_at);
+const available=computed(()=>props.approval.status==='failed'&&['publish_app','publish_flow'].includes(props.approval.payload?.action?.action)&&!!props.approval.payload?.publication_attempt?.started_at);
 async function verify(){
  if(busy.value||!available.value)return;
  busy.value=true;error.value='';

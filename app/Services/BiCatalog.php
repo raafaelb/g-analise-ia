@@ -360,7 +360,7 @@ class BiCatalog
         $related = [];
         if ($includeRelations && in_array($kind, ['app', 'flow', 'table', 'schedule', 'dw-desk', 'bi-desk', 'credential', 'agent'], true)) {
             $origin = $body['cloned_from'] ?? $body['_state']['cloned_from'] ?? null;
-            $publicationOrigin = $kind === 'app' && $summary['state'] === 'draft' && (is_string($origin) || is_int($origin)) && ctype_digit((string) $origin) && (int) $origin > 0 ? (string) $origin : null;
+            $publicationOrigin = in_array($kind, ['app', 'flow'], true) && $summary['state'] === 'draft' && (is_string($origin) || is_int($origin)) && ctype_digit((string) $origin) && (int) $origin > 0 ? (string) $origin : null;
             $scope = app(BiRelationCatalog::class)->read($this, $connection, $project, $kind, $id, $body, Cache::get($this->snapshotKey($connection, $tenant)), $authorizedLists, $publicationOrigin);
             $snapshot = $scope['snapshot'];
             $metadata = $scope['metadata'];
@@ -369,15 +369,16 @@ class BiCatalog
         }
 
         $management = null;
-        if ($includeRelations && $kind === 'app' && $summary['state'] === 'draft' && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection)) {
-            $managed = ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $tenant)->where('resource', 'app:'.$id)->where('status', 'draft')->whereIn('project_id', Project::where('user_id', $user->id)->where('tenant_id', $tenant)->select('id'))->first();
-            if ($managed) {
-                $ownerProject = Project::find($managed->project_id);
-                $management = ['project_id' => $managed->project_id, 'can_delete_draft' => true, 'can_publish' => $ownerProject?->status !== 'archived' && $ownerProject?->source_ref === 'app:'.$id, 'publication_origin' => null];
+        if ($includeRelations && in_array($kind, ['app', 'flow'], true) && $summary['state'] === 'draft' && $user->role !== 'viewer' && ! $this->policy->isReadOnly($tenant, $connection)) {
+            $ref = $kind.':'.$id;
+            $managed = ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $tenant)->where('resource', $ref)->where('status', 'draft')->whereIn('project_id', Project::where('user_id', $user->id)->where('tenant_id', $tenant)->select('id'))->first();
+            if ($managed || $kind === 'flow') {
+                $ownerProject = $managed ? Project::find($managed->project_id) : Project::where('user_id', $user->id)->where('tenant_id', $tenant)->where('source_ref', $ref)->where('status', '!=', 'archived')->first();
+                $management = ['project_id' => $ownerProject?->id, 'can_delete_draft' => $kind === 'app' && $managed !== null, 'can_publish' => $metadataComplete && $ownerProject?->status !== 'archived' && ($kind === 'flow' || $ownerProject?->source_ref === $ref), 'publication_origin' => null];
                 $origin = $body['cloned_from'] ?? $body['_state']['cloned_from'] ?? null;
-                $original = collect($snapshot['resources']['app'] ?? [])->first(fn (array $row): bool => (string) $row['id'] === (string) $origin && $row['state'] === 'published' && ! empty($row['desk_id']));
-                if ($original) {
-                    $originDesk = collect($snapshot['resources']['bi-desk'] ?? [])->first(fn (array $row): bool => (string) $row['id'] === (string) $original['desk_id']);
+                $original = collect($snapshot['resources'][$kind] ?? [])->first(fn (array $row): bool => (string) $row['id'] === (string) $origin && $row['state'] === 'published' && ! empty($row['desk_id']));
+                if ($original && ($kind === 'app' || (isset($body['originalTableId']) && (string) $body['originalTableId'] === (string) ($metadata[$original['ref']]['table']['id'] ?? '')))) {
+                    $originDesk = collect($snapshot['resources'][$kind === 'flow' ? 'dw-desk' : 'bi-desk'] ?? [])->first(fn (array $row): bool => (string) $row['id'] === (string) $original['desk_id']);
                     $management['publication_origin'] = ['resource' => $original['ref'], 'name' => $original['name'], 'desk_id' => (int) $original['desk_id'], 'desk_name' => $originDesk['name'] ?? 'Mesa #'.$original['desk_id']];
                 }
             }

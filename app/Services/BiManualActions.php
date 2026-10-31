@@ -26,15 +26,18 @@ class BiManualActions
         abort_unless(in_array($kind, ['app', 'flow'], true) && ctype_digit($resourceId) && (int) $resourceId > 0, 422, 'Recurso inválido.');
         [$connection, $tenantItem] = $this->catalog->access($user, $tenant);
         $action = $data['action'];
-        abort_unless(in_array($action, $kind === 'flow' ? ['clone_flow'] : ['clone_app', 'delete_draft', 'publish_app'], true), 422, 'Ação manual não permitida.');
-        $this->policy->assertCommandAllowed($tenant, [$action === 'delete_draft' ? 'rm' : $kind, in_array($action, ['clone_app', 'clone_flow'], true) ? 'clone' : ($action === 'publish_app' ? 'publish' : 'app:'.$resourceId)], $connection);
+        abort_unless(in_array($action, $kind === 'flow' ? ['clone_flow', 'publish_flow'] : ['clone_app', 'delete_draft', 'publish_app'], true), 422, 'Ação manual não permitida.');
+        $this->policy->assertCommandAllowed($tenant, [$action === 'delete_draft' ? 'rm' : $kind, in_array($action, ['clone_app', 'clone_flow'], true) ? 'clone' : (in_array($action, ['publish_app', 'publish_flow'], true) ? 'publish' : 'app:'.$resourceId)], $connection);
         $arguments = ['action' => $action, 'resource' => $kind.':'.$resourceId];
         if (in_array($action, ['clone_app', 'clone_flow'], true)) {
             $arguments['name'] = trim($data['name']);
         }
-        if ($action === 'publish_app') {
+        if (in_array($action, ['publish_app', 'publish_flow'], true)) {
             $arguments['desk'] = (int) $data['desk'];
             $arguments['publish_mode'] = $data['publish_mode'];
+            if ($action === 'publish_flow') {
+                $arguments['copy_data'] = (bool) ($data['copy_data'] ?? false);
+            }
         }
         $requestId = strtolower($data['request_id']);
         $requestHash = hash('sha256', json_encode([$tenant, $arguments], JSON_THROW_ON_ERROR));
@@ -50,13 +53,23 @@ class BiManualActions
                 if (in_array($arguments['action'], ['clone_app', 'clone_flow'], true)) {
                     $project = new Project(['user_id' => $user->id, 'tenant_id' => $tenant, 'tenant_name' => $tenantItem['name'], 'name' => $arguments['name'], 'description' => 'Cópia de '.$arguments['resource'].' preparada pelo catálogo.', 'instructions' => 'A duplicação foi preparada pela interface. Confira o histórico de revisões e o recurso já criado antes de iniciar outra criação.']);
                     $project->id = (string) Str::uuid();
+                } elseif ($arguments['action'] === 'publish_flow') {
+                    $managed = ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $tenant)->where('resource', $arguments['resource'])->where('status', 'draft')->first();
+                    $project = $managed ? Project::where('user_id', $user->id)->where('tenant_id', $tenant)->where('status', '!=', 'archived')->find($managed->project_id) : Project::where('user_id', $user->id)->where('tenant_id', $tenant)->where('source_ref', $arguments['resource'])->where('status', '!=', 'archived')->first();
+                    if (! $project) {
+                        abort_if($managed !== null, 422, 'O projeto deste ETL está arquivado. Reabra o contexto antes de publicar.');
+                        $project = new Project(['user_id' => $user->id, 'tenant_id' => $tenant, 'tenant_name' => $tenantItem['name'], 'name' => 'Publicação de ETL', 'source_ref' => $arguments['resource'], 'description' => 'Publicação de ETL preparada pelo catálogo.']);
+                        $project->id = (string) Str::uuid();
+                    }
                 } else {
                     $managed = ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $tenant)->where('resource', $arguments['resource'])->where('status', 'draft')->first();
                     abort_unless($managed, 422, 'Esta ação exige um rascunho criado e registrado pelo portal.');
                     $project = Project::where('user_id', $user->id)->where('tenant_id', $tenant)->findOrFail($managed->project_id);
                 }
                 $revision = $this->broker->manualRevision($user, $project, $arguments);
-                if (! $project->exists) {
+                if (! $project->exists && $arguments['action'] === 'publish_flow') {
+                    $project->name = mb_substr((string) $revision['publication']['source']['name'], 0, 150);
+                } elseif (! $project->exists) {
                     $project->description = 'Cópia de “'.mb_substr((string) ($revision['info']['data']['nome'] ?? 'recurso'), 0, 150).'” no G-Analise BI.';
                 }
 

@@ -115,3 +115,14 @@ Use `clone_flow` com um nome para aproveitar um ETL existente em rascunho própr
 ## Navegação da prévia no portal
 
 Na prévia interativa, a roda sobre um mapa pode controlar o zoom em vez de rolar o documento. Oriente o usuário a usar a margem interna ou a barra do próprio dashboard e a ajuda ao lado de Recarregar. Entrar no dashboard direciona o foco ao iframe existente para uso do teclado, sem solicitar nova sessão. Uma falha de interação visual não autoriza repetir ETLs, criar tabelas ou publicar. Se também falhar fora do mapa, relate a pendência sem declarar que a captura da roda explica todos os casos.
+
+
+## Publicação revisada de ETLs
+
+Use `publish_flow` somente quando houver pedido explícito de publicar. Informe uma mesa de **dados** (`dw-desk`), não uma mesa de aplicações. `publish_mode: new` é o padrão: publica a versão separadamente e preserva as existentes. Para incorporar uma manutenção à origem, informe `publish_mode: replace`; a revisão precisa identificar a versão original, a mesma mesa e as tabelas correspondentes. Não invente essas associações.
+
+`copy_data` é uma escolha separada, booleana, padrão `false`, permitida somente em `replace`. Peça essa cópia apenas quando o usuário quiser levar os dados da tabela de teste ao destino original. Não confunda copiar esses dados com consultar novamente a fonte. A revisão apresenta remoções e alterações de tipos; mudanças estruturais e de armazenamento podem exigir nova carga e afetar a apresentação.
+
+Aguarde a autorização na conversa. O portal confere novamente autoria sincronizada, origem, destino e esquema, registra o envio antes de executar e consulta o resultado. Em substituições, a confirmação identifica o ETL/tabela que sobreviveram. Preserve o vínculo de uma aplicação já existente no projeto quando publicar uma fonte auxiliar.
+
+`publication.verified` confirma configuração e destinos, não uma carga nem a cópia física dos dados. Respeite `requires_data_check` e `data_verified: false`: confira dados, rótulos/formatos, agenda diária e execução concluída antes de entregar. Uma publicação incerta não deve ser reenviada. Use `publication_status` com o `approval_id` da revisão já autorizada neste projeto; a ação compartilha a mesma conferência do botão **Conferir publicação**. Uma retomada automática por resultado incerto permite somente essa conferência até confirmar o resultado, e acontece no máximo uma vez por revisão. Se continuar sem confirmação, explique a pendência e encerre a tarefa, sem publicar ou criar outro recurso. Depois da confirmação, use `publication.resource` como referência e `refresh_resource` para conferir a autoria atual sem descartar edições locais; não reutilize o ID de uma cópia incorporada. Não declare sucesso apenas porque o comando foi aceito.
