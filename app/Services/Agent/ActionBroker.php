@@ -359,11 +359,9 @@ class ActionBroker
         }
         if (in_array($action, ['credential_schema', 'credential_relationships'], true)) {
             $report = app(BiCredentials::class)->inspect($user, (string) $project->tenant_id, substr($arguments['resource'], 11), $action === 'credential_relationships' ? 'relationships' : 'schema', $arguments['schema'] ?? null, $arguments['search'] ?? null, (int) ($arguments['offset'] ?? 0));
-            if ($action === 'credential_relationships') {
-                Audit::record($user->id, 'horus.credential_relationships', 'Relacionamentos da fonte consultados pela tarefa do projeto.', $project->id, ['resource' => $arguments['resource'], 'verified' => $report['verified'], 'relationship_count' => count($report['relationships'] ?? []), 'truncated' => $report['truncated'] ?? null]);
-            }
+            Audit::record($user->id, 'horus.'.$action, 'Metadados da fonte consultados pela tarefa do projeto.', $project->id, ['resource' => $arguments['resource'], 'verified' => $report['verified'], ($action === 'credential_relationships' ? 'relationship_count' : 'table_count') => count($report[$action === 'credential_relationships' ? 'relationships' : 'tables'] ?? []), 'truncated' => $report['truncated'] ?? null]);
             if ($action === 'credential_schema' && ! isset($arguments['search']) && strlen(json_encode($report, JSON_THROW_ON_ERROR)) > 60000) {
-                $report['tables'] = array_map(fn (array $table): array => ['schema' => $table['schema'] ?? null, 'name' => $table['name'], 'column_count' => count($table['columns'] ?? [])], $report['tables'] ?? []);
+                $report['tables'] = array_map(fn (array $table): array => ['schema' => $table['schema'] ?? null, 'name' => $table['name'], 'column_count' => count($table['columns'] ?? []), 'visible_column_count' => $table['visible_column_count'] ?? null, 'columns_complete' => $table['columns_complete'] ?? null, 'columns_truncated' => $table['columns_truncated'] ?? null], $report['tables'] ?? []);
                 $report['columns_omitted'] = true;
                 $report['message'] = 'Catálogo resumido para a IA. Use search para buscar o assunto solicitado e receber as colunas. Se houver next_offset, a lista ainda tem outras páginas.';
             }

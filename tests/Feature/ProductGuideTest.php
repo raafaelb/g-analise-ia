@@ -52,6 +52,7 @@ class ProductGuideTest extends TestCase
         $this->assertNotContains('etl-clones', array_column($response->json('articles'), 'id'));
         $this->assertNotContains('etl-publications', array_column($response->json('articles'), 'id'));
         $this->assertNotContains('source-relationships', array_column($response->json('articles'), 'id'));
+        $this->assertNotContains('source-structure', array_column($response->json('articles'), 'id'));
         $this->assertNotContains('catalog-source-relationships', array_column($response->json('pages.catalog.steps'), 'id'));
         $this->assertNotContains('catalog-edit', array_column($response->json('pages.catalog.steps'), 'id'));
         $this->assertSame([], $response->json('progress'));

@@ -47,7 +47,7 @@ class BiCredentialsTest extends TestCase
         $user = User::factory()->create();
         $connection = Connection::create(['user_id' => $user->id, 'provider' => 'horus', 'status' => 'connected', 'credentials' => ['auth' => ['token' => 'synthetic-only']], 'metadata' => ['session_generation' => 'session-a', 'tenants' => [['id' => '100', 'name' => 'Teste autorizado']]]]);
         $body = ['nome' => 'Conexão existente', 'type' => 'postgresql', 'agentId' => 7, 'config' => ['hostname' => 'old.example.invalid', 'database' => 'existing_db', 'username' => 'readonly_test', 'port' => 5432], 'owners' => [1], 'key' => 'synthetic-reference-key'];
-        $state = (object) ['bodies' => [11 => $body], 'commands' => [], 'created' => 0, 'pushes' => 0, 'passwords' => [11 => 'EXISTING-SYNTHETIC-SECRET'], 'last_written' => null, 'agent_available' => true, 'fail_push' => false, 'test_data' => ['ok' => true, 'message' => 'Native confirmation'], 'schema_data' => ['Success' => true, 'Tables' => [['Name' => 'example_table', 'Schema' => 'public', 'Columns' => [['Name' => 'id', 'Type' => 'integer']]]]], 'query_rows' => [['SCHEMA_NAME' => 'public', 'TABLE_NAME' => 'example_table', 'COLUMN_NAME' => 'id', 'DATA_TYPE' => 'integer', 'IS_NULLABLE' => 'NO', 'ORDINAL_POSITION' => 1]]];
+        $state = (object) ['bodies' => [11 => $body], 'commands' => [], 'created' => 0, 'pushes' => 0, 'passwords' => [11 => 'EXISTING-SYNTHETIC-SECRET'], 'last_written' => null, 'agent_available' => true, 'fail_push' => false, 'test_data' => ['ok' => true, 'message' => 'Native confirmation'], 'schema_data' => ['Success' => true, 'Tables' => [['Name' => 'example_table', 'Schema' => 'public', 'Columns' => [['Name' => 'id', 'Type' => 'integer']]]]], 'query_rows' => [['SCHEMA_NAME' => 'public', 'TABLE_NAME' => 'example_table', 'COLUMN_NAME' => 'id', 'DATA_TYPE' => 'integer', 'IS_NULLABLE' => 'NO', 'ORDINAL_POSITION' => 1, 'VISIBLE_COLUMN_COUNT' => 1]]];
 
         return [$user, $connection, $state];
     }
@@ -142,9 +142,10 @@ class BiCredentialsTest extends TestCase
             if (array_slice($args, 0, 2) === ['credential', 'query']) {
                 $this->assertSame('credential:11', $args[2]);
                 $this->assertStringContainsString('FROM information_schema.columns', $args[4]);
-                $this->assertSame(['--limit', '5001', '--timeout', '45s'], array_slice($args, 5));
+                $probe = str_starts_with($args[4], 'SELECT COUNT(*) AS metadata_row_count');
+                $this->assertSame(['--limit', $probe ? '1' : '501', '--timeout', '45s'], array_slice($args, 5));
 
-                return ['data' => ['count' => count($state->query_rows), 'rows' => $state->query_rows]];
+                return ['data' => $probe ? ($state->probe_data ?? ['rows' => []]) : ($state->query_data ?? ['count' => count($state->query_rows), 'rows' => $state->query_rows])];
             }
             throw new RuntimeException('Unexpected native command.');
         });
@@ -388,6 +389,7 @@ class BiCredentialsTest extends TestCase
     public function test_native_schema_is_limited_to_table_and_column_metadata(): void
     {
         [$user, , $state] = $this->context();
+        $state->bodies[11]['type'] = 'oracle';
         $state->schema_data['password'] = 'SYNTHETIC-PRIVATE-PASSWORD';
         $this->native($state);
         $response = $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('verified', true)->assertJsonPath('tables.0.name', 'example_table')->assertJsonPath('tables.0.columns.0.name', 'id');
@@ -402,6 +404,7 @@ class BiCredentialsTest extends TestCase
         $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema', ['schema' => 'public'])->assertOk()->assertJsonPath('verified', true)->assertJsonPath('method', 'postgres_information_schema')->assertJsonPath('tables.0.schema', 'public')->assertJsonPath('tables.0.columns.0.type', 'integer')->assertJsonPath('tables.0.columns.0.nullable', false);
         $queries = array_values(array_filter($state->commands, fn (array $command): bool => array_slice($command, 0, 2) === ['credential', 'query']));
         $this->assertCount(1, $queries);
+        $this->assertSame([], array_values(array_filter($state->commands, fn (array $command): bool => array_slice($command, 0, 2) === ['credential', 'schema'])));
         $this->assertStringContainsString("table_schema = 'public'", $queries[0][4]);
         $this->assertSame(0, $state->pushes);
         $this->assertSame(0, $state->created);
@@ -414,7 +417,7 @@ class BiCredentialsTest extends TestCase
         $state->query_rows = [];
         $this->native($state);
         $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('verified', false)->assertJsonPath('state', 'unconfirmed')->assertJsonMissingPath('tables');
-        $state->schema_data = ['Success' => false, 'Error' => 'password=SYNTHETIC-PRIVATE-PASSWORD'];
+        $state->query_data = ['Success' => false, 'rows' => [], 'Error' => 'password=SYNTHETIC-PRIVATE-PASSWORD'];
         $response = $this->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('verified', false)->assertJsonPath('state', 'failed');
         $this->assertStringNotContainsString('SYNTHETIC-PRIVATE-PASSWORD', $response->getContent());
     }
@@ -504,9 +507,9 @@ class BiCredentialsTest extends TestCase
     {
         [$user, , $state] = $this->context();
         $state->schema_data = ['Success' => false, 'Error' => '42601 UNION'];
-        $state->query_rows = array_map(fn (int $index): array => ['SCHEMA_NAME' => 'public', 'TABLE_NAME' => 'table_'.intdiv($index, 10), 'COLUMN_NAME' => 'column_'.$index, 'DATA_TYPE' => 'text', 'IS_NULLABLE' => 'YES', 'ORDINAL_POSITION' => $index + 1], range(0, 5000));
+        $state->query_rows = array_map(fn (int $index): array => ['SCHEMA_NAME' => 'public', 'TABLE_NAME' => 'table_'.intdiv($index, 10), 'COLUMN_NAME' => 'column_'.$index, 'DATA_TYPE' => 'text', 'IS_NULLABLE' => 'YES', 'ORDINAL_POSITION' => ($index % 10) + 1, 'VISIBLE_COLUMN_COUNT' => 10], range(0, 500));
         $this->native($state);
-        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('verified', true)->assertJsonPath('truncated', true)->assertJsonCount(500, 'tables');
+        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('verified', true)->assertJsonPath('truncated', true)->assertJsonCount(50, 'tables')->assertJsonPath('tables.0.columns_complete', true);
         $this->assertSame(0, $state->pushes);
     }
 
@@ -572,8 +575,8 @@ class BiCredentialsTest extends TestCase
 
         $queries = array_values(array_filter($state->commands, fn (array $command): bool => array_slice($command, 0, 2) === ['credential', 'query']));
         $this->assertCount(1, $queries);
-        $this->assertStringContainsString("table_name ILIKE '%visita!_domiciliar%' ESCAPE '!'", $queries[0][4]);
-        $this->assertStringContainsString('LIMIT 5001 OFFSET 5000', $queries[0][4]);
+        $this->assertStringContainsString("LOWER(c.table_name) LIKE LOWER('%visita!_domiciliar%') ESCAPE '!'", $queries[0][4]);
+        $this->assertStringContainsString('LIMIT 501 OFFSET 5000', $queries[0][4]);
         $this->assertSame(0, $state->pushes);
     }
 
@@ -581,10 +584,10 @@ class BiCredentialsTest extends TestCase
     {
         [$user, , $state] = $this->context();
         $state->schema_data = ['Success' => false, 'Error' => '42601 UNION'];
-        $state->query_rows = array_map(fn (int $index): array => ['SCHEMA_NAME' => 'public', 'TABLE_NAME' => 'wide_table', 'COLUMN_NAME' => 'column_'.$index, 'DATA_TYPE' => 'text', 'IS_NULLABLE' => 'YES'], range(0, 5000));
+        $state->query_rows = array_map(fn (int $index): array => ['SCHEMA_NAME' => 'public', 'TABLE_NAME' => 'wide_table', 'COLUMN_NAME' => 'column_'.$index, 'DATA_TYPE' => 'text', 'IS_NULLABLE' => 'YES', 'ORDINAL_POSITION' => $index + 1, 'VISIBLE_COLUMN_COUNT' => 501], range(0, 500));
         $this->native($state);
 
-        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('truncated', true)->assertJsonPath('next_offset', 5000)->assertJsonCount(5000, 'tables.0.columns');
+        $this->actingAs($user)->postJson('/api/catalog/100/credentials/11/inspect/schema')->assertOk()->assertJsonPath('truncated', true)->assertJsonPath('next_offset', 500)->assertJsonCount(500, 'tables.0.columns')->assertJsonPath('tables.0.columns_complete', false);
     }
 
     public function test_structure_search_rejects_sql_and_invalid_pagination_before_starting_the_cli(): void

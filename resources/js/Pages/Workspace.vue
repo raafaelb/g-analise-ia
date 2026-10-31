@@ -118,12 +118,12 @@ async function api<T=any>(path:string,method='GET',data?:unknown):Promise<T>{
  const headers:Record<string,string>={'Accept':'application/json','X-GAnalise-User':String(state.value.user.id),'X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content??''};
  if(!isForm)headers['Content-Type']='application/json';
  const response=await fetch(appUrl('/api'+path),{method,headers,credentials:'same-origin',...(data===undefined?{}:{body:isForm?data:JSON.stringify(data)})});
- if(response.status===401){location.href=appUrl('/login');throw new Error('Sua sessão expirou.');}
- if(response.status===429){throw new Error('Muitas solicitações. Aguarde alguns instantes e tente novamente.');}
- if(response.status===419){throw new Error('Sua sessão expirou. Atualize a página.');}
+ if(response.status===401){location.href=appUrl('/login');throw Object.assign(new Error('Sua sessão expirou.'),{status:response.status});}
+ if(response.status===429){throw Object.assign(new Error('Muitas solicitações. Aguarde alguns instantes e tente novamente.'),{status:response.status});}
+ if(response.status===419){throw Object.assign(new Error('Sua sessão expirou. Atualize a página.'),{status:response.status});}
  const result=await response.json().catch(()=>({message:'Não foi possível concluir a operação.'}));
- if(response.status===423&&result.requires_password_change){window.location.assign(appUrl('/app/account'));throw new Error(result.message);}
- if(!response.ok){throw new Error(result.errors?String(Object.values(result.errors).flat()[0]):result.message??'Falha na solicitação.');}return result;
+ if(response.status===423&&result.requires_password_change){window.location.assign(appUrl('/app/account'));throw Object.assign(new Error(result.message),{status:response.status});}
+ if(!response.ok){throw Object.assign(new Error(result.errors?String(Object.values(result.errors).flat()[0]):result.message??'Falha na solicitação.'),{status:response.status,fields:Object.keys(result.errors??{})});}return result;
 }
 async function openCatalogProject(id:string){await refresh();navigate('project',id);}
 async function refresh(){const isCurrent=bootstrapRequests.next();const result=await api<Bootstrap>('/bootstrap');if(!isCurrent())return;const before=state.value.connections.find(c=>c.provider==='horus');const after=result.connections.find(c=>c.provider==='horus');if(before?.status==='connected'&&(after?.status!=='connected'||before.metadata?.session_generation!==after.metadata?.session_generation)){window.location.assign(appUrl('/app/connections'));return;}state.value=result;}

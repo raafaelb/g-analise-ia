@@ -16,8 +16,8 @@ after(async()=>server?.close());
 function report(overrides={}){
  return {relationships:[{id:'fk-one',name:'orders_customer_fk',from:{schema:'public',table:'orders'},to:{schema:'public',table:'customers'},columns:[{source:'customer_id',target:'id',position:1}],column_count:1,complete:true,validated:true,enabled:null}],scope_warning:'Somente vínculos declarados e visíveis. Uma lista vazia não comprova ausência de vínculos.',offset:0,page_size:200,next_offset:null,truncated:false,search:null,schema:null,...overrides};
 }
-async function render(data,busy=false){
- return renderToString(createSSRApp(Relationships,{report:data,schema:'',busy}));
+async function render(data,busy=false,error=''){
+ return renderToString(createSSRApp(Relationships,{report:data,schema:'',busy,error}));
 }
 
 test('a declared relationship shows the direction and paired fields without claiming business cardinality',async()=>{
@@ -66,4 +66,19 @@ test('provider identifiers are escaped in schema, table, constraint and field na
  assert.match(html,/&lt;svg/);
  assert.match(html,/&lt;iframe/);
  assert.doesNotMatch(html,/<script>alert\(1\)|<img src=x|<svg onload|<iframe src=evil/);
+});
+
+
+test('an in-flight refresh is announced beside the still visible previous result',async()=>{
+ const html=await render(report(),true);
+ assert.match(html,/aria-busy="true"/);
+ assert.match(html,/Consultando a fonte/);
+ assert.match(html,/O resultado anterior continua visível/);
+ assert.match(html,/orders/);
+});
+test('a recoverable error is presented in the result panel without hiding its previous data',async()=>{
+ const html=await render(report(),false,'A rede falhou. O resultado anterior permanece identificado.');
+ assert.match(html,/role="alert"/);
+ assert.match(html,/A rede falhou/);
+ assert.match(html,/orders/);
 });

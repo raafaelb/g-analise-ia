@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.8",
+  "version": "2026-10-31.9",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -199,8 +199,8 @@
         },
         {
           "id": "catalog-source-relationships",
-          "title": "Investigue como as tabelas se conectam",
-          "description": "Em Conexões de dados, abra a fonte e use Ver relacionamentos. Confira os pares de campos, a busca e as páginas. A consulta mostra os vínculos declarados e visíveis; campos incompletos ou sem validação exigem investigação. Nenhuma carga é iniciada.",
+          "title": "Explore as tabelas e seus vínculos",
+          "description": "Em Conexões de dados, abra a fonte e use Ver tabelas e colunas. Buscar na fonte e Próxima consultam outras partes da estrutura quando o conector permite. Campos parciais indicam que a tabela continua. Ver relacionamentos confere vínculos declarados; nenhum desses controles inicia carga.",
           "anchor": "catalog-types",
           "audience": "authors"
         },
@@ -508,7 +508,7 @@
       "id": "data-connections",
       "title": "Como adiciono uma nova conexão de dados?",
       "summary": "Cadastre uma fonte pelo Catálogo BI, com os campos protegidos e revisão.",
-      "body": "Abra **Catálogo BI**, selecione o ambiente e a categoria **Conexões de dados**. Quando sua conta permitir, use **Adicionar nova conexão**, escolha o tipo de fonte e o agente e preencha os dados no formulário privado. Confira a proposta antes de autorizar a criação.\n\nAs credenciais protegidas são tratadas pelo formulário e não precisam ser enviadas à IA. As ações de teste e consulta de estrutura dependem do conector e das permissões. Alguns formatos avançados ainda não possuem editor completo; o portal informa a disponibilidade.\n\nIsso é diferente de conectar sua conta G-Analise BI na página **Conexões**. Uma conexão de dados é o acesso a um banco ou outra fonte que alimenta ETLs. Para investigar combinações de tabelas, abra Ver relacionamentos. A consulta usa apenas os metadados disponíveis à conexão e não altera o banco. Veja a orientação Relacionamentos entre tabelas para entender campos incompletos e limites de acesso.",
+      "body": "Abra **Catálogo BI**, selecione o ambiente e a categoria **Conexões de dados**. Quando sua conta permitir, use **Adicionar nova conexão**, escolha o tipo de fonte e o agente e preencha os dados no formulário privado. Confira a proposta antes de autorizar a criação.\n\nAs credenciais protegidas são tratadas pelo formulário e não precisam ser enviadas à IA. As ações de teste e consulta de estrutura dependem do conector e das permissões. Alguns formatos avançados ainda não possuem editor completo; o portal informa a disponibilidade.\n\nIsso é diferente de conectar sua conta G-Analise BI na página **Conexões**. Uma conexão de dados é o acesso a um banco ou outra fonte que alimenta ETLs. Para investigar combinações de tabelas, abra Ver relacionamentos. A consulta usa apenas os metadados disponíveis à conexão e não altera o banco. Veja a orientação Relacionamentos entre tabelas para entender campos incompletos e limites de acesso. Para explorar tabelas e campos com busca e páginas, consulte a orientação Como buscar tabelas e colunas em uma conexão.",
       "pages": [
         "catalog",
         "connections"
@@ -794,6 +794,23 @@
         "activity"
       ],
       "actions": [],
+      "audience": "authors"
+    },
+    {
+      "id": "source-structure",
+      "title": "Como buscar tabelas e colunas em uma conexão?",
+      "summary": "Explore a estrutura da fonte com busca remota, páginas e indicação de campos parciais.",
+      "body": "Abra **Catálogo BI → Conexões de dados**, escolha a conexão e selecione **Ver tabelas e colunas**. Esta consulta mostra nomes, tipos e campos visíveis, incluindo tabelas e visões disponíveis ao conector. Ela não lê registros de negócio nem inicia cargas.\n\nNo PostgreSQL, MySQL e SQL Server, digite o assunto em **Buscar por tabela ou coluna** e selecione **Buscar na fonte**. A busca é feita na estrutura da fonte. Quando um campo corresponde, os demais campos visíveis da tabela também são considerados, respeitando as páginas. Não é uma busca de valores dos registros.\n\n**Próxima** e **Anterior** consultam páginas com até 500 campos. Os filtros aplicados permanecem ao trocar de página, mesmo que você tenha começado a editar uma nova busca. Se mudar o agrupamento no filtro opcional de schema, selecione Buscar na fonte ou Ver tabelas e colunas para aplicá-lo desde o início. Deixe esse filtro em branco quando não souber o nome técnico.\n\n**Campos parciais** informa que apenas parte dos campos visíveis está no resultado atual. Uma tabela pode continuar na próxima página. Refine pelo nome da tabela ou percorra as páginas antes de concluir sua estrutura. A contagem vale para os campos visíveis à conexão, não comprova todos os campos físicos nem acesso aos registros. Cada página reflete o momento da consulta; mudanças na fonte podem alterar a sequência.\n\n**Mostrar mais tabelas deste resultado** e **Mostrar mais campos** expandem o conteúdo já recebido, sem nova consulta. Abra uma tabela para conferir os campos. **Ocultar consulta** mantém os detalhes da conexão abertos. O aviso de consulta em andamento aparece junto aos controles de busca. Em falhas temporárias de rede ou de preenchimento da busca, o erro aparece nessa mesma área e o resultado anterior permanece identificado com seus filtros e horário; não o trate como resposta da nova busca. Sessão expirada, perda de acesso ou conexão alterada retiram o resultado anterior da tela. Quando a consulta é interrompida sem poder manter o resultado, a mensagem recebe foco para ficar visível.\n\nNos demais conectores e nos ambientes protegidos para somente leitura pelo portal, **Filtrar este resultado** busca apenas no relatório retornado. Os limites de tabelas e campos são indicados e não há promessa de paginação remota. Uma resposta vazia só é confirmada quando há evidência suficiente da consulta. Falha, falta de acesso e ausência de confirmação continuam distintas de uma lista vazia visível. A IA usa essas mesmas consultas autorizadas para investigar a fonte sem exigir SQL ou nomes de tabelas do usuário.",
+      "pages": [
+        "catalog",
+        "project"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Explorar conexões de dados"
+        }
+      ],
       "audience": "authors"
     },
     {

@@ -205,32 +205,26 @@ class BiCredentials
             $this->assertListed($connection, $context, $ref);
             $generation = $connection->metadata['session_generation'] ?? null;
             try {
-                if ($action === 'relationships') {
+                if (in_array($action, ['schema', 'relationships'], true)) {
                     [, $document] = $this->document($connection, $context, $ref);
-                    $report = app(BiSourceRelationships::class)->inspect($connection, $context, $ref, $this->types->driver((string) ($document['type'] ?? '')), $schema, $search, $offset);
-                    $this->assertGeneration($connection, $generation);
-                    [$current] = $this->catalog->access(User::findOrFail($connection->user_id), (string) $context->tenant_id);
-                    if ($current->id !== $connection->id || ($current->metadata['session_generation'] ?? null) !== $generation) {
-                        throw new RuntimeException('O acesso mudou durante a consulta de relacionamentos.');
+                    $driver = $this->types->driver((string) ($document['type'] ?? ''));
+                    if ($action === 'relationships') {
+                        $report = app(BiSourceRelationships::class)->inspect($connection, $context, $ref, $driver, $schema, $search, $offset);
+                    } elseif (in_array($driver, ['postgres', 'mysql', 'sqlserver'], true) && ! $this->policy->isReadOnly((string) $context->tenant_id, $connection)) {
+                        $report = app(BiSourceSchema::class)->inspect($connection, $context, $ref, $driver, $schema, $search, $offset);
+                    } elseif ($search !== null || $offset > 0) {
+                        $report = ['verified' => false, 'state' => 'unsupported', 'message' => $this->policy->isReadOnly((string) $context->tenant_id, $connection) ? 'A proteção de leitura deste ambiente permite somente o relatório nativo da estrutura, sem busca ou paginação remota.' : 'A busca na fonte e a paginação da estrutura estão disponíveis para PostgreSQL, MySQL e SQL Server. A consulta geral deste conector continua disponível, com os limites indicados no resultado.', 'checked_at' => now()->toIso8601String()];
                     }
-                    Audit::record($connection->user_id, 'bi.credential.relationships_read', 'Relacionamentos declarados consultados sem leitura de linhas de negócio.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $report['verified'], 'relationship_count' => count($report['relationships'] ?? []), 'truncated' => $report['truncated'] ?? null]);
+                    if (isset($report)) {
+                        $this->assertInspectionAccess($connection, $context, $generation);
+                        Audit::record($connection->user_id, 'bi.credential.'.($action === 'relationships' ? 'relationships_read' : 'schema_read'), 'Metadados da fonte consultados sem leitura de registros de negócio.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $report['verified'], ($action === 'relationships' ? 'relationship_count' : 'table_count') => count($report[$action === 'relationships' ? 'relationships' : 'tables'] ?? []), 'truncated' => $report['truncated'] ?? null, ...($action === 'schema' ? ['method' => $report['method'] ?? null] : [])]);
 
-                    return $report;
-                }
-                if ($action === 'schema' && ($search !== null || $offset > 0)) {
-                    [, $document] = $this->document($connection, $context, $ref);
-                    if ($this->types->driver((string) ($document['type'] ?? '')) !== 'postgres') {
-                        return ['verified' => false, 'state' => 'unsupported', 'message' => 'A busca refinada e a paginação da estrutura estão disponíveis para PostgreSQL nesta versão. A consulta geral continua disponível para este conector.'];
+                        return $report;
                     }
-                    $report = $this->postgresSchema($connection, $context, $ref, $schema, $search, $offset);
-                    $this->assertGeneration($connection, $generation);
-                    Audit::record($connection->user_id, 'bi.credential.schema_read', 'Consulta refinada da estrutura da fonte.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $report['verified'], 'method' => 'postgres_information_schema']);
-
-                    return [...$report, 'method' => 'postgres_information_schema'];
                 }
                 $result = $this->lumo->run($connection, ['credential', $action, $ref, ...($action === 'schema' && $schema !== null ? ['--schema', $schema] : []), ...($action === 'schema' ? ['--timeout', '45s'] : [])], $context, 60);
                 $data = $result['data'] ?? null;
-                $this->assertGeneration($connection, $generation);
+                $this->assertInspectionAccess($connection, $context, $generation);
                 if ($action === 'test') {
                     $verified = is_array($data) && ($data['ok'] ?? null) === true;
                     Audit::record($connection->user_id, 'bi.credential.tested', $verified ? 'Agente confirmou o teste de conectividade.' : 'O teste de conectividade não foi confirmado.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $verified]);
@@ -238,24 +232,16 @@ class BiCredentials
                     return ['verified' => $verified, 'state' => $verified ? 'connected' : 'unconfirmed', 'message' => $verified ? 'O agente conseguiu estabelecer a conexão com a fonte de dados.' : 'A resposta do BI não confirmou a conexão. Confira os dados e o agente selecionado.', 'checked_at' => now()->toIso8601String()];
                 }
 
-                $method = 'native';
-                if (is_array($data) && ($data['Success'] ?? null) === false && is_string($data['Error'] ?? null) && str_contains($data['Error'], '42601') && str_contains(strtoupper($data['Error']), 'UNION')) {
-                    [, $body] = $this->document($connection, $context, $ref);
-                    if ($this->types->driver((string) ($body['type'] ?? '')) === 'postgres') {
-                        $report = $this->postgresSchema($connection, $context, $ref, $schema);
-                        $method = 'postgres_information_schema';
-                    }
-                }
-                $report ??= $this->schema($data);
-                $this->assertGeneration($connection, $generation);
-                Audit::record($connection->user_id, 'bi.credential.schema_read', $report['verified'] ? 'Estrutura da fonte consultada pela conexão autorizada.' : 'A estrutura da fonte ainda não pôde ser confirmada.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $report['verified'], 'method' => $method]);
+                $report = $this->schema($data);
+                $this->assertInspectionAccess($connection, $context, $generation);
+                Audit::record($connection->user_id, 'bi.credential.schema_read', $report['verified'] ? 'Estrutura da fonte consultada pela conexão autorizada.' : 'A estrutura da fonte ainda não pôde ser confirmada.', null, ['tenant_id' => $context->tenant_id, 'resource' => $ref, 'verified' => $report['verified'], 'method' => 'native']);
 
-                return [...$report, 'method' => $method];
+                return [...$report, 'method' => 'native'];
             } catch (RuntimeException $e) {
-                if ($e instanceof BiBusy || $e instanceof HttpExceptionInterface || $connection->fresh()->status !== 'connected' || $e->getCode() === 6) {
+                if ($e instanceof BiBusy || $e instanceof HttpExceptionInterface || $connection->fresh()?->status !== 'connected' || $e->getCode() === 6) {
                     throw $e;
                 }
-                $this->assertGeneration($connection, $generation);
+                $this->assertInspectionAccess($connection, $context, $generation);
 
                 return ['verified' => false, 'state' => 'failed', 'message' => $action === 'test' ? 'O agente não confirmou o acesso. Confira endereço, porta, banco, usuário e senha, e se o agente está disponível.' : 'O agente não forneceu a estrutura da fonte. Confira o suporte do conector, as permissões e a disponibilidade do agente.', 'checked_at' => now()->toIso8601String()];
             }
@@ -336,6 +322,15 @@ class BiCredentials
         }
     }
 
+    private function assertInspectionAccess(Connection $connection, Project $context, ?string $generation): void
+    {
+        $this->assertGeneration($connection, $generation);
+        [$current] = $this->catalog->access(User::findOrFail($connection->user_id), (string) $context->tenant_id);
+        if ($current->id !== $connection->id || ($current->metadata['session_generation'] ?? null) !== $generation) {
+            throw new RuntimeException('O acesso mudou durante a consulta da fonte.');
+        }
+    }
+
     /** @return array{string, array<string, mixed>, array<string, mixed>} */
     private function document(Connection $connection, Project $context, string $ref): array
     {
@@ -394,43 +389,15 @@ class BiCredentials
     }
 
     /** @return array<string, mixed> */
-    private function postgresSchema(Connection $connection, Project $context, string $ref, ?string $schema, ?string $search = null, int $offset = 0): array
-    {
-        $where = $schema === null ? "table_schema NOT IN ('pg_catalog','information_schema')" : "table_schema = '".str_replace("'", "''", $schema)."'";
-        if ($search !== null) {
-            $literal = str_replace(['!', '%', '_', "'"], ['!!', '!%', '!_', "''"], $search);
-            $where .= " AND (table_name ILIKE '%".$literal."%' ESCAPE '!' OR column_name ILIKE '%".$literal."%' ESCAPE '!')";
-        }
-        $sql = 'SELECT table_schema AS schema_name, table_name, column_name, data_type, is_nullable, ordinal_position FROM information_schema.columns WHERE '.$where.' ORDER BY table_schema, table_name, ordinal_position LIMIT 5001'.($offset > 0 ? ' OFFSET '.$offset : '');
-        $result = $this->lumo->run($connection, ['credential', 'query', $ref, '--sql', $sql, '--limit', '5001', '--timeout', '45s'], $context, 60)['data'] ?? null;
-        $rows = is_array($result) ? ($result['rows'] ?? null) : null;
-        if (! is_array($rows) || ! array_is_list($rows) || $rows === []) {
-            return ['verified' => false, 'state' => 'unconfirmed', 'message' => 'A consulta não retornou metadados suficientes para confirmar a estrutura. Confira as permissões da fonte; um resultado vazio não comprova ausência de tabelas.', 'checked_at' => now()->toIso8601String()];
-        }
-        $tables = [];
-        $truncated = count($rows) > 5000;
-        foreach (array_slice($rows, 0, 5000) as $row) {
-            if (! is_array($row)) {
-                throw new RuntimeException('Formato de metadados não reconhecido.');
-            }
-            $row = array_change_key_case($row, CASE_LOWER);
-            foreach (['schema_name', 'table_name', 'column_name', 'data_type'] as $key) {
-                if (! is_string($row[$key] ?? null) || $row[$key] === '') {
-                    throw new RuntimeException('Formato de metadados não reconhecido.');
-                }
-            }
-            $key = json_encode([$row['schema_name'], $row['table_name']], JSON_THROW_ON_ERROR);
-            $tables[$key] ??= ['schema' => $row['schema_name'], 'name' => $row['table_name'], 'columns' => []];
-            $tables[$key]['columns'][] = ['name' => $row['column_name'], 'type' => $row['data_type'], 'nullable' => ($row['is_nullable'] ?? '') === 'YES'];
-        }
-
-        return ['verified' => true, 'state' => 'available', 'tables' => array_values($tables), 'truncated' => $truncated, 'next_offset' => $truncated ? $offset + 5000 : null, 'offset' => $offset, 'search' => $search, 'total_tables' => count($tables), 'message' => count($tables).' tabela(s) identificada(s) na consulta de estrutura.', 'checked_at' => now()->toIso8601String()];
-    }
-
-    /** @return array<string, mixed> */
     private function schema(mixed $data): array
     {
-        if (! is_array($data) || ($data['Success'] ?? null) === false || ($data['ok'] ?? null) === false || ($data['success'] ?? null) === false) {
+        $successful = is_array($data);
+        foreach (['Success', 'ok', 'success'] as $flag) {
+            if (is_array($data) && array_key_exists($flag, $data) && $data[$flag] !== true) {
+                $successful = false;
+            }
+        }
+        if (! $successful) {
             return ['verified' => false, 'state' => 'failed', 'message' => 'O BI não forneceu uma estrutura válida para esta fonte. Isso não significa que o banco esteja vazio.', 'checked_at' => now()->toIso8601String()];
         }
         $tables = $data['tables'] ?? $data['Tables'] ?? null;
@@ -438,15 +405,34 @@ class BiCredentials
             return ['verified' => false, 'state' => 'unconfirmed', 'message' => 'O formato da estrutura retornada ainda não pôde ser confirmado. Nenhuma tabela vazia será presumida.', 'checked_at' => now()->toIso8601String()];
         }
         $result = [];
+        $columnsTruncated = false;
         foreach (array_slice($tables, 0, 500) as $table) {
-            if (! is_array($table) || ! is_string($table['name'] ?? $table['Name'] ?? null)) {
+            if (! is_array($table) || ! is_string($table['name'] ?? $table['Name'] ?? null) || ($table['name'] ?? $table['Name']) === '' || strlen($table['name'] ?? $table['Name']) > 1024) {
                 throw new RuntimeException('Estrutura de tabelas não reconhecida.');
             }
             $columns = $table['columns'] ?? $table['Columns'] ?? [];
-            $result[] = ['name' => $table['name'] ?? $table['Name'], 'schema' => $table['schema'] ?? $table['Schema'] ?? null, 'columns' => array_map(fn (array $column): array => ['name' => $column['name'] ?? $column['Name'] ?? '', 'type' => $column['type'] ?? $column['Type'] ?? null], array_slice(is_array($columns) ? $columns : [], 0, 300))];
+            if (! is_array($columns) || ! array_is_list($columns)) {
+                throw new RuntimeException('Estrutura de colunas não reconhecida.');
+            }
+            $normalized = [];
+            foreach (array_slice($columns, 0, 300) as $column) {
+                $name = is_array($column) ? ($column['name'] ?? $column['Name'] ?? null) : null;
+                $type = is_array($column) ? ($column['type'] ?? $column['Type'] ?? null) : null;
+                if (! is_string($name) || $name === '' || strlen($name) > 1024 || ($type !== null && (! is_string($type) || strlen($type) > 1024))) {
+                    throw new RuntimeException('Estrutura de colunas não reconhecida.');
+                }
+                $normalized[] = ['name' => $name, 'type' => $type];
+            }
+            $tableSchema = $table['schema'] ?? $table['Schema'] ?? null;
+            if ($tableSchema !== null && (! is_string($tableSchema) || strlen($tableSchema) > 1024)) {
+                throw new RuntimeException('Schema da tabela não reconhecido.');
+            }
+            $limited = count($columns) > 300;
+            $columnsTruncated = $columnsTruncated || $limited;
+            $result[] = ['name' => $table['name'] ?? $table['Name'], 'schema' => $tableSchema, 'columns_truncated' => $limited, 'columns' => $normalized];
         }
 
-        return ['verified' => true, 'state' => 'available', 'tables' => $result, 'truncated' => count($tables) > 500, 'total_tables' => count($tables), 'message' => count($tables).' tabela(s) retornada(s) pela fonte.', 'checked_at' => now()->toIso8601String()];
+        return ['verified' => true, 'state' => 'available', 'tables' => $result, 'truncated' => count($tables) > 500 || $columnsTruncated, 'columns_truncated' => $columnsTruncated, 'pagination_supported' => false, 'search_supported' => false, 'offset' => 0, 'next_offset' => null, 'schema' => null, 'search' => null, 'coverage' => 'native_report', 'total_tables' => count($tables), 'message' => count($tables).' tabela(s) retornada(s) pela fonte.', 'checked_at' => now()->toIso8601String()];
     }
 
     /** @return array<string, mixed> */

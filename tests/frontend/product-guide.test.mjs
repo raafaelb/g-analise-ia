@@ -47,3 +47,9 @@ test('source relationship help is discoverable without requiring SQL terminology
  const matches=searchGuideArticles(content.articles,'relacionamentos entre tabelas','catalog');
  assert.equal(matches[0].id,'source-relationships');
 });
+
+
+test('structure discovery help distinguishes remote searches from local result filters',()=>{
+ const matches=searchGuideArticles(content.articles,'buscar tabelas colunas conexão','catalog');
+ assert.equal(matches[0].id,'source-structure');
+});
