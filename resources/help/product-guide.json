@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.14",
+  "version": "2026-10-31.16",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -304,7 +304,7 @@
         {
           "id": "refresh-coverage",
           "title": "Confira todas as fontes",
-          "description": "Selecione o trabalho para verificar todas as fontes, as agendas, os horários e as janelas de execução. Fontes compartilhadas não devem ganhar agendas duplicadas.",
+          "description": "Selecione o projeto e use Verificar atualizações para conferir suas fontes, agendas e cargas. Trocar de projeto ou de aplicação descarta a resposta anterior. A consulta preserva agendas mais frequentes e não executa cargas.",
           "anchor": "refresh-coverage",
           "audience": "all"
         },
@@ -318,7 +318,7 @@
         {
           "id": "refresh-result",
           "title": "Enfileirado ainda não é sucesso",
-          "description": "Confira agenda ativa, horário de Brasília e execução concluída. Use os detalhes e o histórico para investigar falhas, sem repetir cargas às cegas.",
+          "description": "Atualização diária verificada confirma agenda, última carga e teste da configuração consultada. Fonte nova pode solicitar sua primeira carga; aguarde a conclusão. Configuração a conferir pede nova consulta antes de decidir sobre a agenda.",
           "audience": "all"
         },
         {
@@ -637,7 +637,7 @@
       "id": "refresh",
       "title": "Como garanto a atualização dos dados?",
       "summary": "Confira todas as fontes, agenda ativa e execução concluída com sucesso.",
-      "body": "Abra **Atualização de dados** para verificar a cobertura do trabalho. Cada novo dashboard deve ter todas as fontes atualizadas pelo menos uma vez por dia; agendas mais frequentes devem ser preservadas. Prefira a madrugada no horário de Brasília e evite duplicar agendas para fontes compartilhadas.\n\n**Enfileirado** não significa sucesso. Confirme que a agenda está ativa e que a carga terminou com sucesso no BI. Histórico e detalhes ajudam a investigar falhas.\n\nUma fonte privada pode impedir o agendamento. Nessa situação, a publicação necessária deve ser apresentada para autorização; o trabalho não deve ser considerado concluído com atualização apenas manual sem explicar a pendência.\n\nNo **Catálogo BI → Agendas**, abra a agenda para conferir todos os gatilhos, horários e janelas de execução. Uma agenda pode ter mais de um horário. Agendas semanais e mensais têm dias específicos; o dia do mês não é um intervalo de meses. Uma janela de execução pode impedir que um intervalo alcance todos os dias.\n\n**Quando os dados mudarem** é uma sondagem condicional: verificar a origem a cada poucos segundos não significa carregar os dados nessa frequência nem garante uma carga diária. A revisão na conversa usa as mesmas descrições dos detalhes da agenda. Confira sempre também o resultado real das fontes.\n\nPara solicitar uma carga pontual, abra **Catálogo BI → Agendas → uma agenda ativa → Atualizar agora**. Revise as fontes pelo nome e autorize. O acompanhamento fica salvo para sua conta e continua após fechar a página. Na conversa, pedidos da IA usam o mesmo acompanhamento e mostram o resultado no cartão da autorização.",
+      "body": "Abra **Atualização de dados** para verificar a cobertura do trabalho. Cada novo dashboard deve ter todas as fontes atualizadas pelo menos uma vez por dia; agendas mais frequentes devem ser preservadas. Prefira a madrugada no horário de Brasília e evite duplicar agendas para fontes compartilhadas.\n\n**Enfileirado** não significa sucesso. Confirme que a agenda está ativa e que a carga terminou com sucesso no BI. Histórico e detalhes ajudam a investigar falhas.\n\nUma fonte privada pode impedir o agendamento. Nessa situação, a publicação necessária deve ser apresentada para autorização; o trabalho não deve ser considerado concluído com atualização apenas manual sem explicar a pendência.\n\nNo **Catálogo BI → Agendas**, abra a agenda para conferir todos os gatilhos, horários e janelas de execução. Uma agenda pode ter mais de um horário. Agendas semanais e mensais têm dias específicos; o dia do mês não é um intervalo de meses. Uma janela de execução pode impedir que um intervalo alcance todos os dias.\n\n**Quando os dados mudarem** é uma sondagem condicional: verificar a origem a cada poucos segundos não significa carregar os dados nessa frequência nem garante uma carga diária. A revisão na conversa usa as mesmas descrições dos detalhes da agenda. Confira sempre também o resultado real das fontes.\n\nPara solicitar uma carga pontual, abra **Catálogo BI → Agendas → uma agenda ativa → Atualizar agora**. Revise as fontes pelo nome e autorize. O acompanhamento fica salvo para sua conta e continua após fechar a página. Na conversa, pedidos da IA usam o mesmo acompanhamento e mostram o resultado no cartão da autorização.\n\nEm **Conferir todas as fontes**, selecione o projeto e clique em **Verificar atualizações**. Se trocar de projeto ou se a aplicação vinculada mudar durante a consulta, a resposta anterior é descartada. Uma nova consulta mantém o contexto do trabalho selecionado.\n\n**Atualização diária verificada** confirma que a configuração consultada está coberta, a última carga terminou e há um teste confirmado para essa configuração. **Últimas cargas conferidas; teste pendente** indica que a observação do histórico ainda precisa desse comprovante. Uma agenda pausada não usa o teste de outra agenda; alternativas ativas são conferidas separadamente.\n\nSe os metadados não puderem ser atualizados, uma área estiver sem acesso ou faltar a configuração de uma agenda, a conferência informa a pendência. **Fonte não identificada** indica um vínculo que ainda precisa ser conferido na aplicação. Uma consulta incompleta não comprova ausência de agenda e não deve motivar outra agenda duplicada.\n\n**Configuração a conferir** pode aparecer se a agenda mudou durante a consulta ou a versão atual não pôde ser confirmada. Confira o acesso ou a agenda no Catálogo BI e use **Verificar atualizações** novamente. Repetir essa consulta não executa outra carga. A criação, alteração ou execução de uma agenda segue suas próprias revisões.\n\nUma fonte recém-publicada pode ainda não ter histórico. Isso não impede solicitar sua primeira carga quando a agenda está ativa, a fonte está publicada e o acesso foi conferido. Autorize em **Atualizar agora** e acompanhe até a conclusão; ausência de histórico não confirma sucesso. Falhas de permissão, conexão ou estado desconhecido continuam exigindo conferência antes de enviar.",
       "pages": [
         "refresh",
         "project",

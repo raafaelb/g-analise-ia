@@ -8,6 +8,7 @@ use App\Models\RefreshSchedule;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 class RefreshCoverage
 {
@@ -15,11 +16,19 @@ class RefreshCoverage
     {
         $sources = [];
         $unresolved = [];
-        foreach ($app['tables'] ?? [] as $binding) {
-            $id = (string) ($binding['tableId'] ?? '');
-            if (! preg_match('/^[1-9][0-9]*$/D', $id)) {
+        $bindings = $app['tables'] ?? null;
+        if (! is_array($bindings) || ! array_is_list($bindings)) {
+            $unresolved[] = ['table_id' => null, 'reason' => 'O BI não forneceu uma lista reconhecida de tabelas vinculadas à aplicação. Confira a configuração antes de concluir a atualização diária.'];
+            $bindings = [];
+        }
+        foreach ($bindings as $binding) {
+            $value = is_array($binding) ? ($binding['tableId'] ?? null) : null;
+            if ((! is_int($value) && ! is_string($value)) || ! preg_match('/^[1-9][0-9]*$/D', (string) $value)) {
+                $unresolved[] = ['table_id' => null, 'reason' => 'Uma tabela vinculada não possui referência válida. Confira a aplicação antes de concluir a atualização diária.'];
+
                 continue;
             }
+            $id = (string) $value;
             $table = $tables[$id] ?? null;
             if (! $table) {
                 $unresolved[] = ['table_id' => $id, 'reason' => 'Metadados da tabela indisponíveis para a sessão.'];
@@ -78,6 +87,14 @@ class RefreshCoverage
         }
         $catalog = app(BiCatalog::class);
         $snapshot = $catalog->snapshot($user, $tenant, true);
+        if (($snapshot['metadata_fresh'] ?? false) !== true) {
+            throw new RuntimeException('Não foi possível atualizar os metadados necessários para conferir as fontes e agendas. Tente Verificar atualizações novamente; os arquivos anteriores não confirmam a configuração atual.');
+        }
+        foreach (['table', 'flow', 'schedule'] as $kind) {
+            if (($snapshot['capabilities'][$kind]['status'] ?? null) !== 'available') {
+                throw new RuntimeException('Não foi possível consultar todas as tabelas, fontes e agendas com o acesso atual. Atualize os acessos em Conexões e confira as permissões no BI antes de concluir a conferência.');
+            }
+        }
         $detail = $catalog->detail($user, $tenant, 'app', $appId, includeRelations: false);
         [$connection,$item] = $catalog->access($user, $tenant);
         $context = $catalog->context($connection, $item);
@@ -89,71 +106,104 @@ class RefreshCoverage
                 $ref = $kind.':'.$resource['id'];
                 if (isset($documents[$ref])) {
                     $maps[$kind][(string) $resource['id']] = $documents[$ref];
+                } elseif ($kind === 'schedule') {
+                    throw new RuntimeException('Uma ou mais agendas não forneceram sua configuração para esta consulta. Confira o acesso às agendas antes de criar outra ou confirmar a atualização diária.');
                 }
             }
         }
         $report = $this->assess($detail['details'], $maps['table'], $maps['flow'], $maps['schedule']);
         $logs = [];
+        $configurations = [];
         foreach ($report['sources'] as &$source) {
             $source['last_execution'] = null;
+            $best = null;
+            $bestScore = -1;
+            $checkedSchedules = [];
             foreach ($source['schedules'] as $schedule) {
                 if (! $schedule['covers_daily']) {
                     continue;
                 }
+                $candidate = $source;
+                $candidate['configured'] = false;
+                $id = $schedule['id'];
                 try {
-                    $id = $schedule['id'];
-                    $logs[$id] ??= app(LumoClient::class)->run($connection, ['info', 'schedule:'.$id], $context)['data'];
-                    $payload = $logs[$id]['payload'] ?? $logs[$id];
-                    $execution = $this->execution($logs[$id], (int) $id, [$source['flow_id']]);
-                    $record = $project ? RefreshSchedule::where('user_id', $user->id)->where('tenant_id', $tenant)->where('source_id', $source['resource'])->first() : null;
-                    $test = $record?->metadata['test_request'] ?? null;
-                    $tracked = BiLoadExecution::where('user_id', $user->id)->where('tenant_id', $tenant)->where('schedule_id', (string) $id)->where('status', 'succeeded')->latest()->limit(100)->get()->first(fn ($load) => ($load->metadata['proof']['verified'] ?? false) === true && in_array((string) $source['flow_id'], array_column($load->metadata['bindings'] ?? [], 'flow_id'), true) && hash_equals((string) ($load->metadata['configuration_hash'] ?? ''), $this->signature($maps['schedule'][$id] ?? [], $documents)));
-                    if ($tracked && (! is_array($test) || empty($test['requested_at']) || $tracked->requested_at->greaterThan(Carbon::parse($test['requested_at'])))) {
-                        $source['test_execution'] = $tracked->metadata['proof'];
-                    }
-                    if (! isset($source['test_execution']) && is_array($test) && (string) ($test['schedule_id'] ?? '') === (string) $id) {
-                        $configuration = $this->signature($maps['schedule'][$id] ?? [], $documents);
-                        $sameConfiguration = ! empty($test['configuration_hash']) && hash_equals($test['configuration_hash'], $configuration);
-                        if ($sameConfiguration) {
-                            if (empty($test['run_id'])) {
-                                $history = app(LumoClient::class)->run($connection, ['schedule', 'logs', 'schedule:'.$id, '--since', $test['requested_at'], '--tail', '100'], $context)['data'];
-                                $test = $this->correlate($history, $test);
-                                if ($user->role !== 'viewer') {
-                                    $record->update(['metadata' => [...($record->metadata ?? []), 'test_request' => $test]]);
-                                }
-                            }
-                            $proof = $record->metadata['test_result'] ?? null;
-                            if (! empty($proof['verified']) && ($proof['run_id'] ?? null) === ($test['run_id'] ?? null)) {
-                                $verification = $proof;
-                            } elseif (! empty($test['run_id'])) {
-                                $verification = $this->execution($logs[$id], (int) $id, $test['expected_flow_ids'], $test['run_id'], $test['requested_at']);
-                            } else {
-                                $verification = ['status' => $test['correlation'] ?? 'awaiting_history', 'verified' => false];
-                            }
-                            $source['test_execution'] = $verification;
-                            if ($verification['verified'] && $user->role !== 'viewer') {
-                                $record->update(['metadata' => [...($record->metadata ?? []), 'test_result' => $verification, 'test_verified' => true]]);
-                            }
-                        } else {
-                            $source['test_execution'] = ['status' => 'configuration_changed', 'verified' => false];
+                    $configurations[$id] ??= app(LumoClient::class)->run($connection, ['diff', 'schedule:'.$id, '--include-remote'], $context)['data'];
+                    $equal = $configurations[$id]['workingVsServer']['equal'] ?? null;
+                    if ($equal !== true) {
+                        $candidate['last_execution'] = ['status' => $equal === false ? 'configuration_changed' : 'unavailable', 'verified' => false, 'schedule_id' => $id];
+                        $checkedSchedules[$id] = ['configuration_current' => false, 'covers_daily' => false];
+                    } else {
+                        $logs[$id] ??= app(LumoClient::class)->run($connection, ['info', 'schedule:'.$id], $context)['data'];
+                        $payload = $logs[$id]['payload'] ?? $logs[$id];
+                        $execution = $this->execution($logs[$id], (int) $id, [$candidate['flow_id']]);
+                        $record = $project ? RefreshSchedule::where('user_id', $user->id)->where('tenant_id', $tenant)->where('source_id', $candidate['resource'])->first() : null;
+                        $test = $record?->metadata['test_request'] ?? null;
+                        $tracked = BiLoadExecution::where('user_id', $user->id)->where('tenant_id', $tenant)->where('schedule_id', (string) $id)->where('status', 'succeeded')->latest()->limit(100)->get()->first(fn ($load) => ($load->metadata['proof']['verified'] ?? false) === true && in_array((string) $candidate['flow_id'], array_column($load->metadata['bindings'] ?? [], 'flow_id'), true) && hash_equals((string) ($load->metadata['configuration_hash'] ?? ''), $this->signature($maps['schedule'][$id] ?? [], $documents)));
+                        if ($tracked && (! is_array($test) || empty($test['requested_at']) || $tracked->requested_at->greaterThan(Carbon::parse($test['requested_at'])))) {
+                            $candidate['test_execution'] = $tracked->metadata['proof'];
                         }
-                    }
+                        if (! isset($candidate['test_execution']) && is_array($test) && (string) ($test['schedule_id'] ?? '') === (string) $id) {
+                            $configuration = $this->signature($maps['schedule'][$id] ?? [], $documents);
+                            $sameConfiguration = ! empty($test['configuration_hash']) && hash_equals($test['configuration_hash'], $configuration);
+                            if ($sameConfiguration) {
+                                if (empty($test['run_id'])) {
+                                    $history = app(LumoClient::class)->run($connection, ['schedule', 'logs', 'schedule:'.$id, '--since', $test['requested_at'], '--tail', '100'], $context)['data'];
+                                    $test = $this->correlate($history, $test);
+                                    if ($user->role !== 'viewer') {
+                                        $record->update(['metadata' => [...($record->metadata ?? []), 'test_request' => $test]]);
+                                    }
+                                }
+                                $proof = $record->metadata['test_result'] ?? null;
+                                if (! empty($proof['verified']) && ($proof['run_id'] ?? null) === ($test['run_id'] ?? null)) {
+                                    $verification = $proof;
+                                } elseif (! empty($test['run_id'])) {
+                                    $verification = $this->execution($logs[$id], (int) $id, $test['expected_flow_ids'], $test['run_id'], $test['requested_at']);
+                                } else {
+                                    $verification = ['status' => $test['correlation'] ?? 'awaiting_history', 'verified' => false];
+                                }
+                                $candidate['test_execution'] = $verification;
+                                if ($verification['verified'] && $user->role !== 'viewer') {
+                                    $record->update(['metadata' => [...($record->metadata ?? []), 'test_result' => $verification, 'test_verified' => true]]);
+                                }
+                            } else {
+                                $candidate['test_execution'] = ['status' => 'configuration_changed', 'verified' => false];
+                            }
+                        }
 
-                    if ($execution['status'] === 'observed_success' && Carbon::parse($execution['finished_at'])->lessThan(now()->subDay())) {
-                        $execution['status'] = 'stale';
+                        if ($execution['status'] === 'observed_success' && Carbon::parse($execution['finished_at'])->lessThan(now()->subDay())) {
+                            $execution['status'] = 'stale';
+                        }
+                        $active = $payload['ativo'] ?? null;
+                        $candidate['configured'] = $candidate['published'] && $active === true;
+                        $checkedSchedules[$id] = ['configuration_current' => true, 'active' => $active === true, 'covers_daily' => $active === true];
+                        if ($active !== true) {
+                            $execution['status'] = $active === false ? 'inactive' : 'unavailable';
+                        }
+                        $candidate['last_execution'] = [...$execution, 'schedule_id' => $id];
                     }
-                    if (($payload['ativo'] ?? null) !== true) {
-                        $execution['status'] = 'inactive';
-                        $source['configured'] = false;
-                    }
-                    $source['last_execution'] = [...$execution, 'schedule_id' => $id];
-                    if (in_array($execution['status'], ['observed_success', 'completed'], true)) {
-                        break;
-                    }
-                } catch (\RuntimeException $e) {
-                    $source['last_execution'] = ['status' => 'unavailable', 'verified' => false, 'message' => $e->getMessage()];
+                } catch (RuntimeException $e) {
+                    $candidate['last_execution'] = ['status' => 'unavailable', 'verified' => false, 'message' => $e->getMessage(), 'schedule_id' => $id];
+                    $checkedSchedules[$id] = ['configuration_current' => false, 'covers_daily' => false];
+                }
+                if (! $candidate['configured'] && $source['status'] === 'daily_configured') {
+                    $status = $candidate['last_execution']['status'] ?? 'unavailable';
+                    $candidate['status'] = in_array($status, ['inactive', 'configuration_changed'], true) ? $status : 'metadata_unavailable';
+                    $candidate['recommendation'] = 'verify_current_configuration';
+                }
+                $successful = in_array($candidate['last_execution']['status'] ?? '', ['observed_success', 'completed'], true);
+                $score = $candidate['configured'] ? ($successful ? (! empty($candidate['test_execution']['verified']) ? 3 : 2) : 1) : 0;
+                if ($score > $bestScore) {
+                    $best = $candidate;
+                    $bestScore = $score;
+                }
+                if ($score === 3) {
+                    break;
                 }
             }
+            if ($best !== null) {
+                $source = $best;
+            }
+            $source['schedules'] = array_map(fn (array $schedule): array => [...$schedule, ...($checkedSchedules[$schedule['id']] ?? [])], $source['schedules']);
             if ($project && $user->role !== 'viewer') {
                 $record = RefreshSchedule::firstOrNew(['user_id' => $user->id, 'tenant_id' => $tenant, 'source_id' => $source['resource']]);
                 if (! $record->exists) {
@@ -169,6 +219,7 @@ class RefreshCoverage
         $report['last_executions_successful'] = $report['configured'] && collect($report['sources'])->every(fn ($source) => in_array($source['last_execution']['status'] ?? '', ['observed_success', 'completed'], true));
 
         $report['verified'] = $report['last_executions_successful'] && collect($report['sources'])->every(fn ($source) => $source['test_execution']['verified'] ?? false);
+        $report['message'] = $report['verified'] ? 'Agendas e teste de carga conferidos para a configuração consultada.' : ($report['configured'] ? 'Agendas identificadas; o teste da configuração atual ainda exige conferência.' : 'Há fontes pendentes. Não foi criada ou alterada nenhuma agenda.');
 
         return [...$report, 'tenant' => $detail['tenant'], 'application' => $detail['resource'], 'checked_at' => now()->toIso8601String()];
     }

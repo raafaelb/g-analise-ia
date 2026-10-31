@@ -18,6 +18,18 @@ class BiNativeFailureTest extends TestCase
 
     private const CAPACITY = 'Error: start import for writeback:10: Limite de linhas dos Cadastros atingido (0/0). Esta operação precisa de 2 linhas; margem disponível: 0 linhas.';
 
+    private const NO_EXECUTION = 'Error: status flow:10: Flow 10 ainda não tem execução registrada.';
+
+    public function test_a_first_execution_status_returns_a_scoped_safe_reason(): void
+    {
+        $failure = BiNativeFailure::detect(['flow', 'status', 'flow:10'], 9, '', self::NO_EXECUTION."\n");
+
+        $this->assertInstanceOf(BiNativeFailure::class, $failure);
+        $this->assertSame('flow_no_execution', $failure->reason);
+        $this->assertSame(['resource' => 'flow:10'], $failure->details);
+        $this->assertSame('Esta fonte ainda não possui uma execução registrada.', $failure->getMessage());
+    }
+
     public function test_capacity_error_returns_only_safe_counts_for_an_import(): void
     {
         $failure = BiNativeFailure::detect(['writeback', 'import', 'writeback:10', 'file.xlsx'], 9, '', self::CAPACITY."\nhttps://example.invalid/download?token=private-value");
@@ -46,6 +58,12 @@ class BiNativeFailureTest extends TestCase
             'another export' => [['writeback', 'export', 'writeback:11'], 9, 'Error: download export for writeback:10 failed: 403 forbidden'],
             'server error' => [['writeback', 'export', 'writeback:10'], 9, 'Error: download export for writeback:10 failed: 500 error'],
             'oversized integer' => [['writeback', 'import', 'writeback:10'], 9, str_replace('(0/0)', '(999999999999999999999/0)', self::CAPACITY)],
+            'no execution for another flow' => [['flow', 'status', 'flow:11'], 9, self::NO_EXECUTION],
+            'mismatched status identity' => [['flow', 'status', 'flow:10'], 9, str_replace('Flow 10', 'Flow 11', self::NO_EXECUTION)],
+            'no execution authentication' => [['flow', 'status', 'flow:10'], 6, self::NO_EXECUTION],
+            'no execution from another command' => [['flow', 'run', 'flow:10'], 9, self::NO_EXECUTION],
+            'unknown status failure' => [['flow', 'status', 'flow:10'], 9, 'Error: status flow:10: permission denied'],
+            'untrusted extra status output' => [['flow', 'status', 'flow:10'], 9, self::NO_EXECUTION."\nPrivate diagnostic must stay unclassified"],
         ];
     }
 

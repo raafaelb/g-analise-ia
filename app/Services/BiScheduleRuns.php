@@ -128,7 +128,15 @@ class BiScheduleRuns
                     throw new RuntimeException('Esta agenda já tem uma execução em andamento. Acompanhe o histórico antes de solicitar outra.');
                 }
                 foreach (array_unique($ids) as $flowId) {
-                    $status = $this->lumo->run($current, ['flow', 'status', 'flow:'.$flowId], $context, 60)['data'];
+                    try {
+                        $status = $this->lumo->run($current, ['flow', 'status', 'flow:'.$flowId], $context, 60)['data'];
+                    } catch (BiNativeFailure $failure) {
+                        if ($failure->reason !== 'flow_no_execution' || ($failure->details['resource'] ?? null) !== 'flow:'.$flowId) {
+                            throw $failure;
+                        }
+
+                        continue;
+                    }
                     if (! is_array($status) || (! empty($status['startedWhen']) && empty($status['finishedWhen']))) {
                         throw new RuntimeException('Uma das fontes está ocupada ou seu estado não pôde ser conferido. Aguarde antes de solicitar outra carga.');
                     }

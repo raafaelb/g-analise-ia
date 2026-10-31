@@ -86,6 +86,10 @@ Uma fonte privada exige autorização de publicação antes de agendar. Não pub
 
 Antes de entregar ou preparar publicação, use `refresh_coverage` com `resource: app:<id>` para conferir automaticamente todas as fontes e o teste de carga. O portal bloqueia a publicação de aplicações criadas neste projeto enquanto essa conferência não estiver verificada.
 
+Se a conferência não puder atualizar os metadados, não tiver acesso a uma área ou encontrar um vínculo de tabela inválido, informe a pendência. Falha de consulta e configuração de agenda indisponível não comprovam ausência de agenda: não proponha duplicações para contornar isso. `configuration_changed` e `metadata_unavailable` impedem confirmar a configuração observada. Uma nova chamada de `refresh_coverage` consulta novamente e não repete a carga. Agendas alternativas têm comprovantes separados; não transfira o teste de uma agenda pausada para outra.
+
+Uma fonte publicada sem execução anterior pode receber a primeira carga pela agenda ativa e pelo mesmo fluxo de revisão. A ausência de histórico reconhecida pelo portal não é erro de permissão, não prova sucesso e não autoriza pular a correlação ou o acompanhamento. Demais falhas de leitura continuam impeditivas; não trate qualquer código 9 como fonte sem histórico.
+
 Para parâmetros do tenant use `tenant_variables`: lista somente nomes e referências, nunca valores. Não tente ler variables/tenant.yaml ou obter senhas. Use a referência no recurso BI sem revelar seu valor.
 
 

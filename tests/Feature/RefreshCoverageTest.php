@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\RefreshCoverage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class RefreshCoverageTest extends TestCase
@@ -145,5 +146,49 @@ class RefreshCoverageTest extends TestCase
         $log = $this->completedLog();
         $log['last_log']['flows'][0]['FinishedWhen'] = 'invalid';
         $this->assertFalse(app(RefreshCoverage::class)->execution($log, 100, [10], 'new-run', now()->subMinutes(3)->toIso8601String())['verified']);
+    }
+
+    private function dailyAssessment(array $application): array
+    {
+        return app(RefreshCoverage::class)->assess($application, [1 => ['nome' => 'Pedidos', 'originFlowId' => 10]], [10 => ['nome' => 'Carga', 'deskId' => 2, 'load_type' => 'Total']], [100 => ['nome' => 'Madrugada', 'ativo' => true, 'flows' => [['flow_etl_id' => 10, 'context' => 'Total']], 'triggers' => [['type' => 'Day', 'start_when' => '03:00']]]]);
+    }
+
+    #[DataProvider('unidentifiedBindings')]
+    public function test_an_unidentified_binding_keeps_coverage_incomplete_even_with_a_configured_source(mixed $binding): void
+    {
+        $report = $this->dailyAssessment(['tables' => [['tableId' => 1], $binding]]);
+
+        $this->assertFalse($report['configured']);
+        $this->assertFalse($report['verified']);
+        $this->assertTrue($report['sources'][0]['configured']);
+        $this->assertSame([['table_id' => null, 'reason' => 'Uma tabela vinculada não possui referência válida. Confira a aplicação antes de concluir a atualização diária.']], $report['unresolved_tables']);
+        $this->assertStringNotContainsString('SYNTHETIC-PRIVATE', json_encode($report));
+    }
+
+    public static function unidentifiedBindings(): array
+    {
+        return ['missing identifier' => [[]], 'text instead of binding' => ['SYNTHETIC-PRIVATE-REFERENCE'], 'boolean identifier' => [['tableId' => true]], 'float identifier' => [['tableId' => 1.0]], 'array identifier' => [['tableId' => [1]]], 'negative identifier' => [['tableId' => '-1']], 'noncanonical identifier' => [['tableId' => '01']]];
+    }
+
+    #[DataProvider('unrecognizedTableLists')]
+    public function test_an_unrecognized_table_list_remains_an_explicit_pending_source(array $application): void
+    {
+        $report = $this->dailyAssessment($application);
+
+        $this->assertFalse($report['configured']);
+        $this->assertSame([['table_id' => null, 'reason' => 'O BI não forneceu uma lista reconhecida de tabelas vinculadas à aplicação. Confira a configuração antes de concluir a atualização diária.']], $report['unresolved_tables']);
+    }
+
+    public static function unrecognizedTableLists(): array
+    {
+        return ['missing list' => [[]], 'null list' => [['tables' => null]], 'scalar list' => [['tables' => 'SYNTHETIC-PRIVATE-REFERENCE']], 'object list' => [['tables' => ['item' => ['tableId' => 1]]]]];
+    }
+
+    public function test_a_canonical_string_table_id_keeps_daily_coverage(): void
+    {
+        $report = $this->dailyAssessment(['tables' => [['tableId' => '1']]]);
+
+        $this->assertTrue($report['configured']);
+        $this->assertSame([], $report['unresolved_tables']);
     }
 }

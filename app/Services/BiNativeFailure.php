@@ -17,6 +17,9 @@ class BiNativeFailure extends RuntimeException
             return null;
         }
         $failure = mb_substr($stderr, 0, 12_000)."\n".mb_substr($output, 0, 4_000);
+        if (($arguments[0] ?? '') === 'flow' && ($arguments[1] ?? '') === 'status' && preg_match('/^flow:([1-9][0-9]*)$/D', $arguments[2] ?? '', $reference) && preg_match('/\AError: status '.preg_quote($arguments[2], '/').': Flow '.$reference[1].' ainda não tem execução registrada\.\z/u', trim($failure))) {
+            return new self('flow_no_execution', 'Esta fonte ainda não possui uma execução registrada.', ['resource' => $arguments[2]]);
+        }
         $imports = (($arguments[0] ?? '') === 'new' && ($arguments[1] ?? '') === 'writeback' && in_array('--from-file', $arguments, true)) || (($arguments[0] ?? '') === 'writeback' && ($arguments[1] ?? '') === 'import');
         if ($imports && preg_match('/Limite de linhas dos Cadastros atingido \((\d{1,15})\/(\d{1,15})\).*?precisa de (\d{1,15}) linhas; margem disponível: (\d{1,15}) linhas/isu', $failure, $match)) {
             $values = array_map(intval(...), array_slice($match, 1));

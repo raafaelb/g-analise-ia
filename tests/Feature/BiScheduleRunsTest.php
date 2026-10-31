@@ -15,6 +15,7 @@ use App\Models\Project;
 use App\Models\RefreshSchedule;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
+use App\Services\BiNativeFailure;
 use App\Services\BiScheduleRuns;
 use App\Services\LumoClient;
 use App\Services\UserAccessRevocation;
@@ -46,6 +47,8 @@ class BiScheduleRunsTest extends TestCase
     private ?int $sendError = null;
 
     private bool $busySource = false;
+
+    private ?RuntimeException $sourceError = null;
 
     private bool $denySchedules = false;
 
@@ -111,6 +114,10 @@ class BiScheduleRunsTest extends TestCase
                 return ['data' => ['schedule' => ['id' => 20], 'lista' => $this->history]];
             }
             if (array_slice($arguments, 0, 2) === ['flow', 'status']) {
+                if ($this->sourceError !== null) {
+                    throw $this->sourceError;
+                }
+
                 return ['data' => $this->busySource ? ['startedWhen' => '2026-10-31T05:59:00Z', 'finishedWhen' => null] : ['startedWhen' => '2026-10-30T06:00:00Z', 'finishedWhen' => '2026-10-30T06:00:10Z', 'success' => true]];
             }
             if (array_slice($arguments, 0, 2) === ['schedule', 'run']) {
@@ -185,6 +192,54 @@ class BiScheduleRunsTest extends TestCase
         $this->assertSame(1, $this->sends());
         $this->assertSame($before, $this->bodies);
         Queue::assertPushed(ObserveBiLoadExecution::class, fn ($job) => $job->executionId === BiLoadExecution::sole()->id);
+    }
+
+    public function test_a_published_source_without_execution_history_can_receive_its_first_load(): void
+    {
+        Queue::fake([ExecuteApprovedAction::class, ObserveBiLoadExecution::class]);
+        [$user] = $this->context();
+        $this->sourceError = BiNativeFailure::detect(['flow', 'status', 'flow:10'], 9, '', 'Error: status flow:10: Flow 10 ainda não tem execução registrada.');
+        $this->assertInstanceOf(BiNativeFailure::class, $this->sourceError);
+
+        $review = $this->send($user);
+
+        $this->assertSame('completed', $review->status);
+        $this->assertSame('accepted', BiLoadExecution::sole()->status);
+        $this->assertFalse($review->payload['execution']['result']['execution_request']['verified']);
+        $this->assertSame(1, $this->sends());
+        Queue::assertPushed(ObserveBiLoadExecution::class, fn ($job) => $job->executionId === BiLoadExecution::sole()->id);
+    }
+
+    #[TestWith([6])]
+    #[TestWith([9])]
+    #[TestWith([7])]
+    public function test_a_status_read_refusal_or_unknown_failure_never_sends_a_load(int $code): void
+    {
+        Queue::fake([ExecuteApprovedAction::class, ObserveBiLoadExecution::class]);
+        [$user] = $this->context();
+        $this->sourceError = new RuntimeException('Synthetic status read refusal', $code);
+
+        $review = $this->send($user);
+
+        $this->assertSame('failed', $review->status);
+        $this->assertDatabaseCount('bi_load_executions', 0);
+        $this->assertSame(0, $this->sends());
+        Queue::assertNotPushed(ObserveBiLoadExecution::class);
+    }
+
+    public function test_a_missing_execution_reason_for_another_source_cannot_authorize_a_load(): void
+    {
+        Queue::fake([ExecuteApprovedAction::class, ObserveBiLoadExecution::class]);
+        [$user] = $this->context();
+        $this->sourceError = BiNativeFailure::detect(['flow', 'status', 'flow:11'], 9, '', 'Error: status flow:11: Flow 11 ainda não tem execução registrada.');
+        $this->assertInstanceOf(BiNativeFailure::class, $this->sourceError);
+
+        $review = $this->send($user);
+
+        $this->assertSame('failed', $review->status);
+        $this->assertDatabaseCount('bi_load_executions', 0);
+        $this->assertSame(0, $this->sends());
+        Queue::assertNotPushed(ObserveBiLoadExecution::class);
     }
 
     public function test_network_loss_keeps_a_durable_uncertain_attempt_without_resending(): void
