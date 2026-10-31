@@ -9,22 +9,22 @@ test('phone keeps a real mobile viewport while fitting the available height', ()
     const preview=fitPreview('phone',650,680);
     assert.equal(preview.viewportWidth,390);
     assert.equal(preview.viewportHeight,844);
-    assert.equal(Math.round(preview.displayWidth),314);
-    assert.equal(preview.displayHeight,680);
+    assert.equal(Math.round(preview.displayWidth),299);
+    assert.equal(preview.displayHeight,648);
 });
 test('tablet keeps its portrait viewport and fits without horizontal clipping', () => {
     const preview=fitPreview('tablet',600,680);
     assert.equal(preview.viewportWidth,768);
     assert.equal(preview.viewportHeight,1024);
-    assert.equal(preview.displayWidth,510);
-    assert.equal(preview.displayHeight,680);
+    assert.equal(preview.displayWidth,486);
+    assert.equal(preview.displayHeight,648);
 });
 test('desktop scales to the available width without changing the responsive viewport', () => {
     const preview=fitPreview('desktop',600,680);
     assert.equal(preview.viewportWidth,1280);
     assert.equal(preview.viewportHeight,800);
-    assert.equal(preview.displayWidth,600);
-    assert.equal(preview.displayHeight,375);
+    assert.equal(preview.displayWidth,568);
+    assert.equal(preview.displayHeight,355);
 });
 test('a large panel does not enlarge device pixels beyond their native preview size', () => {
     const preview=fitPreview('phone',1800,1200);
@@ -58,4 +58,28 @@ test('the ordinary catalog viewer remains available without responsive measureme
 
 test('unsupported browsers cannot start authenticated sessions in either viewer', () => {
     for(const responsive of [true,false])assert.equal(canStartPreviewSession(sessionContext({supported:false,responsive})),false);
+});
+
+
+test('device chrome reserves its margin in the geometry without resizing the measured stage', () => {
+    const phone=fitPreview('phone',833,714);
+    const automatic=fitPreview('auto',833,714);
+
+    assert.equal(phone.viewportWidth,390);
+    assert.equal(phone.viewportHeight,844);
+    assert.equal(phone.displayHeight,682);
+    assert.equal(automatic.viewportWidth,833);
+    assert.equal(automatic.viewportHeight,714);
+    assert.equal(automatic.scale,1);
+});
+
+test('a stage smaller than the device margin waits instead of producing negative sizes', () => {
+    for(const [width,height] of [[32,714],[833,32],[24,24]]) {
+        const preview=fitPreview('tablet',width,height);
+
+        assert.equal(preview.ready,false);
+        assert.equal(preview.viewportWidth,768);
+        assert.equal(preview.viewportHeight,1024);
+        assert.equal(preview.scale,0);
+    }
 });

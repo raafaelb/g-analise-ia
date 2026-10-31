@@ -1,4 +1,7 @@
 import {after, before, test} from 'node:test';
+import {readFile} from 'node:fs/promises';
+import {parse,compileScript} from '@vue/compiler-sfc';
+import ts from 'typescript';
 import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import vue from '@vitejs/plugin-vue';
@@ -64,4 +67,77 @@ test('an explicitly inactive viewer waits for activation and reuses its existing
     await nextTick();
 
     assert.equal(requests.length, 1);
+});
+
+
+const {descriptor}=parse(await readFile(new URL('../../resources/js/Components/BiLiveViewer.vue',import.meta.url),'utf8'));
+let responsiveScript=compileScript(descriptor,{id:'responsive-viewer-regression',inlineTemplate:true}).content;
+responsiveScript=responsiveScript.replace(/from (['"])(vue|lucide-vue-next)\1/g,(_,quote,name)=>`from ${quote}${import.meta.resolve(name)}${quote}`);
+responsiveScript=responsiveScript.replace(/from (['"])\.\.\/lib\/responsive-preview\1/g,(_,quote)=>`from ${quote}${new URL('../../resources/js/lib/responsive-preview.ts',import.meta.url)}${quote}`);
+const responsiveCode=ts.transpileModule(responsiveScript,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ESNext}}).outputText;
+const ResponsiveViewer=(await import('data:text/javascript;base64,'+Buffer.from(responsiveCode).toString('base64'))).default;
+function element(kind,text=''){return {kind,text,props:{},children:[],parent:null};}
+const responsiveRenderer=createRenderer({
+    createElement:kind=>element(kind),createText:text=>element('text',text),createComment:text=>element('comment',text),
+    setText:(item,text)=>item.text=text,setElementText:(item,text)=>{item.text=text;item.children=[];},patchProp:(item,key,previous,next)=>item.props[key]=next,
+    insert:(item,parent,anchor=null)=>{if(item.parent){const old=item.parent.children.indexOf(item);if(old>=0)item.parent.children.splice(old,1);}const index=parent.children.indexOf(anchor);if(index<0)parent.children.push(item);else parent.children.splice(index,0,item);item.parent=parent;},
+    remove:item=>{if(item.parent){const index=item.parent.children.indexOf(item);if(index>=0)item.parent.children.splice(index,1);}item.parent=null;},
+    parentNode:item=>item.parent,nextSibling:item=>item.parent?.children[item.parent.children.indexOf(item)+1]??null,
+    insertStaticContent:(text,parent,anchor)=>{const item=element('static',text),index=parent.children.indexOf(anchor);if(index<0)parent.children.push(item);else parent.children.splice(index,0,item);item.parent=parent;return [item,item];},
+});
+function findElement(item,predicate){if(predicate(item))return item;return item.children.map(child=>findElement(child,predicate)).find(Boolean);}
+async function mountResponsiveViewer(t,request){
+    const descriptors=['HTMLIFrameElement','ResizeObserver'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]);
+    globalThis.HTMLIFrameElement=class {};
+    globalThis.HTMLIFrameElement.prototype.credentialless=false;
+    let observer;
+    globalThis.ResizeObserver=class {constructor(callback){this.callback=callback;observer=this;}observe(){}disconnect(){}};
+    const root=element('root'),device=ref('auto'),active=ref(true);
+    const app=responsiveRenderer.createApp({render:()=>h(ResponsiveViewer,{tenant:'100',appId:'200',deviceControls:true,device:device.value,active:active.value,request})});
+    t.after(()=>{app.unmount();for(const [key,value] of descriptors){if(value)Object.defineProperty(globalThis,key,value);else delete globalThis[key];}});
+    app.mount(root);await nextTick();
+    return {root,device,active,frame:()=>findElement(root,item=>item.kind==='iframe'),measure:async(width,height)=>{observer.callback([{contentRect:{width,height}}]);await nextTick();await nextTick();}};
+}
+
+test('device switches keep one authenticated frame and the selected native viewport',async t=>{
+    const requests=[];
+    const view=await mountResponsiveViewer(t,async(...args)=>{requests.push(args);return session;});
+    await view.measure(833,714);
+    const frame=view.frame();
+    assert.ok(frame);
+    assert.equal(frame.props.style.width,'833px');
+    assert.equal(frame.props.style.height,'714px');
+
+    for(const [device,width,height] of [['phone',390,844],['tablet',768,1024],['desktop',1280,800],['auto',833,714]]){
+        view.device.value=device;await nextTick();
+
+        assert.equal(view.frame(),frame);
+        assert.equal(frame.props.src,session.url);
+        assert.equal(frame.props.style.width,width+'px');
+        assert.equal(frame.props.style.height,height+'px');
+    }
+    assert.equal(requests.length,1);
+    assert.equal(frame.props.credentialless,'');
+    assert.equal(frame.props.sandbox,'allow-scripts allow-same-origin allow-forms');
+});
+
+test('a transient zero-sized or hidden panel retains its frame and resumes without another ticket',async t=>{
+    const requests=[];
+    const view=await mountResponsiveViewer(t,async(...args)=>{requests.push(args);return session;});
+    assert.equal(requests.length,0);
+    await view.measure(833,714);
+    const frame=view.frame();
+
+    view.active.value=false;await nextTick();await view.measure(0,0);
+    assert.equal(view.frame(),frame);
+    view.device.value='phone';await nextTick();
+    assert.equal(view.frame(),frame);
+    assert.equal(frame.props.style.width,'833px');
+
+    view.active.value=true;await nextTick();await view.measure(640,680);
+    assert.equal(view.frame(),frame);
+    assert.equal(frame.props.style.width,'390px');
+    assert.equal(frame.props.style.height,'844px');
+    assert.equal(frame.props.src,session.url);
+    assert.equal(requests.length,1);
 });

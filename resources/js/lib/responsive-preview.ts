@@ -12,10 +12,13 @@ export function fitPreview(device: PreviewDevice, availableWidth: number, availa
     const width = Number.isFinite(availableWidth) ? Math.max(0, availableWidth) : 0;
     const height = Number.isFinite(availableHeight) ? Math.max(0, availableHeight) : 0;
     const preset = previewDevices.find(item => item.id === device) ?? previewDevices[0];
-    const viewportWidth = preset.width ?? width;
-    const viewportHeight = preset.height ?? height;
-    if (width === 0 || height === 0) return {ready: false, viewportWidth, viewportHeight, displayWidth: 0, displayHeight: 0, scale: 0};
-    const scale = preset.id === 'auto' ? 1 : Math.min(1, width / viewportWidth, height / viewportHeight);
+    const inset = preset.id === 'auto' ? 0 : 16;
+    const contentWidth = Math.max(0, width - inset * 2);
+    const contentHeight = Math.max(0, height - inset * 2);
+    const viewportWidth = preset.width ?? contentWidth;
+    const viewportHeight = preset.height ?? contentHeight;
+    if (contentWidth === 0 || contentHeight === 0) return {ready: false, viewportWidth, viewportHeight, displayWidth: 0, displayHeight: 0, scale: 0};
+    const scale = preset.id === 'auto' ? 1 : Math.min(1, contentWidth / viewportWidth, contentHeight / viewportHeight);
     return {ready: true, viewportWidth, viewportHeight, displayWidth: viewportWidth * scale, displayHeight: viewportHeight * scale, scale};
 }
 
