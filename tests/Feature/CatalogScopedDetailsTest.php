@@ -44,6 +44,10 @@ class CatalogScopedDetailsTest extends TestCase
 
     private bool $busyGraph = false;
 
+    private array $scopedResults = [];
+
+    private array $deniedAfterPull = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -80,6 +84,7 @@ class CatalogScopedDetailsTest extends TestCase
                         $this->write($context, $reference, $this->bodies[$reference]);
                     }
                 }
+                $this->denied = array_values(array_unique([...$this->denied, ...$this->deniedAfterPull]));
                 if ($this->changeSession) {
                     $connection->fresh()->update(['metadata' => [...$connection->metadata, 'session_generation' => (string) Str::uuid()]]);
                 }
@@ -106,6 +111,13 @@ class CatalogScopedDetailsTest extends TestCase
                 }
                 if (in_array($kind, ['variables', 'investigation', 'deck', 'presentation'], true)) {
                     throw new RuntimeException('Unrelated catalog area must not block this resource.');
+                }
+                if (in_array('--desk', $arguments, true) && array_key_exists($kind, $this->scopedResults)) {
+                    if ($this->scopedResults[$kind] === false) {
+                        throw new RuntimeException('Synthetic scoped area refusal.', 6);
+                    }
+
+                    return ['data' => $this->scopedResults[$kind]];
                 }
                 $rows = [];
                 foreach ($this->bodies as $reference => $body) {
@@ -347,5 +359,114 @@ class CatalogScopedDetailsTest extends TestCase
         $this->actingAs($user)->getJson('/api/catalog/321/resources/table/10')->assertOk()->assertJsonPath('related.0.items.0.contents.0.count', 1)->assertJsonPath('related.0.items.0.contents.1.count', 1)->assertJsonPath('related.0.items.0.contents.2.count', 1)->assertJsonPath('related.0.items.0.contents.2.complete', true);
 
         $this->assertNotContains('writeback:31', $this->pulled);
+    }
+
+    public function test_an_application_desk_lists_only_its_members_and_keeps_dashboard_details(): void
+    {
+        [$user] = $this->connect(['bi-desk:7' => ['nome' => 'Diretoria'], 'app:40' => ['nome' => 'Receitas', 'deskId' => '7', 'dashboards' => [['header' => ['id' => 90], 'body' => ['nome' => 'Mensal', 'widgets' => []]]]], 'app:42' => ['nome' => 'Despesas', 'deskId' => 7, 'dashboards' => []], 'app:41' => ['nome' => 'SYNTHETIC-OTHER-DESK', 'deskId' => 8]]);
+        $this->nativeRows = true;
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/bi-desk/7')->assertOk()->assertJsonPath('related.0.count', 2)->assertJsonPath('related.0.complete', true);
+
+        $application = collect($response->json('related.0.items'))->firstWhere('ref', 'app:40');
+        $this->assertSame('Mensal', $application['dashboards'][0]['name']);
+
+        $this->assertStringNotContainsString('SYNTHETIC-OTHER-DESK', $response->getContent());
+        $this->assertNotContains(['list', 'app', '--remote', '--limit', '500', '--offset', '0'], $this->commands);
+        $this->assertNotContains(['info', 'bi-desk:7', '--dependents'], $this->commands);
+        $this->assertSame(['app:40', 'app:42'], $this->pulled);
+    }
+
+    public function test_a_data_desk_scopes_tables_flows_and_writebacks_without_reading_other_desks(): void
+    {
+        [$user] = $this->connect(['dw-desk:7' => ['nome' => 'Dados'], 'table:10' => ['nome' => 'Pedidos', 'deskId' => 7], 'table:11' => ['nome' => 'SYNTHETIC-OTHER-TABLE', 'deskId' => 8], 'flow:20' => ['nome' => 'Carga', 'deskId' => 7], 'flow:21' => ['nome' => 'SYNTHETIC-OTHER-FLOW', 'deskId' => 8], 'writeback:30' => ['nome' => 'Metas', 'deskId' => 7], 'writeback:31' => ['nome' => 'SYNTHETIC-OTHER-WRITEBACK', 'deskId' => 8]]);
+        $this->nativeRows = true;
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/dw-desk/7')->assertOk()->assertJsonPath('related.0.items.0.ref', 'table:10')->assertJsonPath('related.1.items.0.ref', 'flow:20')->assertJsonPath('related.2.items.0.ref', 'writeback:30')->assertJsonPath('related.2.complete', true);
+
+        $this->assertStringNotContainsString('SYNTHETIC-OTHER', $response->getContent());
+        foreach (['table', 'flow', 'writeback'] as $kind) {
+            $this->assertContains(['list', $kind, '--remote', '--desk', '7', '--limit', '500', '--offset', '0'], $this->commands);
+            $this->assertNotContains(['list', $kind, '--remote', '--limit', '500', '--offset', '0'], $this->commands);
+        }
+        $this->assertSame(['table:10', 'flow:20', 'writeback:30'], $this->pulled);
+    }
+
+    #[DataProvider('unprovenScopedRows')]
+    public function test_an_unproven_desk_filter_falls_back_to_current_tenant_members(array $deskAttributes): void
+    {
+        [$user] = $this->connect(['bi-desk:7' => ['nome' => 'Diretoria'], 'app:40' => ['nome' => 'Receitas', 'deskId' => 7], 'app:41' => ['nome' => 'SYNTHETIC-OTHER-DESK', 'deskId' => 8]]);
+        $this->nativeRows = true;
+        $this->scopedResults['app'] = ['matched' => 1, 'results' => [['id' => 41, 'nome' => 'SYNTHETIC-OTHER-DESK', ...$deskAttributes]]];
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/bi-desk/7')->assertOk()->assertJsonPath('related.0.items.0.ref', 'app:40')->assertJsonPath('related.0.count', 1)->assertJsonPath('related.0.complete', true);
+
+        $this->assertStringNotContainsString('SYNTHETIC-OTHER-DESK', $response->getContent());
+        $this->assertContains(['list', 'app', '--remote', '--limit', '500', '--offset', '0'], $this->commands);
+    }
+
+    public static function unprovenScopedRows(): array
+    {
+        return ['missing desk' => [[]], 'private resource' => [['deskId' => null]], 'another desk' => [['deskId' => 8]], 'invalid desk shape' => [['deskId' => [7]]], 'boolean desk' => [['deskId' => true]]];
+    }
+
+    public function test_conflicting_membership_after_pull_rechecks_the_tenant_and_keeps_the_real_desk_contents(): void
+    {
+        [$user] = $this->connect(['bi-desk:7' => ['nome' => 'Diretoria'], 'app:40' => ['nome' => 'Receitas', 'deskId' => 7], 'app:41' => ['nome' => 'SYNTHETIC-MOVED-APP', 'deskId' => 8]]);
+        $this->nativeRows = true;
+        $this->scopedResults['app'] = ['matched' => 1, 'results' => [['id' => 41, 'nome' => 'SYNTHETIC-MOVED-APP', 'deskId' => 7]]];
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/bi-desk/7')->assertOk()->assertJsonPath('related.0.items.0.ref', 'app:40')->assertJsonPath('related.0.count', 1)->assertJsonPath('related.0.complete', true);
+
+        $this->assertStringNotContainsString('SYNTHETIC-MOVED-APP', $response->getContent());
+        $this->assertContains(['list', 'app', '--remote', '--limit', '500', '--offset', '0'], $this->commands);
+    }
+
+    public function test_a_denied_scoped_list_is_reported_without_trying_a_broader_query(): void
+    {
+        [$user] = $this->connect(['bi-desk:7' => ['nome' => 'Diretoria'], 'app:40' => ['nome' => 'SYNTHETIC-NOT-READABLE', 'deskId' => 7]]);
+        $this->nativeRows = true;
+        $this->scopedResults['app'] = false;
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/bi-desk/7')->assertOk()->assertJsonPath('related.0.status', 'access_denied')->assertJsonPath('related.0.count', null)->assertJsonPath('related.0.complete', false);
+
+        $this->assertStringNotContainsString('SYNTHETIC-NOT-READABLE', $response->getContent());
+        $this->assertNotContains(['list', 'app', '--remote', '--limit', '500', '--offset', '0'], $this->commands);
+        $this->assertSame([], $this->pulled);
+    }
+
+    public function test_an_incomplete_scoped_page_has_unknown_count_instead_of_a_false_empty_desk(): void
+    {
+        [$user] = $this->connect(['bi-desk:7' => ['nome' => 'Diretoria'], 'app:40' => ['nome' => 'Receitas', 'deskId' => 7]]);
+        $this->nativeRows = true;
+        $this->scopedResults['app'] = ['matched' => 2, 'results' => [['id' => 40, 'nome' => 'Receitas', 'deskId' => 7]]];
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/bi-desk/7')->assertOk()->assertJsonPath('related.0.status', 'unavailable')->assertJsonPath('related.0.count', null)->assertJsonPath('related.0.complete', false);
+
+        $this->assertSame([], $this->pulled);
+    }
+
+    public function test_an_empty_scoped_desk_does_not_read_or_pull_applications_from_other_desks(): void
+    {
+        [$user] = $this->connect(['bi-desk:7' => ['nome' => 'Diretoria'], 'app:41' => ['nome' => 'SYNTHETIC-OTHER-DESK', 'deskId' => 8]]);
+        $this->nativeRows = true;
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/bi-desk/7')->assertOk()->assertJsonPath('related.0.count', 0)->assertJsonPath('related.0.complete', true);
+
+        $this->assertSame([], $this->pulled);
+        $this->assertNotContains(['list', 'app', '--remote', '--limit', '500', '--offset', '0'], $this->commands);
+    }
+
+    public function test_a_permission_refusal_during_desk_revalidation_keeps_members_unknown_and_private(): void
+    {
+        [$user] = $this->connect(['bi-desk:7' => ['nome' => 'Diretoria'], 'app:40' => ['nome' => 'SYNTHETIC-PRIVATE-MEMBER', 'deskId' => 7], 'app:41' => ['nome' => 'SYNTHETIC-MOVED-MEMBER', 'deskId' => 8]]);
+        $this->nativeRows = true;
+        $this->scopedResults['app'] = ['matched' => 1, 'results' => [['id' => 41, 'nome' => 'SYNTHETIC-MOVED-MEMBER', 'deskId' => 7]]];
+        $this->deniedAfterPull = ['app'];
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/bi-desk/7')->assertOk()->assertJsonPath('related.0.status', 'access_denied')->assertJsonPath('related.0.count', null)->assertJsonPath('related.0.complete', false);
+
+        $this->assertStringNotContainsString('SYNTHETIC-PRIVATE-MEMBER', $response->getContent());
+        $this->assertStringNotContainsString('SYNTHETIC-MOVED-MEMBER', $response->getContent());
     }
 }

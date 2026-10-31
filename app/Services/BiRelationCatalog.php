@@ -28,9 +28,10 @@ class BiRelationCatalog
         } else {
             $resources = [];
             $capabilities = [];
+            $desk = in_array($kind, ['dw-desk', 'bi-desk'], true) ? $id : null;
             foreach ($types as $type) {
                 try {
-                    $resources[$type] = $authorizedLists[$type] ?? $catalog->rows($connection, $context, $type);
+                    $resources[$type] = $authorizedLists[$type] ?? ($desk === null ? $catalog->rows($connection, $context, $type) : $this->deskRows($catalog, $connection, $context, $type, $desk));
                     $capabilities[$type] = ['status' => 'available', 'count' => count($resources[$type]), 'reason' => null];
                 } catch (RuntimeException $e) {
                     $this->assertUsable($connection, $e);
@@ -39,7 +40,6 @@ class BiRelationCatalog
                 }
             }
             $authorizedLists = [...$authorizedLists, ...$resources];
-            $unfiltered = $resources;
             $members = null;
             if (in_array($kind, ['dw-desk', 'bi-desk'], true)) {
                 $members = $this->deskMembers($connection, $context, $kind.':'.$id, $types, $resources, $capabilities);
@@ -52,7 +52,16 @@ class BiRelationCatalog
             $refs = $this->metadataReferences($kind, $body, $resources, false, $publicationOrigin);
             [$metadata, $fresh] = $this->documents($catalog, $connection, $context, $refs);
             if ($fresh && $members !== null && ! $this->confirmedDeskMembers($catalog, $id, $resources, $metadata)) {
-                $resources = $unfiltered;
+                foreach ($types as $type) {
+                    try {
+                        $resources[$type] = $catalog->rows($connection, $context, $type);
+                        $capabilities[$type] = ['status' => 'available', 'count' => count($resources[$type]), 'reason' => null];
+                    } catch (RuntimeException $e) {
+                        $this->assertUsable($connection, $e);
+                        $resources[$type] = [];
+                        $capabilities[$type] = ['status' => $e->getCode() === 6 ? 'access_denied' : 'unavailable', 'count' => null, 'reason' => $e->getMessage()];
+                    }
+                }
                 $refs = $this->metadataReferences($kind, $body, $resources, false, $publicationOrigin);
                 [$metadata, $fresh] = $this->documents($catalog, $connection, $context, $refs);
             }
@@ -85,6 +94,18 @@ class BiRelationCatalog
         }
 
         return ['snapshot' => $snapshot, 'metadata' => $metadata, 'credential_keys' => $keys];
+    }
+
+    private function deskRows(BiCatalog $catalog, Connection $connection, Project $context, string $kind, string $desk): array
+    {
+        $rows = $catalog->rows($connection, $context, $kind, true, $desk);
+        foreach ($rows as $row) {
+            if (! array_key_exists('deskId', $row) || (! is_int($row['deskId']) && ! is_string($row['deskId'])) || (string) $row['deskId'] !== $desk) {
+                return $catalog->rows($connection, $context, $kind);
+            }
+        }
+
+        return $rows;
     }
 
     private function types(string $kind, array $body, ?string $origin): array

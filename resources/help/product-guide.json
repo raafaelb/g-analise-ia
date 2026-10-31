@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.13",
+  "version": "2026-10-31.14",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -193,7 +193,7 @@
         {
           "id": "catalog-types",
           "title": "Escolha o tipo de recurso",
-          "description": "Aplicações contêm dashboards. Mesas organizam recursos. Tabelas guardam os dados, e ETLs preparam suas cargas. Conexões de dados são acessos às fontes.",
+          "description": "Aplicações contêm dashboards. Abra uma mesa para conferir os recursos organizados nela: mesas de aplicações reúnem painéis, e mesas de dados reúnem tabelas e ETLs. Conexões de dados são os acessos às fontes.",
           "anchor": "catalog-types",
           "audience": "all"
         },
@@ -546,7 +546,7 @@
       "id": "tenants-desks",
       "title": "O que são tenants e mesas?",
       "summary": "Tenants separam ambientes; mesas organizam e compartilham recursos dentro deles.",
-      "body": "**Tenant** é o ambiente de uma organização ou operação no BI. Sua conta só deve receber os tenants autorizados. A escolha do catálogo muda o ambiente consultado.\n\n**Mesas de aplicações** organizam aplicações e dashboards. **Mesas de dados** organizam tabelas, ETLs e outros recursos de dados. **Minha Mesa** é a área de rascunhos privados indicada pelo estado do recurso.\n\nCriar ou renomear uma mesa não publica automaticamente os recursos nela. Compartilhamento e permissões obedecem às regras do BI e à revisão de publicação quando oferecida pelo portal.",
+      "body": "**Tenant** é o ambiente de uma organização ou operação no BI. Sua conta só deve receber os tenants autorizados. A escolha do catálogo muda o ambiente consultado.\n\n**Mesas de aplicações** organizam aplicações e dashboards. **Mesas de dados** organizam tabelas, ETLs e outros recursos de dados. **Minha Mesa** é a área de rascunhos privados indicada pelo estado do recurso.\n\nCriar ou renomear uma mesa não publica automaticamente os recursos nela. Compartilhamento e permissões obedecem às regras do BI e à revisão de publicação quando oferecida pelo portal.\n\nAo abrir uma mesa, o catálogo consulta seus recursos autorizados e confere os vínculos atuais. Uma consulta sem permissão ou incompleta é indicada na janela; não significa que a mesa esteja vazia. Se houver uma mudança recente de acesso, use Atualizar acessos em Conexões e retome a consulta. Atualizar catálogo solicita uma nova conferência do inventário e pode levar mais tempo do que abrir uma mesa específica.",
       "pages": [
         "catalog",
         "project"
