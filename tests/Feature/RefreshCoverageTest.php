@@ -9,7 +9,7 @@ class RefreshCoverageTest extends TestCase
 {
     public function test_shared_sources_are_deduplicated_and_more_frequent_agendas_preserved(): void
     {
-        $report = app(RefreshCoverage::class)->assess(['tables' => [['tableId' => 1], ['tableId' => 2], ['tableId' => 3]]], [1 => ['originFlowId' => 10], 2 => ['originFlowId' => 10], 3 => ['originFlowId' => 20]], [10 => ['deskId' => 2, 'load_type' => 'Total'], 20 => ['deskId' => 2, 'load_type' => 'Temporal']], [100 => ['ativo' => true, 'flows' => [['flow_etl_id' => 10, 'context' => 'Total']], 'triggers' => [['type' => 'Day', 'period' => 1, 'start_when' => '03:00']]], 200 => ['ativo' => true, 'flows' => [['flow_etl_id' => 20, 'context' => 'Temporal:Days:2']], 'triggers' => [['type' => 'Minute', 'period' => 10]]]]);
+        $report = app(RefreshCoverage::class)->assess(['tables' => [['tableId' => 1], ['tableId' => 2], ['tableId' => 3]]], [1 => ['originFlowId' => 10], 2 => ['originFlowId' => 10], 3 => ['originFlowId' => 20]], [10 => ['deskId' => 2, 'load_type' => 'Total'], 20 => ['deskId' => 2, 'load_type' => 'Temporal']], [100 => ['ativo' => true, 'flows' => [['flow_etl_id' => 10, 'context' => 'Total']], 'triggers' => [['type' => 'Day', 'period' => 1, 'start_when' => '03:00']]], 200 => ['ativo' => true, 'flows' => [['flow_etl_id' => 20, 'context' => 'Temporal:Days:2']], 'triggers' => [['type' => 'Minute', 'period' => 10, 'start_when' => '2020-01-01T03:00:00Z', 'start_time' => '00:00', 'end_time' => '23:59']]]]);
         $this->assertCount(2, $report['sources']);
         $this->assertCount(2, $report['sources'][0]['tables']);
         $this->assertTrue($report['configured']);
@@ -47,7 +47,19 @@ class RefreshCoverageTest extends TestCase
         $this->assertFalse($coverage->daily([['type' => 'Day', 'period' => 2]]));
         $this->assertFalse($coverage->daily([['type' => 'Day', 'period' => 1, 'weekdays' => [1, 2, 3, 4, 5]]]));
         $this->assertFalse($coverage->daily([['type' => 'Day', 'period' => 1, 'start_when' => now()->addMonth()->toIso8601String()]]));
-        $this->assertTrue($coverage->daily([['type' => 'Hour', 'period' => 2, 'start_when' => '2020-01-01T00:00:00Z']]));
+        $this->assertTrue($coverage->daily([['type' => 'Hour', 'period' => 2, 'start_when' => '2020-01-01T00:00:00Z', 'start_time' => '00:00', 'end_time' => '23:59']]));
+    }
+
+    public function test_a_native_daily_trigger_without_period_is_recognized_and_described(): void
+    {
+        $coverage = app(RefreshCoverage::class);
+        $triggers = [['type' => 'Day', 'start_when' => '03:00', 'start_time' => '07:00', 'end_time' => '19:00']];
+
+        $report = $coverage->assess(['tables' => [['tableId' => 1]]], [1 => ['originFlowId' => 10]], [10 => ['deskId' => 2, 'load_type' => 'Total']], [100 => ['ativo' => true, 'flows' => [['flow_etl_id' => 10, 'context' => 'Total']], 'triggers' => $triggers]]);
+
+        $this->assertTrue($report['configured']);
+        $this->assertSame('Diariamente às 03:00', $report['sources'][0]['schedules'][0]['frequency']);
+        $this->assertSame('preserve_existing', $report['sources'][0]['recommendation']);
     }
 
     public function test_load_context_is_cross_checked_against_the_source_contract(): void

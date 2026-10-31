@@ -92,17 +92,9 @@ class ScheduleChanges
         }
     }
 
-    private function intervalMinutes(array $trigger): ?float
+    private function intervalMinutes(array $trigger): ?int
     {
-        $period = $trigger['period'] ?? null;
-        if (! is_numeric($period) || (float) $period < 1 || (float) $period !== (float) (int) $period) {
-            return null;
-        }
-        $unit = match ($trigger['type'] ?? '') {
-            'Minute' => 1, 'Hour' => 60, 'Day' => 1440, default => null,
-        };
-
-        return $unit === null ? null : (float) $period * $unit;
+        return app(BiScheduleTiming::class)->intervalMinutes($trigger);
     }
 
     private function canonical(mixed $value): mixed

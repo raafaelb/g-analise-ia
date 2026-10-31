@@ -9,7 +9,7 @@ class ScheduleChangesTest extends TestCase
 {
     private function active(int $flow, string $context = 'Total'): array
     {
-        return ['ativo' => true, 'flows' => [['flow_etl_id' => $flow, 'context' => $context]], 'triggers' => [['type' => 'Minute', 'period' => 5]]];
+        return ['ativo' => true, 'flows' => [['flow_etl_id' => $flow, 'context' => $context]], 'triggers' => [['type' => 'Minute', 'period' => 5, 'start_when' => '2020-01-01T00:00:00Z', 'start_time' => '00:00', 'end_time' => '23:59']]];
     }
 
     public function test_new_active_schedule_cannot_duplicate_a_shared_source(): void
@@ -70,9 +70,9 @@ class ScheduleChangesTest extends TestCase
 
     public function test_faster_and_equivalent_intervals_preserve_current_loads(): void
     {
-        $before = [...$this->active(10), 'triggers' => [['type' => 'Hour', 'period' => 1, 'start_when' => '2020-01-01T00:00:00Z']]];
+        $before = [...$this->active(10), 'triggers' => [['type' => 'Hour', 'period' => 1, 'start_when' => '2020-01-01T00:00:00Z', 'start_time' => '00:00', 'end_time' => '23:59']]];
         foreach ([30, 60] as $minutes) {
-            $candidate = [...$before, 'nome' => 'Novo nome', 'triggers' => [['period' => (string) $minutes, 'start_when' => '2020-01-01T00:00:00Z', 'type' => 'Minute']]];
+            $candidate = [...$before, 'nome' => 'Novo nome', 'triggers' => [['period' => (string) $minutes, 'start_when' => '2020-01-01T00:00:00Z', 'type' => 'Minute', 'start_time' => '00:00', 'end_time' => '23:59']]];
             app(ScheduleChanges::class)->assertNoAdditionalLoad('1', $candidate, ['1' => $before]);
         }
         $this->addToAssertionCount(1);
@@ -106,5 +106,14 @@ class ScheduleChangesTest extends TestCase
         $candidate = [...$before, 'triggers' => [['start_when' => '15:00', 'period' => 1, 'type' => 'Day'], ['period' => 1, 'type' => 'Day', 'start_when' => '03:00']]];
         app(ScheduleChanges::class)->assertNoAdditionalLoad('1', $candidate, ['1' => $before]);
         $this->addToAssertionCount(1);
+    }
+
+    public function test_an_existing_daily_load_without_a_period_cannot_be_disabled(): void
+    {
+        $before = [...$this->active(10), 'triggers' => [['type' => 'Day', 'start_when' => '03:00']]];
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Preserve a agenda diária');
+        app(ScheduleChanges::class)->assertNoAdditionalLoad('1', [...$before, 'ativo' => false], ['1' => $before]);
     }
 }

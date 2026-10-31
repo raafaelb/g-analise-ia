@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\BiScheduleTiming;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -12,6 +14,21 @@ class Approval extends Model
     protected $guarded = [];
 
     protected $table = 'approvals';
+
+    protected $appends = ['schedule_timing'];
+
+    protected function scheduleTiming(): Attribute
+    {
+        return Attribute::get(function (): ?array {
+            $triggers = $this->payload['revision']['schedule']['triggers'] ?? null;
+            if (! is_array($triggers) || ! array_is_list($triggers)) {
+                return null;
+            }
+            $timing = app(BiScheduleTiming::class);
+
+            return ['frequency' => $timing->frequency($triggers), 'daily_or_more_frequent' => $timing->daily($triggers), 'triggers' => array_map(fn (mixed $trigger): string => $timing->frequency([$trigger]), array_slice($triggers, 0, 100))];
+        });
+    }
 
     protected static function booted(): void
     {

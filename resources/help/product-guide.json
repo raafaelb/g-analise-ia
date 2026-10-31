@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.1",
+  "version": "2026-10-31.2",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -269,7 +269,7 @@
         {
           "id": "refresh-coverage",
           "title": "Confira todas as fontes",
-          "description": "Selecione o trabalho para verificar as fontes, os vínculos e a cobertura de atualização. Fontes compartilhadas não devem ganhar agendas duplicadas.",
+          "description": "Selecione o trabalho para verificar todas as fontes, as agendas, os horários e as janelas de execução. Fontes compartilhadas não devem ganhar agendas duplicadas.",
           "anchor": "refresh-coverage",
           "audience": "all"
         },
@@ -307,7 +307,7 @@
         {
           "id": "activity-review",
           "title": "Autorização e execução são etapas diferentes",
-          "description": "Autorizar uma revisão permite executar somente aquela proposta. Aguarde a confirmação; resultado incerto pede conferência antes de repetir.",
+          "description": "Autorizar permite executar somente a proposta apresentada. Nas agendas, confira fontes, todos os horários e as janelas. Aguarde o resultado confirmado antes de repetir.",
           "audience": "all"
         },
         {
@@ -590,10 +590,12 @@
       "id": "refresh",
       "title": "Como garanto a atualização dos dados?",
       "summary": "Confira todas as fontes, agenda ativa e execução concluída com sucesso.",
-      "body": "Abra **Atualização de dados** para verificar a cobertura do trabalho. Cada novo dashboard deve ter todas as fontes atualizadas pelo menos uma vez por dia; agendas mais frequentes devem ser preservadas. Prefira a madrugada no horário de Brasília e evite duplicar agendas para fontes compartilhadas.\n\n**Enfileirado** não significa sucesso. Confirme que a agenda está ativa e que a carga terminou com sucesso no BI. Histórico e detalhes ajudam a investigar falhas.\n\nUma fonte privada pode impedir o agendamento. Nessa situação, a publicação necessária deve ser apresentada para autorização; o trabalho não deve ser considerado concluído com atualização apenas manual sem explicar a pendência.",
+      "body": "Abra **Atualização de dados** para verificar a cobertura do trabalho. Cada novo dashboard deve ter todas as fontes atualizadas pelo menos uma vez por dia; agendas mais frequentes devem ser preservadas. Prefira a madrugada no horário de Brasília e evite duplicar agendas para fontes compartilhadas.\n\n**Enfileirado** não significa sucesso. Confirme que a agenda está ativa e que a carga terminou com sucesso no BI. Histórico e detalhes ajudam a investigar falhas.\n\nUma fonte privada pode impedir o agendamento. Nessa situação, a publicação necessária deve ser apresentada para autorização; o trabalho não deve ser considerado concluído com atualização apenas manual sem explicar a pendência.\n\nNo **Catálogo BI → Agendas**, abra a agenda para conferir todos os gatilhos, horários e janelas de execução. Uma agenda pode ter mais de um horário. Agendas semanais e mensais têm dias específicos; o dia do mês não é um intervalo de meses. Uma janela de execução pode impedir que um intervalo alcance todos os dias.\n\n**Quando os dados mudarem** é uma sondagem condicional: verificar a origem a cada poucos segundos não significa carregar os dados nessa frequência nem garante uma carga diária. A revisão na conversa usa as mesmas descrições dos detalhes da agenda. Confira sempre também o resultado real das fontes.",
       "pages": [
         "refresh",
-        "project"
+        "project",
+        "catalog",
+        "activity"
       ],
       "actions": [
         {

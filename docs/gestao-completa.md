@@ -392,3 +392,24 @@ Impacto no tour e tira-dúvidas: a versão `2026-10-31.1` mantém as âncoras do
 Validação automatizada desta revisão: **647 testes de backend e 3.741 asserções em SQLite e em PostgreSQL isolado**, 66 testes de interface, TypeScript/build local, Pint, teste operacional de configuração e smoke do Codex sem inferência.
 
 No navegador, a mesa de dados abriu com suas nove tabelas e nove ETLs, incluindo navegação e contagens. O texto atualizado do tour foi conferido em computador e em 390 × 844; o guia de ajuda abriu no celular sem transbordamento horizontal. A aba descartável foi fechada e somente os dois registros de tour criados nesta homologação foram removidos, preservando as abas originais e o primeiro acesso real do titular.
+
+
+## Contrato dos gatilhos e revisão de agendas — 31/10/2026
+
+A conferência das fontes e a proteção de frequência agora usam `BiScheduleTiming`, baseado no scaffold público do Lumo 3.44.0 e na [referência oficial de schedule](https://docs.horusbi.com.br/lumo/referencia/schedule). O gatilho diário depende de `start_when` no formato de horário: `period` não é obrigatório e não define um intervalo de dias. Duas regressões reproduziram a falsa pendência de cobertura e a ausência de proteção contra desativação de uma agenda diária válida sem `period` antes da correção.
+
+As descrições apresentam todos os gatilhos, em vez de apenas o primeiro: horário diário; intervalo de horas/minutos com janela; dia da semana, incluindo domingo com valor zero; dia do mês com ajuste ao fim do mês; e sondagem condicional de mudanças em segundos. Sondagem CDC não comprova carga diária. Nomes internos desconhecidos e a configuração SQL/credencial da sonda não entram nesses rótulos.
+
+A cobertura verifica relógios e instantes válidos, início futuro, término, restrições de dias e alcance da janela. Intervalos são conferidos sobre um ciclo limitado da grade de disparos; um intervalo de 24 horas fora da sua janela e intervalos que deixam dias sem disparo não confirmam cobertura diária. Sete gatilhos semanais distintos podem cobrir a semana. Formatos incompletos, ambíguos ou janelas noturnas sem contrato confirmado permanecem sem comprovação; nenhum desses casos é convertido silenciosamente em uma agenda diária. Essa análise de configuração continua separada da confirmação de execução concluída de todas as fontes.
+
+As revisões do chat e de Atividade recebem os rótulos na serialização de `Approval`, fora do payload assinado. As propostas anteriores também ganham a apresentação corrigida, sem alterar fingerprint, status, conteúdo autorizado ou prazo. O navegador deixa de interpretar o campo `period` de forma própria e usa a mesma descrição do servidor. Início futuro e término são explicados no horário de Brasília.
+
+A leitura real conferiu 19 agendas autorizadas da Inovadora: quatro com gatilhos de horas, doze diárias e três de minutos. O ensaio consulta e recebe somente metadados; não ativa, pausa, executa, cria, altera nem exclui agendas ou fontes. Outros tipos e casos-limite são cobertos por contratos isolados, sem declarar execução real desses gatilhos no agente. O editor manual completo de agendas continua uma entrega própria pendente; esta revisão corrige a base de conferência e a apresentação das autorizações.
+
+Impacto no tour e tira-dúvidas: a versão `2026-10-31.2` explica horários múltiplos, janelas, semanal/mensal e a diferença entre sondagem e carga. Atualizados os passos de conferência de fontes e revisão em Atividade, com as mesmas âncoras estáveis e sem repetir tours já vistos.
+
+A comparação posterior confirmou o mesmo inventário e os mesmos campos de ativação, agente, fuso e gatilhos das 19 agendas, com cobertura diária reconhecida nos mesmos 19 casos. Os sete rótulos de horas/minutos passaram a incluir as janelas; os horários das doze agendas diárias foram preservados. Validação automatizada: **702 testes de backend e 3.809 asserções em SQLite e novamente em PostgreSQL isolado**, 66 testes de interface e TypeScript/build local.
+
+No navegador, uma revisão histórica concluída exibiu o horário diário pela nova apresentação, sem reenvio de carga ou alteração de status. O cartão foi conferido em computador e em 390 × 844, com largura útil de 336 px e sem transbordamento horizontal. A redação **Agenda desta revisão** também evita sugerir uma nova execução ao consultar o histórico.
+
+A revisão final acrescentou dois casos de âncoras absolutas da época do horário de verão: a grade usa o instante UTC e a meia-noite atual de Brasília, sem reaproveitar o deslocamento histórico como horário atual. Os dois casos falharam antes do ajuste e passaram depois. Os tours atualizados de Atividade e Atualização de dados foram conferidos, inclusive o passo de fontes em celular; a aba de teste foi fechada e somente seus quatro registros de tour foram removidos para preservar o primeiro acesso real.

@@ -327,70 +327,11 @@ class RefreshCoverage
 
     public function frequency(array $triggers): string
     {
-        foreach ($triggers as $trigger) {
-            $period = (int) ($trigger['period'] ?? 0);
-            if ($period < 1) {
-                continue;
-            }
-            $label = match ($trigger['type'] ?? '') {
-                'Minute' => 'A cada '.$period.' minuto(s)','Hour' => 'A cada '.$period.' hora(s)','Day' => $period === 1 ? 'Diariamente' : 'A cada '.$period.' dias',default => null
-            };
-            if ($label) {
-                if (($trigger['type'] ?? '') === 'Day' && preg_match('/^\d{2}:\d{2}$/D', (string) ($trigger['start_when'] ?? ''))) {
-                    $label .= ' às '.$trigger['start_when'];
-                }
-
-                return $label;
-            }
-        }
-
-        return 'Frequência a conferir';
+        return app(BiScheduleTiming::class)->frequency($triggers);
     }
 
     public function daily(array $triggers): bool
     {
-        foreach ($triggers as $trigger) {
-            $period = $trigger['period'] ?? null;
-            if (! is_numeric($period) || (float) $period < 1 || (float) $period !== (float) (int) $period) {
-                continue;
-            }
-            $valid = match ($trigger['type'] ?? '') {
-                'Day' => (int) $period === 1,'Hour' => (int) $period <= 24,'Minute' => (int) $period <= 1440,default => false
-            };
-            if (! $valid) {
-                continue;
-            }
-            foreach (['days', 'days_of_week', 'weekdays'] as $key) {
-                if (! empty($trigger[$key]) && count(array_unique((array) $trigger[$key])) < 7) {
-                    $valid = false;
-                }
-            }
-            if (! $valid) {
-                continue;
-            }
-            $start = (string) ($trigger['start_when'] ?? '');
-            if ($start !== '' && ! preg_match('/^\d{2}:\d{2}(?::\d{2})?$/D', $start)) {
-                try {
-                    if (Carbon::parse($start)->isFuture()) {
-                        continue;
-                    }
-                } catch (\Throwable) {
-                    continue;
-                }
-            }
-            if (! empty($trigger['end_when'])) {
-                try {
-                    if (Carbon::parse($trigger['end_when'])->isPast()) {
-                        continue;
-                    }
-                } catch (\Throwable) {
-                    continue;
-                }
-            }
-
-            return true;
-        }
-
-        return false;
+        return app(BiScheduleTiming::class)->daily($triggers);
     }
 }
