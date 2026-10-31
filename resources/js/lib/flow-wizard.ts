@@ -14,6 +14,7 @@ export function wizardProgress(reviews:Review[],now=Date.now()) {
     const completed=new Set(reviews.filter(review=>review.status==='completed').map(review=>review.payload?.action?.action));
     const next=flowWizardSteps.find(step=>!completed.has(step.action));
     const previous=next?[...reviews].reverse().find(review=>review.payload?.action?.action===next.action):null;
-    const uncertain=!!previous&&['create_source_flow','create_source_table'].includes(previous.payload?.action?.action)&&!!previous.payload?.flow_wizard_attempt?.started_at&&previous.status!=='completed';
-    return {active,completed,next:active||uncertain?undefined:next,uncertain};
+    const uncertain=!!previous&&!!previous.payload?.flow_wizard_attempt?.started_at&&previous.status!=='completed'&&previous.payload?.etl_attempt?.not_dispatched!==true;
+    const activeAction=active?.payload?.action?.action;
+    return {active,completed,next:active||uncertain?undefined:next,uncertain,blocked:uncertain?previous:null,currentAction:activeAction==='configure_source_flow'?'create_source_flow':activeAction??next?.action};
 }

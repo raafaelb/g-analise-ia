@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.10",
+  "version": "2026-10-31.11",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -134,7 +134,7 @@
         {
           "id": "project-flow-wizard",
           "title": "Retome as etapas do ETL",
-          "description": "Nos projetos criados pelo assistente, Assistente de ETL reabre as revisões e o acompanhamento. Fechar a janela não cancela uma operação autorizada. Uma criação sem resultado confirmado precisa de conferência antes de repetir. A conversa com IA continua disponível para transformações adicionais.",
+          "description": "Assistente de ETL retoma as etapas e revisões do projeto. Se um envio ficar sem confirmação, use Conferir etapa para ler o resultado existente, sem executar novamente. Um rascunho já criado e vazio pode receber uma revisão de configuração no mesmo identificador. Fechar a janela não cancela uma operação autorizada.",
           "anchor": "project-flow-wizard",
           "audience": "authors"
         },
@@ -214,7 +214,7 @@
         {
           "id": "catalog-create-flow",
           "title": "Crie um ETL passo a passo",
-          "description": "Em Fontes / ETL, Novo ETL permite escolher uma conexão, tabela e campos. Revise separadamente a configuração, o teste de extração, a tabela privada e a carga. A carga de teste começa limitada; confira a amostra antes de usar indicadores. O assistente não publica nem agenda automaticamente.",
+          "description": "Em Fontes / ETL, Novo ETL permite escolher origem e campos e revisar separadamente configuração, extração, tabela e carga. Se uma etapa ficar sem confirmação, o assistente oferece Conferir etapa. A consulta não repete a execução; dados e publicação continuam exigindo conferência própria.",
           "anchor": "catalog-create-flow",
           "audience": "authors"
         },
@@ -848,7 +848,7 @@
       "id": "etl-wizard",
       "title": "Como crio um ETL sem escrever consultas?",
       "summary": "Escolha a conexão, tabela e campos pelo catálogo e autorize cada etapa separadamente.",
-      "body": "Abra **Catálogo BI → Fontes / ETL → Novo ETL**. Escolha uma conexão já disponível. Use **Buscar na fonte** para encontrar tabelas por seu nome ou por um campo; essa busca consulta apenas a estrutura visível, sem registros de negócio. Escolha uma tabela e selecione até 200 campos. A seleção permanece ao passar pelas páginas de campos.\n\nInforme o nome e confira o limite. O padrão é uma **carga de teste de até 100 registros por extração**. Essa amostra limita a futura tabela e não representa automaticamente os totais do negócio. Desmarcar o limite consulta todos os registros dos campos escolhidos nas etapas de extração e carga; confira se o volume é adequado.\n\nHá quatro revisões: **configurar o ETL privado**, **testar a extração**, **criar uma nova tabela privada** a partir do esquema capturado e **carregar a tabela**. A primeira etapa não executa a consulta; o teste de extração consulta os registros, mas não carrega a tabela. A criação da tabela não comprova carga. A última etapa extrai novamente e substitui apenas o conteúdo da tabela própria criada neste assistente. Cada etapa exige sua autorização; uma resposta na fila não é conclusão.\n\nUse **Conferir a tabela carregada** e **Amostra dos dados** para verificar registros e indicadores. Se a extração não retornar campos ou a carga não confirmar registros, a conferência continua pendente. Uma tabela vazia também pode ser um resultado válido da origem; não repita a carga automaticamente.\n\nÉ possível fechar e retomar em **Projetos → projeto criado → Assistente de ETL**. Fechar não cancela uma execução autorizada. Se uma criação já começou e seu resultado ficou incerto, confira o recibo e o recurso pelo projeto antes de criar novamente. Alterações de origem, configuração, sessão ou destino podem exigir nova revisão ou continuação pelo projeto.\n\nEsta versão usa **PostgreSQL, MySQL e SQL Server**, uma tabela de origem e carga total. Outros conectores, combinações entre tabelas, renomeações, transformações e cargas incrementais continuam pela autoria do projeto com IA. O assistente opera rascunhos privados, não recria destinos existentes, não publica, não cria dashboard e não agenda automaticamente. Publicação, agendas e a verificação de atualização diária dos dashboards precisam de suas próprias etapas. Não é necessário usar a IA para percorrer o assistente.",
+      "body": "Abra **Catálogo BI → Fontes / ETL → Novo ETL**. Escolha uma conexão já disponível. Use **Buscar na fonte** para encontrar tabelas por seu nome ou por um campo; essa busca consulta apenas a estrutura visível, sem registros de negócio. Escolha uma tabela e selecione até 200 campos. A seleção permanece ao passar pelas páginas de campos.\n\nInforme o nome e confira o limite. O padrão é uma **carga de teste de até 100 registros por extração**. Essa amostra limita a futura tabela e não representa automaticamente os totais do negócio. Desmarcar o limite consulta todos os registros dos campos escolhidos nas etapas de extração e carga; confira se o volume é adequado.\n\nHá quatro revisões: **configurar o ETL privado**, **testar a extração**, **criar uma nova tabela privada** a partir do esquema capturado e **carregar a tabela**. A primeira etapa não executa a consulta; o teste de extração consulta os registros, mas não carrega a tabela. A criação da tabela não comprova carga. A última etapa extrai novamente e substitui apenas o conteúdo da tabela própria criada neste assistente. Cada etapa exige sua autorização; uma resposta na fila não é conclusão.\n\nUse **Conferir a tabela carregada** e **Amostra dos dados** para verificar registros e indicadores. Se a extração não retornar campos ou a carga não confirmar registros, a conferência continua pendente. Uma tabela vazia também pode ser um resultado válido da origem; não repita a carga automaticamente.\n\nÉ possível fechar e retomar em **Projetos → projeto criado → Assistente de ETL**. Fechar não cancela uma execução autorizada. Se uma etapa já começou e ficou sem confirmação, use **Conferir etapa**. Essa consulta não repete criação, extração ou carga. Quando o ETL criado ainda está vazio e sua autoria corresponde ao que o assistente gerou, **Revisar configuração existente** prepara uma autorização para concluí-lo no mesmo identificador. Veja a ajuda de recuperação de etapas para entender os limites e os casos sem recibo. Alterações de origem, configuração, sessão ou destino podem exigir nova revisão ou continuação pelo projeto.\n\nEsta versão usa **PostgreSQL, MySQL e SQL Server**, uma tabela de origem e carga total. Outros conectores, combinações entre tabelas, renomeações, transformações e cargas incrementais continuam pela autoria do projeto com IA. O assistente opera rascunhos privados, não recria destinos existentes, não publica, não cria dashboard e não agenda automaticamente. Publicação, agendas e a verificação de atualização diária dos dashboards precisam de suas próprias etapas. Não é necessário usar a IA para percorrer o assistente.",
       "pages": [
         "catalog",
         "project"
@@ -857,6 +857,24 @@
         {
           "page": "catalog",
           "label": "Criar ETL pelo catálogo"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "etl-recovery",
+      "title": "Como conferir uma etapa de ETL que ficou pendente?",
+      "summary": "Leia o resultado existente antes de repetir uma criação ou carga; um reparo tem revisão própria.",
+      "body": "Se uma etapa do **Assistente de ETL** aparecer como **Precisa de conferência**, use **Conferir etapa** na mesma janela. O portal consulta o resultado existente. Esse botão não cria outro ETL ou tabela, não extrai de novo e não repete a carga. Você pode fechar e retomar pelo projeto.\n\nQuando a configuração já foi aplicada e há recibo suficiente, a conferência pode confirmar o ETL existente. A ocorrência anterior continua no histórico. Se o rascunho remoto está vazio e os arquivos locais correspondem à configuração gerada, **Revisar configuração existente** prepara outra revisão. Ela deve ser autorizada e configura somente esse ETL, no mesmo identificador; não cria outro recurso, não consulta registros e não publica.\n\nPara extração e carga, o portal registra um recibo assinado quando o comando nativo confirma o término. Se a falha ocorreu apenas na atualização posterior, o resultado pode ser conferido sem executar novamente. O esquema, o destino privado e os acessos continuam sendo validados. Uma confirmação de comando terminado não comprova sozinha que os indicadores estão corretos: confira **Conferir a tabela carregada → Amostra dos dados**. Uma amostra vazia pode ser válida ou exigir investigação; não repita a carga automaticamente.\n\nSe faltar recibo de término, a etapa continua pendente. Use os controles de **Conferir no BI** para consultar o último estado e o histórico disponíveis ou abra o projeto e peça à IA para investigar. Um resultado antigo ou metadados presentes não provam que um envio incerto terminou. Uma nova revisão só é liberada diretamente quando o transporte comprovou que a execução não foi enviada.\n\nAlterações de fonte, sessão, esquema, destino ou autoria local podem impedir a continuação. O assistente preserva as edições; não força uma versão sobre outra. Uma reconexão do BI permite nova consulta com o acesso atual, e um reparo precisa de revisão nova. Mudanças no acesso do portal podem invalidar autorizações anteriores.\n\nSe a configuração inicial foi recusada ou expirou sem envio, **Preparar outra criação** abre uma nova proposta em um projeto separado. O histórico do projeto anterior permanece disponível. Publicação e agenda continuam com suas próprias revisões.",
+      "pages": [
+        "catalog",
+        "project",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "projects",
+          "label": "Retomar um projeto de ETL"
         }
       ],
       "audience": "authors"

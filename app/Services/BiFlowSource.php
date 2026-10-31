@@ -90,6 +90,21 @@ class BiFlowSource
         });
     }
 
+    public function assertUnchanged(User $user, string $tenant, string $resource, string $expected): void
+    {
+        abort_unless(preg_match('/^credential:[1-9][0-9]{0,15}$/D', $resource), 422, 'A conexão da revisão não foi identificada.');
+        $this->access($user, $tenant);
+        $this->credentials->withSource($user, $tenant, substr($resource, 11), function (Connection $connection, Project $context, array $body) use ($expected): array {
+            $key = $body['key'] ?? null;
+            $agent = $body['agentId'] ?? $body['agent_id'] ?? $body['tokenId'] ?? null;
+            if (! is_string($key) || (! is_int($agent) && ! is_string($agent)) || ! preg_match('/^[1-9][0-9]*$/D', (string) $agent) || ! hash_equals($expected, $this->digest(['key' => $key, 'agent' => (int) $agent, 'type' => $body['type'] ?? null, 'config' => $body['config'] ?? null, 'password' => $body['password'] ?? null]))) {
+                throw new RuntimeException('A conexão da fonte mudou depois da configuração do ETL. Confira a origem no projeto antes de executar outra etapa.');
+            }
+
+            return [];
+        });
+    }
+
     public function digest(mixed $value): string
     {
         $sort = function (mixed $item) use (&$sort): mixed {

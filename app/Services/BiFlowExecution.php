@@ -67,10 +67,18 @@ class BiFlowExecution
     {
         $before = $this->catalog->workingMetadata($project)[$arguments['resource']] ?? null;
         $approval->update(['payload' => [...$approval->payload, 'etl_attempt' => ['started_at' => now()->toIso8601String(), 'node' => $arguments['node']]]]);
-        $result = $this->lumo->run($connection, ['flow', 'run-node', $arguments['resource'], '--node', $arguments['node']], $project, 420, false, fn () => AgentRun::whereKey($approval->agent_run_id)->where('status', 'running')->update(['heartbeat_at' => now()]));
+        try {
+            $result = $this->lumo->run($connection, ['flow', 'run-node', $arguments['resource'], '--node', $arguments['node']], $project, 420, false, fn () => AgentRun::whereKey($approval->agent_run_id)->where('status', 'running')->update(['heartbeat_at' => now()]));
+        } catch (BiBusy $error) {
+            $this->recordFinishedReceipt($approval, ['resource' => $arguments['resource'], 'node' => $arguments['node'], 'state' => 'not_dispatched', 'received_at' => now()->toIso8601String(), 'before_sha256' => is_array($before) ? $this->stateFingerprint($before) : null]);
+            $approval->update(['payload' => [...$approval->payload, 'etl_attempt' => [...$approval->payload['etl_attempt'], 'not_dispatched' => true]]]);
+            throw $error;
+        }
         if (($result['data']['state'] ?? null) !== 'finished' || ($result['data']['node'] ?? null) !== $arguments['node']) {
             throw new RuntimeException('O BI não confirmou o término desta etapa. Confira o estado antes de repetir; uma resposta enfileirada não é sucesso.');
         }
+        $receipt = ['resource' => $arguments['resource'], 'node' => $arguments['node'], 'state' => 'finished', 'received_at' => now()->toIso8601String(), 'before_sha256' => is_array($before) ? $this->stateFingerprint($before) : null];
+        $this->recordFinishedReceipt($approval, $receipt);
         $result['execution'] = ['node' => $arguments['node'], 'native_command_finished' => true, 'message' => 'O comando oficial aguardou o resultado final da etapa. Confira a prévia, o esquema e a tabela de destino antes de afirmar que os dados solicitados estão corretos.'];
         try {
             $after = $this->catalog->workingMetadata($project)[$arguments['resource']] ?? null;
@@ -88,7 +96,62 @@ class BiFlowExecution
             $result['workspace_refresh'] = ['verified' => false, 'message' => 'A execução terminou, mas a atualização do documento local precisa ser conferida com refresh_resource. Não repita a execução para corrigir a sincronização.'];
         }
 
+        if (($result['workspace_refresh']['verified'] ?? false) === true) {
+            $current = $this->catalog->workingMetadata($project)[$arguments['resource']] ?? null;
+            if (is_array($current)) {
+                $this->recordFinishedReceipt($approval, [...$receipt, 'resulting_sha256' => $this->stateFingerprint($current)]);
+            }
+        }
+
         return $result;
+    }
+
+    public function finishedReceipt(Approval $approval, string $resource, string $node): ?array
+    {
+        $stored = $approval->payload['etl_attempt']['native_finished'] ?? null;
+        if (! is_array($stored) || ! is_array($stored['receipt'] ?? null) || ! is_string($stored['signature'] ?? null)) {
+            return null;
+        }
+        $receipt = $stored['receipt'];
+        if (($receipt['state'] ?? null) !== 'finished' || ($receipt['resource'] ?? null) !== $resource || ($receipt['node'] ?? null) !== $node || ! hash_equals($this->receiptSignature($approval, $receipt), $stored['signature'])) {
+            return null;
+        }
+
+        return $receipt;
+    }
+
+    public function wasNotDispatched(Approval $approval, string $resource, string $node): bool
+    {
+        $stored = $approval->payload['etl_attempt']['native_finished'] ?? null;
+        $receipt = is_array($stored) ? ($stored['receipt'] ?? null) : null;
+
+        return is_array($receipt) && ($receipt['state'] ?? null) === 'not_dispatched' && ($receipt['resource'] ?? null) === $resource && ($receipt['node'] ?? null) === $node && is_string($stored['signature'] ?? null) && hash_equals($this->receiptSignature($approval, $receipt), $stored['signature']);
+    }
+
+    public function stateFingerprint(array $body): string
+    {
+        $sort = function (mixed $value) use (&$sort): mixed {
+            if (! is_array($value)) {
+                return $value;
+            }
+            if (! array_is_list($value)) {
+                ksort($value);
+            }
+
+            return array_map($sort, $value);
+        };
+
+        return hash_hmac('sha256', json_encode($sort($body), JSON_THROW_ON_ERROR), (string) config('app.key'));
+    }
+
+    private function recordFinishedReceipt(Approval $approval, array $receipt): void
+    {
+        $approval->update(['payload' => [...$approval->payload, 'etl_attempt' => [...($approval->payload['etl_attempt'] ?? []), 'native_finished' => ['receipt' => $receipt, 'signature' => $this->receiptSignature($approval, $receipt)]]]]);
+    }
+
+    private function receiptSignature(Approval $approval, array $receipt): string
+    {
+        return hash_hmac('sha256', 'etl-finished-v1|'.$approval->id.'|'.$approval->user_id.'|'.$approval->project_id.'|'.$approval->fingerprint.'|'.json_encode($receipt, JSON_THROW_ON_ERROR), (string) config('app.key'));
     }
 
     /** @return array{array<string, mixed>, array<string, mixed>} */

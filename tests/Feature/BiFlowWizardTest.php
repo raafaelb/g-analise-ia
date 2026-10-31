@@ -10,6 +10,7 @@ use App\Models\Connection;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
+use App\Services\BiBusy;
 use App\Services\LumoClient;
 use App\Services\WorkspaceFiles;
 use Illuminate\Database\Schema\Blueprint;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
@@ -50,7 +52,7 @@ class BiFlowWizardTest extends TestCase
     {
         $user = User::factory()->create();
         Connection::create(['user_id' => $user->id, 'provider' => 'horus', 'status' => 'connected', 'credentials' => ['auth' => ['token' => 'synthetic-only']], 'metadata' => ['session_generation' => 'session-a', 'tenants' => [['id' => '100', 'name' => 'Ambiente autorizado']]]]);
-        $this->state = (object) ['bodies' => ['credential:11' => ['nome' => 'Fonte disponível', 'type' => $type, 'agentId' => 7, 'key' => 'SYNTHETIC-PRIVATE-REFERENCE', 'config' => ['password' => 'SYNTHETIC-PRIVATE-PASSWORD']], 'flow:10' => ['nome' => 'ETL preexistente', 'deskId' => 6, 'tokenId' => 7, 'load_type' => 'Total', 'nodes' => ['Processors' => []]], 'table:500' => ['nome' => 'Tabela preexistente', 'deskId' => 6]], 'commands' => [], 'flows_created' => 0, 'tables_created' => 0, 'runs' => [], 'loads' => 0, 'fail_push' => false, 'query' => null, 'queued' => false, 'change_loaded_schema' => false, 'empty_preview' => false, 'callback' => null];
+        $this->state = (object) ['bodies' => ['credential:11' => ['nome' => 'Fonte disponível', 'type' => $type, 'agentId' => 7, 'key' => 'SYNTHETIC-PRIVATE-REFERENCE', 'config' => ['password' => 'SYNTHETIC-PRIVATE-PASSWORD']], 'flow:10' => ['nome' => 'ETL preexistente', 'deskId' => 6, 'tokenId' => 7, 'load_type' => 'Total', 'nodes' => ['Processors' => []]], 'table:500' => ['nome' => 'Tabela preexistente', 'deskId' => 6]], 'commands' => [], 'flows_created' => 0, 'tables_created' => 0, 'runs' => [], 'loads' => 0, 'fail_push' => false, 'fail_after_push' => false, 'query' => null, 'queued' => false, 'change_loaded_schema' => false, 'empty_preview' => false, 'callback' => null];
         $this->mock(LumoClient::class)->shouldReceive('initialize')->andReturnNull();
         app(LumoClient::class)->shouldReceive('run')->andReturnUsing(function (Connection $connection, array $args, Project $context): array {
             $s = $this->state;
@@ -99,6 +101,9 @@ class BiFlowWizardTest extends TestCase
                     throw new RuntimeException('Falha sintética ao enviar a configuração.');
                 }
                 $s->bodies[$args[1]] = $this->working($context, $args[1]);
+                if ($s->fail_after_push) {
+                    throw new RuntimeException('Falha sintética da confirmação após envio.');
+                }
 
                 return ['data' => ['saved' => true]];
             }
@@ -112,7 +117,7 @@ class BiFlowWizardTest extends TestCase
                 if ($node['kind'] === 'InsertDatawarehouse') {
                     $s->loads++;
                 }
-                $flow['nodes']['Processors'][0]['metadata'] = ['File' => 'private-fixture.parquet', 'Fields' => [['columnName' => 'ID', 'dataType' => 'Int32'], ['columnName' => 'AMOUNT', 'dataType' => 'Decimal']]];
+                $flow['nodes']['Processors'][0]['metadata'] = ['File' => 'private-fixture-'.count($s->runs).'.parquet', 'Fields' => [['columnName' => 'ID', 'dataType' => 'Int32'], ['columnName' => 'AMOUNT', 'dataType' => 'Decimal']]];
 
                 if ($node['kind'] === 'InsertDatawarehouse' && $s->change_loaded_schema) {
                     $flow['nodes']['Processors'][0]['metadata']['Fields'][] = ['columnName' => 'CHANGED', 'dataType' => 'Int32'];
@@ -416,6 +421,305 @@ class BiFlowWizardTest extends TestCase
         $review = $this->prepare($user, $input);
         $this->assertSame('SELECT "amount"";DROP TABLE other;--" FROM "odd\'schema"."or""ders" LIMIT 3', $review->payload['revision']['flow_wizard']['sql']);
         $this->assertSame(0, $this->state->flows_created);
+    }
+
+    private function checkStep(User $user, Approval $approval): TestResponse
+    {
+        return $this->actingAs($user)->postJson('/api/projects/'.$approval->project_id.'/flow-wizard/verify/'.$approval->id, ['fingerprint' => $approval->fingerprint]);
+    }
+
+    public function test_a_failed_confirmation_recovers_the_existing_configured_flow_without_another_push(): void
+    {
+        $user = $this->context();
+        $this->state->fail_after_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->assertSame('failed', $creation->status);
+        $before = $this->state->commands;
+        $this->checkStep($user, $creation)->assertOk()->assertJsonPath('verification.verified', true)->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.flow_wizard_recovery.previous_message', 'Falha sintética da confirmação após envio.');
+        $newCommands = array_slice($this->state->commands, count($before));
+        $this->assertFalse(collect($newCommands)->contains(fn (array $args): bool => in_array($args[0], ['new', 'push'], true) || array_slice($args, 0, 2) === ['flow', 'run-node']));
+        $this->assertSame(1, $this->state->flows_created);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'flow:99', 'status' => 'draft']);
+        $this->assertSame([], $this->state->runs);
+    }
+
+    public function test_an_existing_empty_flow_is_completed_by_a_separate_review_without_creating_it_again(): void
+    {
+        $user = $this->context();
+        $this->state->fail_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->checkStep($user, $creation)->assertOk()->assertJsonPath('verification.state', 'needs_configuration')->assertJsonPath('approval.status', 'failed');
+        $this->state->fail_push = false;
+        $repair = $this->follow($user, $creation, 'configure_source_flow');
+        $this->assertSame(1, $this->state->flows_created);
+        $this->assertSame(0, $this->state->tables_created);
+        $completed = $this->execute($user, $repair);
+        $this->assertSame('completed', $completed->status, $completed->payload['execution']['message'] ?? '');
+        $this->assertSame('completed', $creation->fresh()->status);
+        $this->assertSame($repair->id, $creation->fresh()->payload['flow_wizard_attempt']['configured_by_approval_id']);
+        $this->assertSame('failed', $creation->fresh()->payload['flow_wizard_recovery']['previous_status']);
+        $this->assertSame(1, $this->state->flows_created);
+        $this->assertSame([], $this->state->runs);
+        $test = $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $this->assertSame('completed', $test->status, $test->payload['execution']['message'] ?? '');
+    }
+
+    public function test_a_repair_with_lost_confirmation_can_be_checked_without_repeating_its_push(): void
+    {
+        $user = $this->context();
+        $this->state->fail_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->state->fail_push = false;
+        $repair = $this->follow($user, $creation, 'configure_source_flow');
+        $this->state->fail_after_push = true;
+        $failed = $this->execute($user, $repair);
+        $this->assertSame('failed', $failed->status);
+        $this->checkStep($user, $creation)->assertOk()->assertJsonPath('verification.verified', true);
+        $this->assertSame('failed', $failed->fresh()->status);
+        $this->assertSame(1, $this->state->flows_created);
+        $this->assertSame(2, collect($this->state->commands)->filter(fn (array $args): bool => $args[0] === 'push')->count());
+    }
+
+    public function test_local_authored_edits_are_preserved_and_prevent_repair_of_an_empty_flow(): void
+    {
+        $user = $this->context();
+        $this->state->fail_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $project = Project::findOrFail($creation->project_id);
+        $path = $this->path($project, 'flow:99');
+        File::append($path, "descricao: Edição local do usuário\n");
+        $hash = hash_file('sha256', $path);
+        $this->checkStep($user, $creation)->assertOk()->assertJsonPath('verification.state', 'needs_authorship')->assertJsonPath('approval.status', 'failed');
+        $this->postJson('/api/catalog/100/flow-wizard/actions', ['action' => 'configure_source_flow', 'project_id' => $project->id, 'request_id' => (string) Str::uuid()])->assertUnprocessable();
+        $this->assertSame($hash, hash_file('sha256', $path));
+        $this->assertSame([], $this->state->bodies['flow:99']['nodes']['Processors']);
+        $this->assertSame(1, $this->state->flows_created);
+    }
+
+    public function test_a_remote_edit_prevents_confirmation_and_repair_without_overwriting_it(): void
+    {
+        $user = $this->context();
+        $this->state->fail_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->state->bodies['flow:99']['nome'] = 'Nome alterado fora do portal';
+        $this->checkStep($user, $creation)->assertUnprocessable();
+        $this->postJson('/api/catalog/100/flow-wizard/actions', ['action' => 'configure_source_flow', 'project_id' => $creation->project_id, 'request_id' => (string) Str::uuid()])->assertUnprocessable();
+        $this->assertSame('Nome alterado fora do portal', $this->state->bodies['flow:99']['nome']);
+        $this->assertSame('failed', $creation->fresh()->status);
+    }
+
+    public function test_table_creation_recovers_its_receipt_binding_and_schema_without_creating_another_table(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $review = $this->follow($user, $creation, 'create_source_table');
+        $this->state->callback = function (Connection $connection, array $args): void {
+            if ($args === ['info', 'table:501']) {
+                $this->state->callback = null;
+                throw new RuntimeException('Conferência de tabela temporariamente indisponível.');
+            }
+        };
+        $table = $this->execute($user, $review);
+        $this->assertSame('failed', $table->status);
+        $this->checkStep($user, $table)->assertOk()->assertJsonPath('verification.verified', true)->assertJsonPath('approval.payload.execution.result.flow_wizard.table', 'table:501');
+        $this->assertSame(1, $this->state->tables_created);
+        $this->assertSame(0, $this->state->loads);
+    }
+
+    public function test_a_table_with_an_unexpected_schema_cannot_be_recovered_or_loaded(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $table = $this->execute($user, $this->follow($user, $creation, 'create_source_table'));
+        $table->update(['status' => 'failed']);
+        $this->state->bodies['table:501']['columns'] = ['ID (TEXT)' => [], 'AMOUNT (DECIMAL)' => []];
+        $this->checkStep($user, $table)->assertUnprocessable();
+        $this->assertSame('failed', $table->fresh()->status);
+        $this->assertSame(0, $this->state->loads);
+    }
+
+    public function test_a_finished_extraction_with_failed_workspace_refresh_is_confirmed_without_running_it_again(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $review = $this->follow($user, $creation, 'test_source_flow');
+        $this->failPostRunPull($review->project_id, false);
+        $test = $this->execute($user, $review);
+        $this->assertSame('failed', $test->status);
+        $this->checkStep($user, $test)->assertOk()->assertJsonPath('verification.verified', true)->assertJsonPath('approval.payload.execution.result.flow_wizard.captured_fields', 2);
+        $this->assertSame(['ExtractPostgreSQL'], $this->state->runs);
+    }
+
+    private function failPostRunPull(string $projectId, bool $load): void
+    {
+        $this->state->callback = function (Connection $connection, array $args, Project $context) use ($projectId, $load): void {
+            if ($args === ['pull', 'flow:99'] && $context->id === $projectId && ($load ? $this->state->loads > 0 : count($this->state->runs) > 0)) {
+                $this->state->callback = null;
+                throw new RuntimeException('Atualização de autoria temporariamente indisponível.');
+            }
+        };
+    }
+
+    public function test_a_finished_load_recovers_with_a_data_check_without_running_the_load_again(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $this->execute($user, $this->follow($user, $creation, 'create_source_table'));
+        $review = $this->follow($user, $creation, 'load_source_table');
+        $this->failPostRunPull($review->project_id, true);
+        $load = $this->execute($user, $review);
+        $this->assertSame('failed', $load->status);
+        $this->checkStep($user, $load)->assertOk()->assertJsonPath('verification.verified', true)->assertJsonPath('approval.payload.execution.result.flow_wizard.data_check.preview_confirmed', true);
+        (new ExecuteApprovedAction($load->id))->handle(app(ActionBroker::class));
+        $this->assertSame(1, $this->state->loads);
+        $this->assertStringNotContainsString('SYNTHETIC-BUSINESS-ROW', Approval::all()->toJson().AuditEvent::all()->toJson());
+    }
+
+    public function test_valid_metadata_without_a_signed_finish_receipt_cannot_confirm_or_repeat_an_execution(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->state->queued = true;
+        $test = $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $this->checkStep($user, $test)->assertOk()->assertJsonPath('verification.state', 'not_proven')->assertJsonPath('approval.status', 'failed');
+        $this->postJson('/api/catalog/100/flow-wizard/actions', ['action' => 'test_source_flow', 'project_id' => $creation->project_id, 'request_id' => (string) Str::uuid()])->assertUnprocessable();
+        $this->assertSame(1, count($this->state->runs));
+        $this->assertSame(0, $this->state->tables_created);
+    }
+
+    public function test_a_finish_receipt_cannot_be_changed_to_confirm_another_node(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $test = $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $payload = $test->payload;
+        $payload['etl_attempt']['native_finished']['receipt']['node'] = 'other-node';
+        $test->update(['status' => 'failed', 'payload' => $payload]);
+        $this->checkStep($user, $test)->assertOk()->assertJsonPath('verification.state', 'not_proven')->assertJsonPath('approval.status', 'failed');
+        $this->assertSame(1, count($this->state->runs));
+    }
+
+    public function test_a_changed_source_connection_blocks_subsequent_stages_and_recovery(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->state->bodies['credential:11']['config']['password'] = 'SYNTHETIC-CHANGED';
+        $this->postJson('/api/catalog/100/flow-wizard/actions', ['action' => 'test_source_flow', 'project_id' => $creation->project_id, 'request_id' => (string) Str::uuid()])->assertUnprocessable();
+        $creation->update(['status' => 'failed']);
+        $this->checkStep($user, $creation)->assertUnprocessable();
+        $this->assertSame([], $this->state->runs);
+    }
+
+    public function test_recovery_requires_the_same_owner_and_a_valid_authorized_revision(): void
+    {
+        $user = $this->context();
+        $this->state->fail_after_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $other = User::factory()->create();
+        $this->checkStep($other, $creation)->assertNotFound();
+        $reader = User::factory()->create(['role' => 'viewer']);
+        $this->checkStep($reader, $creation)->assertNotFound();
+        $this->actingAs($user)->postJson('/api/projects/'.$creation->project_id.'/flow-wizard/verify/'.$creation->id, ['fingerprint' => str_repeat('0', 64)])->assertConflict();
+        $payload = $creation->payload;
+        $payload['revision']['flow_wizard']['sql'] = 'SELECT another_source';
+        $creation->update(['payload' => $payload]);
+        $this->checkStep($user, $creation)->assertConflict();
+        $this->assertSame('failed', $creation->fresh()->status);
+    }
+
+    public function test_pending_unsubmitted_reviews_cannot_be_confirmed_as_completed(): void
+    {
+        $user = $this->context();
+        $creation = $this->prepare($user, $this->input());
+        $this->checkStep($user, $creation)->assertConflict();
+        $this->assertSame('pending', $creation->fresh()->status);
+        $this->assertSame(0, $this->state->flows_created);
+    }
+
+    public function test_a_proven_session_lock_denial_allows_a_new_review_without_a_duplicate_execution(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $review = $this->follow($user, $creation, 'test_source_flow');
+        $this->state->callback = function (Connection $connection, array $args): void {
+            if (array_slice($args, 0, 2) === ['flow', 'run-node']) {
+                $this->state->callback = null;
+                throw new BiBusy;
+            }
+        };
+        $failed = $this->execute($user, $review);
+        $this->assertSame('failed', $failed->status);
+        $this->assertSame([], $this->state->runs);
+        $retry = $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $this->assertSame('completed', $retry->status, $retry->payload['execution']['message'] ?? '');
+        $this->assertSame(1, count($this->state->runs));
+    }
+
+    public function test_recovery_refuses_an_owning_reader_or_a_previous_access_revision(): void
+    {
+        $user = $this->context();
+        $this->state->fail_after_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $user->forceFill(['role' => 'viewer'])->save();
+        $this->checkStep($user->fresh(), $creation)->assertForbidden();
+        $user->forceFill(['role' => 'editor', 'access_version' => 1])->save();
+        $this->withSession(['user_access_version' => 1]);
+        $this->checkStep($user->fresh(), $creation)->assertConflict();
+        $this->assertSame('failed', $creation->fresh()->status);
+    }
+
+    public function test_reconnection_allows_reading_the_existing_result_and_requires_a_fresh_repair_review(): void
+    {
+        $user = $this->context();
+        $this->state->fail_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $connection = Connection::where('user_id', $user->id)->where('provider', 'horus')->sole();
+        $connection->update(['metadata' => [...$connection->metadata, 'session_generation' => 'session-b']]);
+        $this->checkStep($user, $creation)->assertOk()->assertJsonPath('verification.state', 'needs_configuration');
+        $this->state->fail_push = false;
+        $repair = $this->follow($user, $creation, 'configure_source_flow');
+        $this->assertSame('session-b', $repair->payload['revision']['connection_generation']);
+        $result = $this->execute($user, $repair);
+        $this->assertSame('completed', $result->status, $result->payload['execution']['message'] ?? '');
+        $this->assertSame(1, $this->state->flows_created);
+    }
+
+    public function test_changes_after_the_repair_review_prevent_a_push_of_the_older_configuration(): void
+    {
+        $user = $this->context();
+        $this->state->fail_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $repair = $this->follow($user, $creation, 'configure_source_flow');
+        $this->state->fail_push = false;
+        $this->state->bodies['flow:99']['nome'] = 'Alteração posterior à revisão';
+        $result = $this->execute($user, $repair);
+        $this->assertSame('failed', $result->status);
+        $this->assertSame(1, collect($this->state->commands)->filter(fn (array $args): bool => $args[0] === 'push')->count());
+        $this->assertSame('Alteração posterior à revisão', $this->state->bodies['flow:99']['nome']);
+    }
+
+    public function test_later_metadata_cannot_replace_the_result_bound_to_a_signed_finish_receipt(): void
+    {
+        $user = $this->context();
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $test = $this->execute($user, $this->follow($user, $creation, 'test_source_flow'));
+        $test->update(['status' => 'failed']);
+        $this->state->bodies['flow:99']['nodes']['Processors'][0]['metadata']['File'] = 'a-later-extraction.parquet';
+        $this->checkStep($user, $test)->assertUnprocessable();
+        $this->assertSame('failed', $test->fresh()->status);
+        $this->assertSame(1, count($this->state->runs));
+    }
+
+    public function test_extra_recovery_parameters_cannot_redirect_the_checked_resource(): void
+    {
+        $user = $this->context();
+        $this->state->fail_after_push = true;
+        $creation = $this->execute($user, $this->prepare($user, $this->input()));
+        $this->postJson('/api/projects/'.$creation->project_id.'/flow-wizard/verify/'.$creation->id, ['fingerprint' => $creation->fingerprint, 'resource' => 'flow:10'])->assertUnprocessable()->assertJsonValidationErrors('flow');
+        $this->assertSame('failed', $creation->fresh()->status);
     }
 
     public static function drivers(): array

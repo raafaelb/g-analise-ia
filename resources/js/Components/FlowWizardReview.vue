@@ -7,11 +7,11 @@ const expanded=ref(false);
 const source=computed(()=>props.value.source??{});
 const columns=computed<Item[]>(()=>source.value.columns??[]);
 const visible=computed(()=>expanded.value?columns.value:columns.value.slice(0,12));
-const stage=computed(()=>({create_source_flow:'Criar a configuração do ETL',test_source_flow:'Testar a extração dos dados',create_source_table:'Criar a tabela privada',load_source_table:'Carregar a tabela privada'} as Record<string,string>)[props.value.step]??'Conferir etapa do ETL');
+const stage=computed(()=>({create_source_flow:'Criar a configuração do ETL',configure_source_flow:'Concluir a configuração do ETL existente',test_source_flow:'Testar a extração dos dados',create_source_table:'Criar a tabela privada',load_source_table:'Carregar a tabela privada'} as Record<string,string>)[props.value.step]??'Conferir etapa do ETL');
 </script>
 <template>
  <section class="flow-wizard-review" aria-label="Revisão do assistente de ETL">
-  <h3>{{stage}}</h3><div class="flow-review-path"><div><Database :size="17"/><strong>{{source.name}}</strong><small>{{source.schema}} · {{source.table}}</small></div><ArrowRight :size="17"/><div><FolderOpen :size="17"/><strong>{{value.table||'Nova tabela própria'}}</strong><small>Minha Mesa · neste ambiente</small></div></div>
+  <h3>{{stage}}</h3><div class="flow-review-path"><div><Database :size="17"/><strong>{{source.name}}</strong><small>{{source.schema}} · {{source.table}}</small></div><ArrowRight :size="17"/><div><FolderOpen :size="17"/><strong>{{value.repair?.resource||value.table||'Nova tabela própria'}}</strong><small>{{value.repair?'Mesmo ETL · sem nova criação':'Minha Mesa · neste ambiente'}}</small></div></div>
   <dl><div><dt>Agente</dt><dd>{{source.agent?.name}}</dd></div><div><dt>Campos escolhidos</dt><dd>{{columns.length}} de {{source.visible_column_count}} campos visíveis</dd></div><div><dt>Registros por extração</dt><dd>{{source.row_limit?'Até '+source.row_limit+' · carga de teste':'Todos os registros dos campos escolhidos'}}</dd></div><div v-if="value.captured_fields"><dt>Esquema capturado</dt><dd>{{value.captured_fields}} campos</dd></div></dl>
   <p v-if="source.row_limit" class="flow-review-attention"><Info :size="16"/><span>O limite de teste também limita a futura tabela. Essa amostra precisa de revisão antes de usar seus números como indicadores completos.</span></p>
   <p v-else-if="['test_source_flow','load_source_table'].includes(value.step)" class="flow-review-attention"><Info :size="16"/><span>O agente consultará todos os registros dos campos escolhidos. Confira se esse volume é adequado antes de autorizar.</span></p>

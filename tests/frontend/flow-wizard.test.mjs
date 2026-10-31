@@ -38,3 +38,26 @@ test('the review discloses limited sample and target while escaping names',async
 test('unlimited extraction clearly discloses the full selected record volume',async()=>{
  const html=await renderToString(createSSRApp(Review,{value:{...value,source:{...value.source,row_limit:null}}}));assert.match(html,/todos os registros dos campos escolhidos/);assert.doesNotMatch(html,/carga de teste|Até 100/);
 });
+
+
+test('uncertain extraction and load attempts stop advancement instead of offering another execution',()=>{
+ for(const action of ['test_source_flow','load_source_table']){
+  const before=action==='test_source_flow'?['create_source_flow']:['create_source_flow','test_source_flow','create_source_table'];
+  const failed=row(action,'failed',{flow_wizard_attempt:{started_at:'2026-10-31T12:00:00Z'}});
+  const result=progress([...before.map(step=>row(step,'completed')),failed]);
+  assert.equal(result.next,undefined);assert.equal(result.blocked,failed);assert.equal(result.uncertain,true);
+ }
+});
+test('a transport-confirmed unsubmitted execution permits a new review',()=>{
+ const failed=row('test_source_flow','failed',{flow_wizard_attempt:{started_at:'2026-10-31T12:00:00Z'},etl_attempt:{not_dispatched:true}});
+ assert.equal(progress([row('create_source_flow','completed'),failed]).next.action,'test_source_flow');
+});
+test('an active configuration repair uses the configuration step without skipping its review',()=>{
+ const original=row('create_source_flow','failed',{flow_wizard_attempt:{started_at:'2026-10-31T12:00:00Z'}});
+ const repair=row('configure_source_flow','pending');
+ const result=progress([original,repair]);assert.equal(result.active,repair);assert.equal(result.next,undefined);assert.equal(result.currentAction,'create_source_flow');
+});
+test('a repair review identifies the existing flow and its effect instead of presenting another creation',async()=>{
+ const html=await renderToString(createSSRApp(Review,{value:{...value,step:'configure_source_flow',repair:{resource:'flow:90'}}}));
+ assert.match(html,/Concluir a configuração do ETL existente/);assert.match(html,/flow:90/);assert.match(html,/Mesmo ETL · sem nova criação/);
+});

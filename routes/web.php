@@ -63,6 +63,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/catalog/{tenant}/flow-wizard/fields', [BiFlowWizardController::class, 'fields'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/flow-wizard/actions', [BiFlowWizardController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::get('/projects/{id}/flow-wizard', [BiFlowWizardController::class, 'status'])->whereUuid('id');
+        Route::post('/projects/{id}/flow-wizard/verify/{approval}', [BiFlowWizardController::class, 'verify'])->whereUuid(['id', 'approval'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/flows/{id}/actions', [CatalogController::class, 'prepareFlowAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/bi-actions/{id}', [CatalogController::class, 'actionStatus'])->whereUuid('id');
         Route::post('/bi-actions/{id}/schedule-verification', [BiScheduleController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
