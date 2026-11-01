@@ -23,7 +23,7 @@ const renderer=createRenderer({
 });
 function text(item){return item.text+item.children.map(text).join('');}
 function find(item,predicate){if(predicate(item))return item;return item.children.map(child=>find(child,predicate)).find(Boolean);}
-function mount(request,kind='table',download){const root=node('root'),repaint=ref(0),resource=ref(kind+':90');const app=renderer.createApp({setup:()=>()=>{repaint.value;return h(Inspector,{tenant:'923',resource:{kind:resource.value.split(':')[0],id:resource.value.split(':')[1],ref:resource.value},request,download});}});app.mount(root);return {root,repaint,resource,close:()=>app.unmount(),inspect:()=>find(root,item=>item.kind==='button'&&text(item).includes('Amostra')).props.onClick(),export:()=>find(root,item=>item.kind==='button'&&text(item).includes('Exportar XLSX')).props.onClick()};}
+function mount(request,kind='table',download){const root=node('root'),repaint=ref(0),resource=ref(kind+':90');const app=renderer.createApp({setup:()=>()=>{repaint.value;return h(Inspector,{tenant:'923',resource:{kind:resource.value.split(':')[0],id:resource.value.split(':')[1],ref:resource.value},request,download});}});app.mount(root);return {root,repaint,resource,close:()=>app.unmount(),inspect:()=>find(root,item=>item.kind==='button'&&text(item).includes('Amostra')).props.onClick(),history:()=>find(root,item=>item.kind==='button'&&text(item).includes('Histórico de cargas')).props.onClick(),export:()=>find(root,item=>item.kind==='button'&&text(item).includes('Exportar XLSX')).props.onClick()};}
 test('a pending table preview and its result survive unrelated parent repaints with the same resource',async()=>{
  let resolve,calls=0;const view=mount(()=>{calls++;return new Promise(done=>resolve=done);});
  try{const pending=view.inspect();view.repaint.value++;await nextTick();resolve({checked_at:'2026-10-31T15:00:00Z',table:{columns:['STATUS'],rows:[{STATUS:'record-confirmed'}]}});await pending;await nextTick();assert.match(text(view.root),/record-confirmed/);view.repaint.value++;await nextTick();assert.match(text(view.root),/record-confirmed/);assert.equal(calls,1);}finally{view.close();}
@@ -45,4 +45,13 @@ test('a cadastro export is explicit and its pending delivery is discarded after 
 test('a native file denial is visible in the same resource without opening another page',async()=>{
  const view=mount(async()=>({}),'writeback',async()=>{throw new Error('O BI recusou o download desta planilha. Confirme a permissão de exportar.');});
  try{await view.export();await nextTick();const alert=find(view.root,item=>item.props.role==='alert');assert.match(text(alert),/permissão de exportar/);assert.equal(find(view.root,item=>item.kind==='button'&&text(item).includes('Exportar XLSX')).props.disabled,false);}finally{view.close();}
+});
+
+test('flow history keeps zero counters and labels them as processing rather than stored records',async()=>{
+ const requests=[];const view=mount(async(...args)=>{requests.push(args);return {history:[{id:'synthetic-run',state:'succeeded',started_at:'2026-10-31T10:00:00Z',finished_at:'2026-10-31T10:01:00Z',duration_ms:60000,rows_in:0,rows_out:0,message:null}]};},'flow');
+ try{await view.history();await nextTick();const value=text(view.root);assert.equal(requests[0][0],'/catalog/923/resources/flow/90/inspect/history');assert.match(value,/Linhas de entrada/);assert.match(value,/Linhas de saída/);assert.match(value,/Contadores do processamento informados pelo BI/);assert.doesNotMatch(value,/Linhas gravadas/);assert.equal(find(view.root,item=>item.kind==='dd'&&text(item)==='0')?.kind,'dd');}finally{view.close();}
+});
+test('unknown flow counters are not displayed as zero or as a physical table count',async()=>{
+ const view=mount(async()=>({history:[{id:'synthetic-run',state:'succeeded',started_at:'2026-10-31T10:00:00Z',finished_at:'2026-10-31T10:01:00Z',duration_ms:null,rows_in:null,rows_out:null,message:null}]}),'flow');
+ try{await view.history();await nextTick();const value=text(view.root);assert.match(value,/Concluída com sucesso/);assert.doesNotMatch(value,/Linhas de entrada|Linhas de saída|Linhas gravadas|Contadores do processamento/);}finally{view.close();}
 });
