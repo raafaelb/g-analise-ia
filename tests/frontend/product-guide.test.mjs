@@ -82,3 +82,8 @@ test('questions about catalog delays find category loading and full inventory re
 test('agent availability questions find the read-only status guide',()=>{
  assert.equal(searchGuideArticles(content.articles,'agente online','catalog')[0]?.id,'agent-availability');
 });
+
+
+test('scanned PDF questions find visual page limits and attachment guidance',()=>{
+ assert.equal(searchGuideArticles(content.articles,'PDF digitalizado','project')[0]?.id,'scanned-pdf');
+});

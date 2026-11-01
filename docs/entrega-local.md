@@ -86,3 +86,8 @@ A leitura específica de uma aplicação com identidade completa evita a nova li
 ## Criar e editar mesas pelo catálogo
 
 As mesas de aplicações e de dados possuem formulário de criação e de nome/descrição, com revisão, decisão e resultado na própria interface. Criação e edição dos dois tipos foram confirmadas no BI em mesas descartáveis da Inovadora; a limpeza sem cascata preservou as mesas preexistentes. O acesso de membros e as opções avançadas continuam fora do formulário. A rodada passou com 403 testes PHP / 2.362 verificações em SQLite/PostgreSQL, 32 testes de frontend, build Vue/TypeScript e Pint.
+
+
+## PDF sem texto selecionável — 01/11/2026
+
+Anexos PDF digitalizados agora podem preparar até as três primeiras páginas como imagens privadas para o contexto da tarefa. A interface informa a quantidade preparada, e o manifesto informa as páginas efetivamente incluídas no limite compartilhado de três imagens. Não há OCR local ou transcrição pesquisável. Upload, preservação do original, conversão, integridade e montagem dos inputs foram conferidos com um PDF fictício em instalação isolada; não foi iniciada outra inferência na conta real do ChatGPT nesta revisão. Detalhes, testes e limites estão na [matriz atualizada](gestao-completa.md).

@@ -129,3 +129,8 @@ Os formulários usam `lumo new bi-desk` / `new dw-desk`, autoria canônica, lint
 A homologação real criou e editou uma mesa vazia de cada tipo, pela interface, no tenant Inovadora. A comparação e as decisões foram apresentadas no formulário; a edição da mesa de dados foi conferida em viewport móvel. Uma revisão adicional recusada não criou outra mesa. Depois da conferência, somente as mesas descartáveis desta rodada foram removidas, sem cascata, e o inventário de IDs preexistentes foi preservado. Não houve publicação ou execução de fontes. Um erro de userscript de uma extensão do Chrome foi observado no console; a origem é externa ao aplicativo e não impediu o ciclo.
 
 A revisão ampliada passou com **403 testes PHP / 2.362 verificações** em SQLite e PostgreSQL descartável, **32 testes de frontend**, Pint e build Vue/TypeScript. As opções avançadas de acesso e a administração de membros ainda não são alteradas pelo formulário.
+
+
+## Preparação de PDF digitalizado — 01/11/2026
+
+A instalação isolada recebeu por HTTP um PDF fictício de três páginas, sem texto extraível. O processamento preparou três PNGs privados, o download preservou o original e o contexto associou cada página ao seu input visual. O painel, o aviso de limites e o tour foram conferidos em computador e celular. Os 21 testes de anexos incluem limites, omissões, falhas de integridade, espera por preparação concorrente e mensagens de timeout. Esta rodada não iniciou uma nova inferência OpenAI; não acrescenta uma prova de interpretação semântica real de PDF digitalizado às evidências anteriores. O OCR pesquisável continua indisponível. Consulte a [análise de gestão](gestao-completa.md) para os resultados completos e os limites atuais.
