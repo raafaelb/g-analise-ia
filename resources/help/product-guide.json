@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-01.4",
+  "version": "2026-11-01.5",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -63,7 +63,7 @@
         {
           "id": "home-help",
           "title": "A ajuda fica sempre aqui",
-          "description": "Abra a ajuda para pesquisar orientações, fazer perguntas e refazer o tour desta página.",
+          "description": "Abra a ajuda para pesquisar orientações, fazer perguntas e refazer o tour desta página. Na conversa, role o histórico para ler respostas anteriores e use o campo abaixo para uma nova pergunta.",
           "anchor": "workspace-help",
           "audience": "all"
         },
@@ -793,7 +793,7 @@
         "project",
         "account"
       ],
-      "body": "A ajuda explica o próprio G-Analise IA: para que servem projetos e conversas, onde encontrar dashboards, como usar conexões, prévias, revisões e atualização de dados.\n\nAbra **Ajuda** no topo ou **Ajuda e primeiros passos** no menu. Em **Guias e respostas**, busque uma dúvida e leia as orientações, mesmo sem uma conta de IA conectada. Ao escolher um artigo, a leitura começa pelo título. **Voltar às orientações** retorna ao início da lista, mantendo a busca que você digitou. **Refazer tour** repete o passo a passo da página atual; **Rever boas-vindas** apresenta novamente o produto.\n\nNa aba **Conversar com IA**, escreva sua pergunta, por exemplo: “Para que servem os projetos aqui dentro?”. O atendimento usa a documentação desta versão e a autorização da sua conta ChatGPT. A pergunta e as orientações são enviadas à OpenAI, consumindo os limites do seu plano. Não envie senhas ou dados sensíveis.\n\nO atendimento de ajuda orienta e não opera o BI. Para criar ou manter um dashboard, abra **Criar com IA** e use um projeto e as revisões normais. Os botões dos artigos levam às páginas disponíveis para seu perfil.\n\nO histórico é pessoal e separado das conversas dos projetos. Você pode interromper a resposta ou apagar o histórico da ajuda. Se houver falha ou limite da conta, os guias continuam disponíveis.\n\nO tour aguarda os carregamentos e as janelas em uso e pula controles indisponíveis para seu perfil ou tela. No celular, a ajuda fica no menu. Ao abrir a conversa da ajuda, o histórico mostra as mensagens mais recentes.",
+      "body": "A ajuda explica o próprio G-Analise IA: para que servem projetos e conversas, onde encontrar dashboards, como usar conexões, prévias, revisões e atualização de dados.\n\nAbra **Ajuda** no topo ou **Ajuda e primeiros passos** no menu. Em **Guias e respostas**, busque uma dúvida e leia as orientações, mesmo sem uma conta de IA conectada. Ao escolher um artigo, a leitura começa pelo título. **Voltar às orientações** retorna ao início da lista, mantendo a busca que você digitou. **Refazer tour** repete o passo a passo da página atual; **Rever boas-vindas** apresenta novamente o produto.\n\nNa aba **Conversar com IA**, escreva sua pergunta, por exemplo: “Para que servem os projetos aqui dentro?”. Use a rolagem do histórico para ler respostas anteriores. O campo para novas perguntas fica abaixo da conversa. Em telas maiores, os guias relacionados ficam em uma faixa com rolagem lateral. O atendimento usa a documentação desta versão e a autorização da sua conta ChatGPT. A pergunta e as orientações são enviadas à OpenAI, consumindo os limites do seu plano. Não envie senhas ou dados sensíveis.\n\nO atendimento de ajuda orienta e não opera o BI. Para criar ou manter um dashboard, abra **Criar com IA** e use um projeto e as revisões normais. Os botões dos artigos levam às páginas disponíveis para seu perfil.\n\nO histórico é pessoal e separado das conversas dos projetos. Você pode interromper a resposta ou apagar o histórico da ajuda. Se houver falha ou limite da conta, os guias continuam disponíveis.\n\nO tour aguarda os carregamentos e as janelas em uso e pula controles indisponíveis para seu perfil ou tela. No celular, a ajuda fica no menu. Ao abrir a conversa da ajuda, o histórico mostra as mensagens mais recentes.",
       "actions": [
         {
           "page": "home",
