@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.23",
+  "version": "2026-10-31.24",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -200,8 +200,15 @@
         {
           "id": "catalog-search",
           "title": "Localize e confira",
-          "description": "Use a busca e os filtros e abra um cartão para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso. Mensagens extensas ficam em Ver detalhes técnicos, sem mudar o resultado informado pelo BI.",
+          "description": "Use a busca e os filtros e abra um recurso para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso. Mensagens extensas ficam em Ver detalhes técnicos, sem mudar o resultado informado pelo BI.",
           "anchor": "catalog-search",
+          "audience": "all"
+        },
+        {
+          "id": "catalog-layout",
+          "title": "Escolha como consultar",
+          "description": "Use Cartões para explorar visualmente ou Lista para comparar os recursos. A busca, os filtros e a página atual são preservados ao trocar de formato. Sua escolha é lembrada neste navegador quando ele permite salvar preferências.",
+          "anchor": "catalog-layout",
           "audience": "all"
         },
         {
@@ -473,7 +480,7 @@
       "id": "find-dashboards",
       "title": "Onde encontro minhas dashboards?",
       "summary": "Encontre aplicações no catálogo ou retome seu projeto no portal.",
-      "body": "Abra **Catálogo BI**, escolha o **tenant** e a categoria **Aplicações**. Use busca, filtros de mesa e situação para localizar o recurso. Uma aplicação pode conter várias dashboards; abra seu detalhe para escolher a página e visualizar.\n\n**Minha Mesa** identifica os rascunhos privados retornados pela conta BI. **Publicadas** reúne as aplicações compartilhadas conforme as permissões das mesas. Já **Meus projetos** mostra os trabalhos organizados por você neste portal.\n\nFalta de permissão ou consulta indisponível é diferente de uma lista vazia. Confira o motivo apresentado antes de concluir que um recurso foi removido.\n\nA primeira abertura ou **Atualizar catálogo** consulta o inventário do ambiente e pode demorar conforme o BI. Os cartões consultam os detalhes do recurso escolhido; tabelas e conexões com muitos vínculos podem levar mais tempo. Se outra operação estiver em andamento, aguarde e tente novamente. Use **Atualizar catálogo** para conferir mudanças recentes no inventário.",
+      "body": "Abra **Catálogo BI**, escolha o **tenant** e a categoria **Aplicações**. Use busca, filtros de mesa e situação para localizar o recurso. Uma aplicação pode conter várias dashboards; abra seu detalhe para escolher a página e visualizar.\n\n**Minha Mesa** identifica os rascunhos privados retornados pela conta BI. **Publicadas** reúne as aplicações compartilhadas conforme as permissões das mesas. Já **Meus projetos** mostra os trabalhos organizados por você neste portal.\n\nFalta de permissão ou consulta indisponível é diferente de uma lista vazia. Confira o motivo apresentado antes de concluir que um recurso foi removido.\n\nA primeira abertura ou **Atualizar catálogo** consulta o inventário do ambiente e pode demorar conforme o BI. Ao abrir um recurso, o portal consulta seus detalhes; tabelas e conexões com muitos vínculos podem levar mais tempo. Se outra operação estiver em andamento, aguarde e tente novamente. Use **Atualizar catálogo** para conferir mudanças recentes no inventário.\n\nNas áreas disponíveis do catálogo, use **Cartões** ou **Lista** para escolher o formato de leitura. A troca preserva a busca, os filtros e a página atual. Use **Anterior** e **Próxima** para mudar de página e voltar ao início dos resultados. Ao atualizar um inventário menor, o catálogo ajusta a página para continuar mostrando os recursos disponíveis. Clique no recurso para abrir os mesmos detalhes e ações disponíveis para sua conta. A preferência é pessoal neste navegador; se ele não permitir salvar, você ainda poderá selecionar o tenant, consultar os recursos e trocar o formato durante o uso.",
       "pages": [
         "catalog",
         "projects",
