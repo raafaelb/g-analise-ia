@@ -29,7 +29,7 @@ after(async()=>server?.close());
 function node(kind,text=''){
  const item={kind,tagName:kind.toUpperCase(),text,props:{},children:[],parent:null,addEventListener(){},removeEventListener(){},getRootNode(){return globalThis.document;},getClientRects(){return [{}];},scrollIntoView(options){this.scrollOptions=options;},focus(){globalThis.document.activeElement=this;}};
  Object.defineProperty(item,'options',{get(){return item.children.filter(child=>child.kind==='option');}});
- Object.defineProperty(item,'value',{get(){return item.props.value??'';},set(value){item.props.value=value;}});
+ Object.defineProperty(item,'value',{get(){return item.kind==='select'?item.options[item.selectedIndex]?.value??'':item.props.value??'';},set(value){item.props.value=value;}});
  return item;
 }
 const renderer=createRenderer({
@@ -43,7 +43,7 @@ const renderer=createRenderer({
 });
 function find(item,predicate){if(predicate(item))return item;return item.children.map(child=>find(child,predicate)).find(Boolean);}
 function text(item){return item.text+item.children.map(text).join('');}
-function mount(storageDescriptor,{apps=[],onRequest=null,tenants=[{id:'923',name:'Ambiente de teste'}]}={}){
+function mount(storageDescriptor,{apps=[],onRequest=null,tenants=[{id:'923',name:'Ambiente de teste'}],connected:initiallyConnected=true}={}){
  const previous=Object.fromEntries(['window','document','localStorage','Document','ShadowRoot'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  const windowStub={addEventListener(){},removeEventListener(){},matchMedia(){return {matches:true};}};
  Object.defineProperty(windowStub,'localStorage',{configurable:true,...storageDescriptor});
@@ -56,7 +56,7 @@ function mount(storageDescriptor,{apps=[],onRequest=null,tenants=[{id:'923',name
  const kinds=['app','bi-desk','dw-desk','table','flow','schedule','agent','writeback','deck','presentation','investigation','credential','variables'];
  const snapshot={tenant:{id:'923',name:'Ambiente de teste',read_only:false},resources:Object.fromEntries(kinds.map(kind=>[kind,[]])),capabilities:Object.fromEntries(kinds.map(kind=>[kind,{status:'available',count:0}])),tags:[],warnings:[],synced_at:'2026-10-31T12:00:00Z'};
  snapshot.resources.app=apps;snapshot.capabilities.app.count=apps.length;
- const connected=ref(true);
+ const connected=ref(initiallyConnected);
  const app=renderer.createApp({setup:()=>()=>h(Catalog,{tenants,connected:connected.value,userId:17,role:'admin',request:async(...args)=>{requests.push(args);return onRequest?onRequest(...args):{...snapshot,section:args[0].split('/sections/')[1]?.split('?')[0]};}})});
  app.config.errorHandler=error=>errors.push(error.message);app.mount(root);
  return {root,requests,errors,setConnected:value=>connected.value=value,chooseTenant:value=>find(root,item=>item.props['aria-label']==='Tenant do catálogo').props['onUpdate:modelValue'](value),changeServerApps:apps=>{snapshot.resources.app=apps;snapshot.capabilities.app.count=apps.length;},choose:()=>find(root,item=>item.props['aria-label']==='Tenant do catálogo').props['onUpdate:modelValue']('923'),close:()=>{app.unmount();for(const [key,descriptor]of Object.entries(previous)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}};
@@ -146,4 +146,36 @@ test('disconnecting while a category loads discards its result and clears the te
  let release;const pending=new Promise(resolve=>release=resolve);
  const view=mount(savedTenant,{onRequest:async()=>pending});
  try{await settled();view.setConnected(false);await settled();release(section('app','Resposta após desconexão'));await settled();assert.equal(view.requests.length,1);assert.equal(resourceButtons(view.root).length,0);assert.match(text(view.root),/Conecte seu G-Analise BI/);assert.doesNotMatch(text(view.root),/Resposta após desconexão/);view.setConnected(true);await settled();assert.equal(find(view.root,item=>item.props['aria-label']==='Tenant do catálogo').value,'');assert.match(text(view.root),/Escolha um tenant/);assert.doesNotMatch(text(view.root),/Resposta após desconexão/);assert.deepEqual(view.errors,[]);}finally{release(section('app','Resposta após desconexão'));await settled();view.close();}
+});
+
+
+test('a single authorized tenant opens on the first visit without a saved preference',async()=>{
+ const values=new Map();
+ const view=mount({value:{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)}});
+ try{await settled();assert.equal(find(view.root,item=>item.props['aria-label']==='Tenant do catálogo').value,'923');assert.deepEqual(view.requests.map(args=>args[0]),['/catalog/923/sections/app']);assert.equal(values.get('g-analise:tenant:17'),'923');assert.match(text(view.root),/Nenhum recurso nesta área/);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('multiple authorized tenants require a choice when no valid preference exists',async()=>{
+ const view=mount({value:{getItem(){return null;},setItem(){}}},{tenants:[{id:'923',name:'Primeiro ambiente'},{id:'1290',name:'Segundo ambiente'}]});
+ try{await settled();assert.equal(find(view.root,item=>item.props['aria-label']==='Tenant do catálogo').value,'');assert.deepEqual(view.requests,[]);assert.match(text(view.root),/Escolha um tenant para começar/);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('an outdated preference cannot replace the single tenant currently authorized',async()=>{
+ const view=mount({value:{getItem:key=>key==='g-analise:tenant:17'?'923':null,setItem(){}}},{tenants:[{id:'1290',name:'Único ambiente atual'}],onRequest:async()=>section('app','Aplicação permitida',{tenant:'1290'})});
+ try{await settled();assert.equal(find(view.root,item=>item.props['aria-label']==='Tenant do catálogo').value,'1290');assert.deepEqual(view.requests.map(args=>args[0]),['/catalog/1290/sections/app']);assert.match(text(view.root),/Aplicação permitida/);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('a disconnected account never opens a tenant from residual metadata',async()=>{
+ const view=mount({value:{getItem(){return null;},setItem(){}}},{connected:false});
+ try{await settled();assert.deepEqual(view.requests,[]);assert.match(text(view.root),/Conecte seu G-Analise BI/);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('an account without authorized tenants does not invent a catalog selection',async()=>{
+ const view=mount({value:{getItem(){return null;},setItem(){}}},{tenants:[]});
+ try{await settled();assert.deepEqual(view.requests,[]);assert.equal(find(view.root,item=>item.props['aria-label']==='Tenant do catálogo').value,'');assert.match(text(view.root),/Escolha um tenant para começar/);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('a malformed sole tenant identifier is not queried automatically',async()=>{
+ const view=mount({value:{getItem(){return null;},setItem(){}}},{tenants:[{id:'invalid',name:'Resposta incompleta'}]});
+ try{await settled();assert.deepEqual(view.requests,[]);assert.equal(find(view.root,item=>item.props['aria-label']==='Tenant do catálogo').value,'');assert.deepEqual(view.errors,[]);}finally{view.close();}
 });

@@ -4,7 +4,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado consolidado em 01
 
 | Entrega | Implementado e verificado | Etapa restante |
 |---|---|---|
-| Catálogo por tenant | Oito tenants da conta real; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados e variáveis sem valores | Homologar módulos sem dados/permissão e conta real com acesso restrito |
+| Catálogo por tenant | Oito tenants da conta principal e um na conta restrita; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados e variáveis sem valores | Homologar módulos sem liberação, restrições entre mesas e revogação real de permissões; segunda identidade com tenant restrito já conferida |
 | ChatGPT | Login oficial OSS local, plano individual, modelos autorizados, inferência remota, Codex e ferramentas reais | Enquadramento/configuração oficial para hospedagem central; repetir no domínio público |
 | Criação completa | Clone, manutenção, consultas, criação nova, prévia PNG/interativa, histórico de prévias no projeto, revisão assíncrona, ações manuais de duplicação/exclusão e carga de teste | Ampliar a homologação real da substituição de versões; publicação como nova já autorizada e confirmada no BI |
 | Anexos | Extração privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; interpretação real anterior de CSV, PDF, XLSX e imagens; preparo visual de PDF sem texto conferido sem nova inferência | Homologar interpretação real do PDF digitalizado com autorização; OCR não implementado; validar amostras do piloto |
@@ -21,7 +21,7 @@ A publicação como nova foi autorizada pelo próprio portal e confirmada na mes
 
 ## Auditoria das seis entregas — 01/11/2026
 
-O inventário real dos 13 grupos foi comparado novamente com as consultas nativas: IDs, resumos e disponibilidade coincidiram, sem mudar as contagens do portal. Essa conferência usa a conta BI já conectada; não comprova restrições de uma segunda identidade. Uma conta de homologação com acesso reduzido foi solicitada para fechar essa validação nativa.
+O inventário real dos 13 grupos foi comparado novamente com as consultas nativas: IDs, resumos e disponibilidade coincidiram, sem mudar as contagens do portal. Essa primeira conferência utilizou a conta BI principal. Em seguida, a segunda identidade real foi conectada a um perfil local de teste sem administração. Ela recebeu somente o tenant `teste_` (1290); a validação nativa e concorrente está descrita abaixo.
 
 A publicação autorizada de `flow:100344` e `table:93362` foi confirmada na mesa de dados 1585 do tenant Inovadora. A agenda 4324 permaneceu ativa às 03h de Brasília; a execução de teste terminou com sucesso em 31/10/2026 às 18h11min52s. A aplicação geográfica `app:41453` continua privada. Essa autorização já foi consumida e não será repetida.
 
@@ -31,7 +31,23 @@ O auxiliar `bubblewrap` já integra a dependência Codex 0.165.0; a imagem passo
 
 A correção do empacotamento passou no build separado, no teste real do auxiliar e no initialize/thread/start sem inferência. O smoke passou a retornar código 1 ao falhar; a imagem antiga reproduziu esse erro e a corrigida terminou com código 0. Os dez testes do protocolo (37 asserções), os dois testes operacionais Python e o Pint passaram; o login local respondeu HTTP 200. Não houve alteração de interface, rotas, ajuda ou âncoras de tour nesta revisão interna.
 
-As pendências externas continuam explícitas: acesso oficial para oferta ChatGPT remota, segunda conta BI restrita, validação do isolamento/capacidade e infraestrutura definitiva. Nenhuma implantação em servidor foi autorizada ou realizada.
+As pendências externas continuam explícitas: acesso oficial para oferta ChatGPT remota, validação do isolamento do processo/capacidade e infraestrutura definitiva. Nenhuma implantação em servidor foi autorizada ou realizada.
+
+## Segunda identidade BI e abertura do catálogo — 01/11/2026
+
+A conta de teste foi autenticada pelo formulário normal do portal e pelo Lumo, em uma sessão de navegador separada. Recebeu somente o tenant 1290. **29 verificações HTTP** confirmaram o perfil editor, ausência de projetos/conversas/anexos/revisões alheios, recusa da administração, dos tenants 923 e 1214 e de criação de projeto em tenant não autorizado. Conversas, arquivos e revisões de outro usuário retornaram 404. Trocar apenas o identificador de uma aplicação ou tabela mantendo o tenant permitido também foi recusado, sem retornar o recurso.
+
+Os **13 grupos** do catálogo coincidiram em IDs, quantidades e disponibilidade com consultas nativas independentes. Investigações retornou falta de permissão, com quantidade desconhecida. Havia um agente autorizado e nenhum outro recurso na linha de base. O Lumo recusou a leitura de uma aplicação privada e de uma tabela publicada de outro tenant, sem transformar a recusa em expiração da sessão.
+
+Duas consultas reais ocorreram simultaneamente, com sobreposição de cerca de 2,9 segundos: 73 aplicações para a conta principal na Inovadora e nenhuma para a conta restrita em `teste_`. Os contextos permaneceram separados. Esse ensaio não substitui testes de capacidade com muitos usuários nem demonstra isolamento completo do processo no sistema operacional.
+
+A conta restrita criou e editou uma mesa vazia pelo formulário, com revisão e confirmação nativa em cada ação. A descrição final foi conferida no BI. Depois, somente essa mesa foi removida pelo Lumo, com checkpoint Git do YAML e sem cascata; o inventário voltou à linha de base. Isso não acrescenta uma interface de exclusão de mesas ao produto. O perfil local de ensaio foi inativado, sua sessão BI desconectada e suas credenciais removidas; o projeto foi arquivado e os cookies temporários apagados. A conta BI fornecida pelo titular foi preservada.
+
+No primeiro acesso ao catálogo, um único tenant autorizado agora abre automaticamente quando não há preferência válida. Uma escolha anterior ainda permitida é preservada; contas com vários ambientes continuam oferecendo a seleção. Desconectar, ausência de tenants ou identificação inválida não iniciam uma consulta automática. Os seis novos casos exercitam o componente Vue compilado, incluindo preferências antigas e a conexão ausente.
+
+O guia `2026-11-01.3` atualiza o passo **Confira o ambiente** e os artigos de tenants e carregamento. Computador e celular de 390 × 844 foram conferidos; não houve transbordamento horizontal. O tour visto anteriormente não reapareceu após a atualização; a repetição manual exibiu o texto novo e preservou sua primeira versão. O botão **Escolher um projeto** exibiu somente os projetos do usuário conectado, sem solicitar outra conexão BI.
+
+Validação local: **194 testes de frontend**, **41 testes de backend / 263 asserções** sobre guia, isolamento e perfis, TypeScript e build. As evidências privadas preservam os recibos nativos; senhas, cookies e credenciais não integram o código publicado.
 
 ## Disponibilização
 

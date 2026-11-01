@@ -134,3 +134,12 @@ A revisão ampliada passou com **403 testes PHP / 2.362 verificações** em SQLi
 ## Preparação de PDF digitalizado — 01/11/2026
 
 A instalação isolada recebeu por HTTP um PDF fictício de três páginas, sem texto extraível. O processamento preparou três PNGs privados, o download preservou o original e o contexto associou cada página ao seu input visual. O painel, o aviso de limites e o tour foram conferidos em computador e celular. Os 21 testes de anexos incluem limites, omissões, falhas de integridade, espera por preparação concorrente e mensagens de timeout. Esta rodada não iniciou uma nova inferência OpenAI; não acrescenta uma prova de interpretação semântica real de PDF digitalizado às evidências anteriores. O OCR pesquisável continua indisponível. Consulte a [análise de gestão](gestao-completa.md) para os resultados completos e os limites atuais.
+
+
+## Isolamento com duas identidades BI reais — 01/11/2026
+
+Uma identidade nova, limitada ao tenant de teste, foi conectada pelo login normal em perfil local editor e sessão separada. As 29 verificações HTTP incluíram recusa de tenants não autorizados, administração, conversa, arquivo e revisão de outros usuários; ausência de credenciais serializadas e de conexões IA herdadas; criação/leitura do próprio projeto. A comparação do catálogo com os 13 comandos nativos coincidiu em IDs, disponibilidade e contagens. Aplicação privada e tabela publicada da Inovadora foram recusadas na sessão restrita, inclusive mantendo o tenant permitido na URL do portal.
+
+As consultas concorrentes tiveram sobreposição confirmada e retornaram 73 aplicações no contexto principal e zero no contexto restrito. Esse resultado cobre as duas sessões observadas; não comprova capacidade de produção ou isolamento completo do sistema operacional. A nova conta criou/editou uma mesa vazia pelo portal, com revisões e readback; o YAML foi salvo em checkpoint e somente esse recurso foi removido pelo CLI, sem cascata. O inventário inicial foi recuperado.
+
+A seleção inicial do único tenant foi conferida no componente real e no navegador. A ajuda atualizou sem repetir automaticamente o tour já visto; o replay manual apresentou o novo passo em celular. Passaram 194 testes de frontend, 41 testes de backend/263 asserções, TypeScript e build. Nenhuma inferência OpenAI foi iniciada nesta rodada e nenhuma implantação em servidor foi realizada.
