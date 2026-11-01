@@ -6,6 +6,7 @@ use App\Models\Connection;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\BiBusy;
+use App\Services\BiNativeFailure;
 use App\Services\LumoClient;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -110,6 +111,41 @@ class LumoIntegrationTest extends TestCase
             $this->assertSame(6, $e->getCode());
             $this->assertSame('connected', $connection->fresh()->status);
         }
+    }
+
+    public function test_module_unavailability_preserves_the_connected_session_and_credentials(): void
+    {
+        $this->fakeCli('Error: list investigation: A Sentinela não está disponível para este ambiente.', 6);
+        $connection = $this->connection(User::factory()->create());
+        $credentials = $connection->credentials;
+
+        try {
+            app(LumoClient::class)->run($connection, ['list', 'investigation', '--remote']);
+            $this->fail('A indisponibilidade do módulo precisa ser informada.');
+        } catch (BiNativeFailure $failure) {
+            $this->assertSame('module_unavailable', $failure->reason);
+            $this->assertSame(6, $failure->getCode());
+        }
+
+        $this->assertSame('connected', $connection->fresh()->status);
+        $this->assertSame($credentials, $connection->fresh()->credentials);
+    }
+
+    public function test_expired_authentication_takes_precedence_over_a_module_failure(): void
+    {
+        $this->fakeCli('Error: list investigation: A Sentinela não está disponível para este ambiente.', 6);
+        $connection = $this->connection(User::factory()->create());
+        $connection->update(['credentials' => ['auth' => ['token' => 'synthetic-expired', 'expires_at' => '2020-01-01T00:00:00Z']]]);
+
+        try {
+            app(LumoClient::class)->run($connection, ['list', 'investigation', '--remote']);
+            $this->fail('A autenticação expirada precisa ser informada.');
+        } catch (RuntimeException $failure) {
+            $this->assertNotInstanceOf(BiNativeFailure::class, $failure);
+            $this->assertSame('O acesso ao G-Analise expirou. Conecte novamente.', $failure->getMessage());
+        }
+
+        $this->assertSame('reauthentication_required', $connection->fresh()->status);
     }
 
     public function test_expired_session_requires_reauthentication(): void

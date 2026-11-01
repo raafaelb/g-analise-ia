@@ -4,7 +4,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado consolidado em 01
 
 | Entrega | Implementado e verificado | Etapa restante |
 |---|---|---|
-| Catálogo por tenant | Oito tenants da conta principal e um na conta restrita; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados e variáveis sem valores | Homologar módulos sem liberação, restrições entre mesas e revogação real de permissões; segunda identidade com tenant restrito já conferida |
+| Catálogo por tenant | Oito tenants da conta principal e um na conta restrita; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados e variáveis sem valores | Homologar autoria dos módulos indisponíveis e restrições entre mesas; segunda identidade com tenant restrito e revogação/restauração de Criar mesas já conferidas |
 | ChatGPT | Login oficial OSS local, plano individual, modelos autorizados, inferência remota, Codex e ferramentas reais | Enquadramento/configuração oficial para hospedagem central; repetir no domínio público |
 | Criação completa | Clone, manutenção, consultas, criação nova, prévia PNG/interativa, histórico de prévias no projeto, revisão assíncrona, ações manuais de duplicação/exclusão e carga de teste | Ampliar a homologação real da substituição de versões; publicação como nova já autorizada e confirmada no BI |
 | Anexos | Extração privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; interpretação real anterior de CSV, PDF, XLSX e imagens; preparo visual de PDF sem texto conferido sem nova inferência | Homologar interpretação real do PDF digitalizado com autorização; OCR não implementado; validar amostras do piloto |
@@ -37,7 +37,7 @@ As pendências externas continuam explícitas: acesso oficial para oferta ChatGP
 
 A conta de teste foi autenticada pelo formulário normal do portal e pelo Lumo, em uma sessão de navegador separada. Recebeu somente o tenant 1290. **29 verificações HTTP** confirmaram o perfil editor, ausência de projetos/conversas/anexos/revisões alheios, recusa da administração, dos tenants 923 e 1214 e de criação de projeto em tenant não autorizado. Conversas, arquivos e revisões de outro usuário retornaram 404. Trocar apenas o identificador de uma aplicação ou tabela mantendo o tenant permitido também foi recusado, sem retornar o recurso.
 
-Os **13 grupos** do catálogo coincidiram em IDs, quantidades e disponibilidade com consultas nativas independentes. Investigações retornou falta de permissão, com quantidade desconhecida. Havia um agente autorizado e nenhum outro recurso na linha de base. O Lumo recusou a leitura de uma aplicação privada e de uma tabela publicada de outro tenant, sem transformar a recusa em expiração da sessão.
+Os **13 grupos** do catálogo coincidiram em IDs, quantidades e disponibilidade com consultas nativas independentes. Investigações retornou código 6, inicialmente classificado como falta de permissão; o diagnóstico detalhado abaixo corrigiu a causa para módulo indisponível no ambiente, mantendo a quantidade desconhecida. Havia um agente autorizado e nenhum outro recurso na linha de base. O Lumo recusou a leitura de uma aplicação privada e de uma tabela publicada de outro tenant, sem transformar a recusa em expiração da sessão.
 
 Duas consultas reais ocorreram simultaneamente, com sobreposição de cerca de 2,9 segundos: 73 aplicações para a conta principal na Inovadora e nenhuma para a conta restrita em `teste_`. Os contextos permaneceram separados. Esse ensaio não substitui testes de capacidade com muitos usuários nem demonstra isolamento completo do processo no sistema operacional.
 
@@ -48,6 +48,19 @@ No primeiro acesso ao catálogo, um único tenant autorizado agora abre automati
 O guia `2026-11-01.3` atualiza o passo **Confira o ambiente** e os artigos de tenants e carregamento. Computador e celular de 390 × 844 foram conferidos; não houve transbordamento horizontal. O tour visto anteriormente não reapareceu após a atualização; a repetição manual exibiu o texto novo e preservou sua primeira versão. O botão **Escolher um projeto** exibiu somente os projetos do usuário conectado, sem solicitar outra conexão BI.
 
 Validação local: **194 testes de frontend**, **41 testes de backend / 263 asserções** sobre guia, isolamento e perfis, TypeScript e build. As evidências privadas preservam os recibos nativos; senhas, cookies e credenciais não integram o código publicado.
+
+
+## Disponibilidade de módulos e revogação nativa — 01/11/2026
+
+A resposta nativa de `list investigation --remote` foi inspecionada sem expor tokens, nas contas principal e de teste: **“A Sentinela não está disponível para este ambiente.”** O código de saída 6, usado também para recusas de acesso, havia levado o portal a exibir falta de permissão. A conta de teste já tinha as funções Usar IA e Usar a Sentinela liberadas. Não foi necessário ampliar seu acesso nem mudar plano ou habilitar consumo de IA.
+
+O catálogo completo e a consulta por categoria agora distinguem esse erro conhecido de uma negativa de permissão. Exibem **Indisponível**, o motivo e quantidade desconhecida, preservando a conexão. A classificação é restrita à resposta nativa e ao comando correspondentes; erros de autenticação continuam exigindo reconexão, e negativas reais continuam como acesso negado. A disponibilidade do módulo não comprova autoria, execução ou publicação de investigações: essas etapas continuam sem homologação real.
+
+No HEC, somente Criar em Mesas Publicadas foi temporariamente retirado da conta de teste, mantendo as outras funções. A sessão Lumo já conectada recusou a tentativa com código 6; nenhum recurso foi criado. Após remover a personalização e restaurar a herança original do grupo, a mesma sessão criou uma mesa vazia. O recurso foi confirmado por uma nova leitura e removido somente após conferir identidade, nome, ausência de aplicações e checkpoint do YAML canônico. Não foi usada cascata; o inventário final voltou a zero mesas. O HEC confirmou a herança original e nenhuma alteração pendente. O ensaio não demonstra todas as combinações de funções ou restrições por mesa.
+
+A regressão passou com **1.225 testes / 9.047 asserções em SQLite**, mais três casos próprios do PostgreSQL ignorados; **1.228 testes / 9.095 asserções em PostgreSQL isolado**; e **194 testes de frontend**.
+
+Tour e ajuda usam a versão `2026-11-01.4`, explicando a diferença entre indisponibilidade do módulo e permissão do usuário. A revisão não introduz regras específicas para um tenant. Não houve publicação, execução de IA nem escrita em ambiente de clientes.
 
 ## Disponibilização
 

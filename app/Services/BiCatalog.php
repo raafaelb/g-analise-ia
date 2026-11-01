@@ -34,6 +34,14 @@ class BiCatalog
         }
     }
 
+    /** @return array{status: string, count: null, reason: string} */
+    private function failedCapability(RuntimeException $failure): array
+    {
+        $moduleUnavailable = $failure instanceof BiNativeFailure && $failure->reason === 'module_unavailable';
+
+        return ['status' => $failure->getCode() === 6 && ! $moduleUnavailable ? 'access_denied' : 'unavailable', 'count' => null, 'reason' => $failure->getMessage()];
+    }
+
     public function invalidate(string $tenant, Connection $connection): void
     {
         $key = $this->snapshotKey($connection, $tenant);
@@ -122,7 +130,7 @@ class BiCatalog
                             throw $e;
                         }
                         $resources[$kind] = [];
-                        $capabilities[$kind] = ['status' => $e->getCode() === 6 ? 'access_denied' : 'unavailable', 'count' => null, 'reason' => $e->getMessage()];
+                        $capabilities[$kind] = $this->failedCapability($e);
                     }
                 }
                 $resources = app(BiResourceRelations::class)->deskCounters($resources, $capabilities);
@@ -186,7 +194,7 @@ class BiCatalog
                             throw $e;
                         }
                         $rows[$type] = [];
-                        $capabilities[$type] = ['status' => $e->getCode() === 6 ? 'access_denied' : 'unavailable', 'count' => null, 'reason' => $e->getMessage()];
+                        $capabilities[$type] = $this->failedCapability($e);
                     }
                 }
                 $metadata = $this->sectionMetadata($connection, $project, $references);

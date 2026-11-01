@@ -164,6 +164,10 @@ class LumoClient
                         $this->updateCurrentSession($connection, $credentials, $generation, fn (Connection $latest) => ['status' => 'reauthentication_required']);
                         throw new RuntimeException('O acesso ao G-Analise expirou. Conecte novamente.', 6);
                     }
+                    $classified = BiNativeFailure::detect($arguments, 6, $output, $process->getErrorOutput());
+                    if ($classified !== null) {
+                        throw $classified;
+                    }
                     throw new RuntimeException('Sua sessão não tem acesso a este recurso. Confira as permissões no G-Analise BI.', 6);
                 }
                 $classified = BiNativeFailure::detect($arguments, $process->getExitCode(), $output, $process->getErrorOutput());

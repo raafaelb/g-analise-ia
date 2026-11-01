@@ -6,17 +6,20 @@ use RuntimeException;
 
 class BiNativeFailure extends RuntimeException
 {
-    private function __construct(public readonly string $reason, string $message, public readonly array $details = [])
+    private function __construct(public readonly string $reason, string $message, public readonly array $details = [], int $exitCode = 9)
     {
-        parent::__construct($message, 9);
+        parent::__construct($message, $exitCode);
     }
 
     public static function detect(array $arguments, int $exitCode, string $output, string $stderr): ?self
     {
+        $failure = mb_substr($stderr, 0, 12_000)."\n".mb_substr($output, 0, 4_000);
+        if ($exitCode === 6 && ($arguments[0] ?? '') === 'list' && ($arguments[1] ?? '') === 'investigation' && trim($failure) === 'Error: list investigation: A Sentinela não está disponível para este ambiente.') {
+            return new self('module_unavailable', 'Investigações não estão disponíveis neste ambiente. Consulte a habilitação do módulo Sentinela com o administrador do G-Analise BI.', ['module' => 'sentinela'], 6);
+        }
         if ($exitCode !== 9) {
             return null;
         }
-        $failure = mb_substr($stderr, 0, 12_000)."\n".mb_substr($output, 0, 4_000);
         if (($arguments[0] ?? '') === 'flow' && ($arguments[1] ?? '') === 'status' && preg_match('/^flow:([1-9][0-9]*)$/D', $arguments[2] ?? '', $reference) && preg_match('/\AError: status '.preg_quote($arguments[2], '/').': Flow '.$reference[1].' ainda não tem execução registrada\.\z/u', trim($failure))) {
             return new self('flow_no_execution', 'Esta fonte ainda não possui uma execução registrada.', ['resource' => $arguments[2]]);
         }

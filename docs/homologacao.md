@@ -43,7 +43,7 @@ Nomes/referências de variáveis conferidos nos oito tenants, com todos os valor
 
 A desconexão cancela revisões pendentes/aprovadas e tarefas sem worker ativo, impedindo execução de uma autorização enfileirada. Tarefas em andamento recebem cancelamento cooperativo; isso não desfaz uma operação já iniciada no BI. Os testes confirmaram que a conversa aceita uma nova tarefa após o cancelamento e que os dados de outro usuário permanecem intactos.
 
-Cadastros não existiam nos tenants consultados; o tratamento do tipo foi verificado com fixtures. Investigações retornaram acesso negado na conta real. Esses módulos não têm uma homologação funcional real com dados autorizados nesta instalação.
+Cadastros não existiam nos tenants consultados; o tratamento do tipo foi verificado com fixtures. Investigações retornaram código 6, inicialmente classificado como acesso negado. Em 01/11/2026 a inspeção da resposta nativa nas duas identidades confirmou módulo Sentinela indisponível no ambiente; o portal passou a apresentar essa causa. Esses módulos não têm uma homologação funcional real com dados autorizados nesta instalação.
 
 Regressões adicionais: redução de cinco minutos para diária, desativação/remoção de fonte, restrições de dias/datas e perda de um segundo horário são recusadas; frequência equivalente/maior e reordenação YAML são aceitas. Na configuração real, uma proposta mais lenta foi recusada em leitura. A renovação BI foi observada novamente na sessão real após a proteção de geração. Troca de login durante rotação, desconexão durante comando, falha tardia e resultado antigo de tenants foram simulados sem acesso à conta real.
 
@@ -143,3 +143,12 @@ Uma identidade nova, limitada ao tenant de teste, foi conectada pelo login norma
 As consultas concorrentes tiveram sobreposição confirmada e retornaram 73 aplicações no contexto principal e zero no contexto restrito. Esse resultado cobre as duas sessões observadas; não comprova capacidade de produção ou isolamento completo do sistema operacional. A nova conta criou/editou uma mesa vazia pelo portal, com revisões e readback; o YAML foi salvo em checkpoint e somente esse recurso foi removido pelo CLI, sem cascata. O inventário inicial foi recuperado.
 
 A seleção inicial do único tenant foi conferida no componente real e no navegador. A ajuda atualizou sem repetir automaticamente o tour já visto; o replay manual apresentou o novo passo em celular. Passaram 194 testes de frontend, 41 testes de backend/263 asserções, TypeScript e build. Nenhuma inferência OpenAI foi iniciada nesta rodada e nenhuma implantação em servidor foi realizada.
+
+
+## Módulo indisponível e revogação de criação — 01/11/2026
+
+A resposta nativa de Investigações foi conferida nas duas contas sem imprimir autenticação: código 6 e Sentinela indisponível para o ambiente. O catálogo completo e por categoria agora mostram a indisponibilidade, motivo e quantidade desconhecida. Casos sintéticos comprovam que a detecção não se estende a outros comandos ou textos, que a sessão válida é preservada e que autenticação expirada tem prioridade.
+
+A função Criar em Mesas Publicadas foi retirada somente da identidade de homologação pelo HEC. A tentativa nativa recusou a criação, com sessão conectada e inventário vazio. Depois da restauração da herança do grupo, a mesma geração de sessão criou uma mesa vazia. Ela foi conferida e removida com checkpoint, sem cascata; o inventário final voltou ao inicial. A tela do HEC confirmou as quatro funções herdadas e nenhuma alteração pendente. O ensaio não amplia a conta para outros tenants nem comprova todas as combinações de ACL por mesa. Recibos e configuração canônica de teste permanecem privados, fora do Git público.
+
+A regressão desta revisão passou com 1.225 testes / 9.047 asserções em SQLite (três casos próprios do PostgreSQL ignorados nesse banco), 1.228 testes / 9.095 asserções em PostgreSQL isolado e 194 testes de frontend. Tour e ajuda `2026-11-01.4` foram conferidos em computador e celular, com preservação da primeira versão vista.

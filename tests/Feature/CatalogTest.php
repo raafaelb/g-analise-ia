@@ -6,6 +6,7 @@ use App\Models\Connection;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\BiCatalog;
+use App\Services\BiNativeFailure;
 use App\Services\LumoClient;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CatalogTest extends TestCase
@@ -124,6 +126,39 @@ class CatalogTest extends TestCase
         });
         $this->app->instance(LumoClient::class, $mock);
         $this->actingAs($user)->getJson('/api/catalog/321')->assertOk()->assertJsonPath('capabilities.agent.status', 'access_denied')->assertJsonPath('capabilities.agent.count', null);
+    }
+
+    public static function investigationCatalogEndpoints(): array
+    {
+        return [
+            'complete catalog' => ['/api/catalog/321'],
+            'category' => ['/api/catalog/321/sections/investigation'],
+        ];
+    }
+
+    #[DataProvider('investigationCatalogEndpoints')]
+    public function test_an_unavailable_module_returns_200_with_an_unknown_count_and_its_cause(string $endpoint): void
+    {
+        $user = User::factory()->create();
+        $connection = $this->connect($user);
+        $mock = $this->mock(LumoClient::class);
+        $mock->shouldReceive('initialize')->andReturnNull();
+        $mock->shouldReceive('run')->andReturnUsing(function ($connection, $arguments) {
+            if (($arguments[0] ?? '') === 'list' && ($arguments[1] ?? '') === 'investigation') {
+                throw BiNativeFailure::detect($arguments, 6, '', 'Error: list investigation: A Sentinela não está disponível para este ambiente.');
+            }
+
+            return ['data' => ['matched' => 0, 'results' => []]];
+        });
+
+        $this->actingAs($user)->getJson($endpoint)->assertOk()
+            ->assertJsonPath('capabilities.investigation.status', 'unavailable')
+            ->assertJsonPath('capabilities.investigation.count', null)
+            ->assertJsonPath('capabilities.investigation.reason', 'Investigações não estão disponíveis neste ambiente. Consulte a habilitação do módulo Sentinela com o administrador do G-Analise BI.')
+            ->assertJsonPath('resources.investigation', [])
+            ->assertJsonMissingPath('credentials');
+
+        $this->assertSame('connected', $connection->fresh()->status);
     }
 
     public function test_snapshot_cache_is_separate_for_each_user(): void

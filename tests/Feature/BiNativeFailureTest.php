@@ -20,6 +20,20 @@ class BiNativeFailureTest extends TestCase
 
     private const NO_EXECUTION = 'Error: status flow:10: Flow 10 ainda não tem execução registrada.';
 
+    private const MODULE_UNAVAILABLE = 'Error: list investigation: A Sentinela não está disponível para este ambiente.';
+
+    public function test_an_unavailable_investigation_module_is_distinct_from_user_permission(): void
+    {
+        $failure = BiNativeFailure::detect(['list', 'investigation', '--remote'], 6, '', self::MODULE_UNAVAILABLE."\n");
+
+        $this->assertInstanceOf(BiNativeFailure::class, $failure);
+        $this->assertSame('module_unavailable', $failure->reason);
+        $this->assertSame(['module' => 'sentinela'], $failure->details);
+        $this->assertSame(6, $failure->getCode());
+        $this->assertStringContainsString('habilitação do módulo Sentinela', $failure->getMessage());
+        $this->assertStringNotContainsString('permissões', $failure->getMessage());
+    }
+
     public function test_a_first_execution_status_returns_a_scoped_safe_reason(): void
     {
         $failure = BiNativeFailure::detect(['flow', 'status', 'flow:10'], 9, '', self::NO_EXECUTION."\n");
@@ -52,6 +66,11 @@ class BiNativeFailureTest extends TestCase
     public static function unrelatedFailures(): array
     {
         return [
+            'unavailable module with another exit code' => [['list', 'investigation'], 9, self::MODULE_UNAVAILABLE],
+            'unavailable module from another command' => [['info', 'investigation:10'], 6, self::MODULE_UNAVAILABLE],
+            'unavailable module from another category' => [['list', 'app'], 6, self::MODULE_UNAVAILABLE],
+            'investigation permission denial' => [['list', 'investigation'], 6, 'Error: list investigation: Sem permissão para acessar este recurso.'],
+            'untrusted extra module output' => [['list', 'investigation'], 6, self::MODULE_UNAVAILABLE."\nTOKEN_EXPIRED"],
             'authentication' => [['writeback', 'import', 'writeback:10'], 6, self::CAPACITY],
             'another command' => [['credential', 'query', 'credential:10'], 9, self::CAPACITY],
             'empty creation' => [['new', 'writeback', '--name', 'Teste'], 9, self::CAPACITY],
