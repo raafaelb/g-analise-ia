@@ -30,6 +30,8 @@ A migração `add_preview_revision_to_projects_table` acrescenta a revisão conf
 
 As migrações `create_user_guide_progress_table` e `create_help_questions_table` acrescentam o progresso individual e o histórico do atendimento. Aplique-as antes de iniciar a versão com ajuda. O serviço **help** consome somente a fila `help`, com timeout de 180 segundos e uma tentativa; deve iniciar junto de `worker`, `documents` e `scheduler`. A manutenção expira atendimentos interrompidos, sem reenviar perguntas à OpenAI. `ganalise:backup-state` inclui `active_help`; o backup aguarda não haver resposta ativa. A restauração isolada invalida perguntas pendentes.
 
+A migração `2026_11_01_191249_add_attachment_ids_to_agent_runs_table` acrescenta a seleção de arquivos por tarefa. Aplique-a antes de carregar o código atualizado no web e nas filas. Novos pedidos gravam a seleção no envio, incluindo uma lista vazia; retomadas preservam essa lista. Registros antigos com `null` capturam uma única vez os primeiros 12 anexos disponíveis quando forem utilizados, sem reconstruir uma seleção histórica. A atualização não apaga anexos nem elimina conteúdo já enviado ao contexto de uma conversa. Depois de migrar, recarregue os workers de forma graciosa e confira `ganalise:health`.
+
 Os workers têm `restart: unless-stopped`. Alterações no código exigem reiniciar os workers; a fila é preservada. Em produção, use a nova imagem em todos os serviços. Timeout da fila é maior que o turno; ações remotas não têm repetição automática após resultado incerto. Não monte Docker socket no worker.
 
 ## Sandbox do Codex e limites do host

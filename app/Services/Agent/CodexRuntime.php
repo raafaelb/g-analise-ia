@@ -68,7 +68,8 @@ class CodexRuntime
         if (! $model) {
             throw new RuntimeException('Não há modelo autorizado disponível para sua conta.');
         }
-        $attachments = app(AttachmentContext::class)->inputs($project);
+        $attachmentContext = app(AttachmentContext::class);
+        $attachments = $attachmentContext->inputs($project, $attachmentContext->idsForRun($run));
         $tools = $this->broker->tools();
         $toolsHash = hash('sha256', json_encode([$tools, CodexProtocol::command(config('horus.codex.binary')), CodexProtocol::homeInstructions()], JSON_THROW_ON_ERROR));
         $toolsState = $home.'/tools-'.$conversation->id.'.sha256';

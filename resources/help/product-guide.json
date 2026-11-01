@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-01.5",
+  "version": "2026-11-01.6",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -148,8 +148,15 @@
         {
           "id": "project-attachments",
           "title": "Envie referências do trabalho",
-          "description": "Use Anexar arquivo para enviar materiais ao projeto. Confira o processamento em Contexto. PDFs sem texto podem preparar até as 3 primeiras páginas para leitura visual, compartilhando o limite de 3 imagens por tarefa com os outros anexos. A ajuda explica os formatos e limites.",
+          "description": "Use Anexar arquivo para enviar materiais ao projeto e confira o processamento em Contexto. Depois, Arquivos permite escolher quais referências entram no próximo pedido. PDFs sem texto usam até as 3 primeiras páginas no limite compartilhado de 3 imagens.",
           "anchor": "project-attachments",
+          "audience": "authors"
+        },
+        {
+          "id": "project-attachment-selection",
+          "title": "Escolha os arquivos deste pedido",
+          "description": "Em Arquivos, selecione até 12 referências, busque por nome e use as setas para priorizar imagens ou PDFs. Sem anexos prepara um envio sem arquivos novos. A seleção fica registrada na mensagem e nas retomadas da tarefa; conteúdo já enviado pode continuar no histórico.",
+          "anchor": "project-attachment-selection",
           "audience": "authors"
         },
         {
@@ -743,8 +750,8 @@
     {
       "id": "attachments",
       "title": "Como uso arquivos e referências?",
-      "summary": "Anexe materiais ao projeto e confira o que foi extraído antes de usá-los como fonte.",
-      "body": "Na conversa, use **Anexar arquivo** para enviar referências do trabalho. Os arquivos ficam vinculados ao projeto. Abra **Contexto** para conferir o estado de processamento e as limitações antes de pedir a análise. Os formatos aceitos incluem texto, CSV, Markdown, JSON, YAML, PDF, XLSX, PNG e JPEG, com até 10 MB por arquivo.\n\nA tarefa incorpora até os 12 primeiros anexos do projeto, em ordem de envio, com trechos de texto limitados e até 3 imagens no total. PDFs digitalizados sem texto selecionável podem preparar até as 3 primeiras páginas para leitura visual; cada página ocupa uma dessas imagens. O estado **Leitura visual** indica páginas preparadas, e a tarefa informa quais páginas realmente incluiu. Uma preparação concluída não comprova análise de todas as páginas.\n\nPDFs com texto continuam usando extração limitada às primeiras 20 páginas. Planilhas usam valores armazenados, sem executar fórmulas, com até 5 abas, 500 linhas e 40 colunas. Datas podem aparecer como números seriais. Texto extraído tem limite de 180 KB por arquivo e pode ser consultado pela IA conforme o contexto. Limites ou falhas devem ser considerados antes de afirmar uma leitura integral. Para analisar um conjunto específico que exceda os limites, organize as referências necessárias em outro projeto.\n\nUma referência ajuda a explicar o objetivo, mas não comprova que os dados de produção estejam disponíveis ou corretos. A IA precisa conferir a fonte real. Não envie senhas ou segredos dentro de arquivos.\n\nAo enviar uma tarefa, os conteúdos incluídos são enviados à OpenAI usando os limites da sua conta ChatGPT. O sistema prepara os arquivos no servidor, e a análise da IA ocorre na OpenAI. A análise visual de uma prévia BI com indicadores reais continua exigindo a autorização apresentada pelo portal. Anexar arquivos não autoriza publicar dashboards ou alterar fontes.",
+      "summary": "Escolha os arquivos de cada pedido, confira a preparação e priorize as referências dentro dos limites.",
+      "body": "Na conversa, use **Anexar arquivo** para enviar referências do trabalho. Os arquivos ficam vinculados ao projeto. Abra **Contexto** para conferir o estado de processamento e as limitações antes de pedir a análise. Os formatos aceitos incluem texto, CSV, Markdown, JSON, YAML, PDF, XLSX, PNG e JPEG, com até 10 MB por arquivo.\n\nEm **Arquivos**, junto ao clipe da conversa, escolha até **12 anexos para o próximo pedido**. Busque por nome, marque ou desmarque os arquivos e use as setas para mudar a ordem. **Usar padrão** escolhe os 12 primeiros em ordem de envio; **Sem anexos** deixa a seleção vazia. Confirme em **Usar seleção** e depois envie sua mensagem. Os arquivos continuam salvos no projeto.\n\nA escolha fica registrada na mensagem e na tarefa. As retomadas após autorizações conservam essa seleção, sem adotar arquivos enviados depois. Ao voltar à conversa, a escolha do último pedido é recuperada; novas conversas partem da escolha atual ou do padrão. Anexar um novo arquivo o inclui na escolha enquanto houver espaço. A seleção pode ser alterada para o pedido seguinte, mesmo quando uma tarefa anterior já está em andamento.\n\nEscolher outro conjunto não apaga referências que já foram enviadas à IA ou discutidas no histórico. Para trabalhar com outro contexto de conversa, comece uma nova conversa e confira sua seleção. A IA recebe trechos de texto limitados e até **3 imagens no total**, seguindo a ordem escolhida. PDFs digitalizados sem texto selecionável podem preparar até as 3 primeiras páginas para leitura visual; cada página ocupa uma dessas imagens. O estado **Leitura visual** indica páginas preparadas, e a tarefa informa quais páginas realmente incluiu. Uma preparação concluída não comprova análise de todas as páginas.\n\nPDFs com texto continuam usando extração limitada às primeiras 20 páginas. Planilhas usam valores armazenados, sem executar fórmulas, com até 5 abas, 500 linhas e 40 colunas. Datas podem aparecer como números seriais. Texto extraído tem limite de 180 KB por arquivo e pode ser consultado pela IA conforme o contexto. Limites ou falhas devem ser considerados antes de afirmar uma leitura integral. Para analisar outros conjuntos, escolha as referências necessárias em novos pedidos, respeitando os limites. A seleção não comprova que todos os arquivos ou páginas foram interpretados; confira o processamento e os avisos de conteúdo limitado.\n\nUma referência ajuda a explicar o objetivo, mas não comprova que os dados de produção estejam disponíveis ou corretos. A IA precisa conferir a fonte real. Não envie senhas ou segredos dentro de arquivos.\n\nAo enviar uma tarefa, os conteúdos incluídos são enviados à OpenAI usando os limites da sua conta ChatGPT. O sistema prepara os arquivos no servidor, e a análise da IA ocorre na OpenAI. A análise visual de uma prévia BI com indicadores reais continua exigindo a autorização apresentada pelo portal. Anexar arquivos não autoriza publicar dashboards ou alterar fontes.",
       "pages": [
         "project"
       ],

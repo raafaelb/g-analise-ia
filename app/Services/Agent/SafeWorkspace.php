@@ -36,7 +36,12 @@ class SafeWorkspace
         return $path;
     }
 
-    public function file(Project $project, array $arguments): array
+    private function attachmentAllowed(string $relative, ?array $attachmentIds): bool
+    {
+        return ! str_starts_with($relative, 'attachments/') || $attachmentIds === null || in_array($relative, array_map(fn (string $id): string => 'attachments/'.$id.'.txt', $attachmentIds), true);
+    }
+
+    public function file(Project $project, array $arguments, ?array $attachmentIds = null): array
     {
         $operation = $arguments['operation'] ?? 'list';
         if ($operation === 'list') {
@@ -46,7 +51,7 @@ class SafeWorkspace
                 if (is_dir($root.'/'.$folder)) {
                     foreach (File::allFiles($root.'/'.$folder) as $file) {
                         $relative = substr($file->getPathname(), strlen($root) + 1);
-                        if (! is_link($file->getPathname())) {
+                        if (! is_link($file->getPathname()) && $this->attachmentAllowed($relative, $attachmentIds)) {
                             $paths[] = ['path' => $relative, 'size' => $file->getSize()];
                         }if (count($paths) >= 500) {
                             break 2;
@@ -59,6 +64,9 @@ class SafeWorkspace
         }
         $relative = (string) ($arguments['path'] ?? '');
         $path = $this->resolve($project, $relative);
+        if (! $this->attachmentAllowed($relative, $attachmentIds)) {
+            throw new RuntimeException('Este anexo não foi selecionado para a tarefa atual. Peça ao usuário para selecioná-lo em um novo pedido.');
+        }
         if ($operation === 'read') {
             if (! is_file($path) || filesize($path) > 256000) {
                 throw new RuntimeException('Arquivo inexistente ou maior que o limite de leitura.');

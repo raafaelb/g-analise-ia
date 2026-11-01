@@ -93,7 +93,7 @@ class ExecuteApprovedAction implements ShouldQueue
                     return null;
                 }
 
-                return AgentRun::create(['conversation_id' => $run->conversation_id, 'user_id' => $run->user_id, 'input_message_id' => $message->id]);
+                return AgentRun::create(['conversation_id' => $run->conversation_id, 'user_id' => $run->user_id, 'input_message_id' => $message->id, 'attachment_ids' => $run->attachment_ids]);
             });
             Audit::record($approval->user_id, 'approval.executed', 'Ação aprovada concluída; IA retomada para validação.', $approval->project_id, ['approval_id' => $approval->id]);
         } catch (Throwable $e) {
@@ -155,7 +155,7 @@ class ExecuteApprovedAction implements ShouldQueue
             $message = Message::create(['conversation_id' => $run->conversation_id, 'role' => 'system', 'content' => 'O envio da publicação autorizada teve resultado incerto. A IA retomará uma vez somente para conferir o resultado existente: use horus_action publication_status com approval_id '.$approval->id.'. Não publique novamente nem altere recursos enquanto essa conferência estiver pendente. Se continuar sem confirmação, explique a pendência e encerre a tarefa.', 'status' => 'completed', 'metadata' => ['approval_id' => $approval->id, 'continuation' => true, 'publication_recovery_approval_id' => $approval->id, 'publication_recovery_attempt' => $attempt, 'tool_result' => ['status' => 'publication_pending', 'approval_id' => $approval->id, 'remote_read_only_check' => true], 'action' => $approval->payload['action']]]);
             Audit::record($approval->user_id, 'agent.publication_check.queued', 'IA retomada para conferir uma publicação já autorizada, sem reenviar a operação.', $approval->project_id, ['approval_id' => $approval->id, 'attempt' => $attempt]);
 
-            return AgentRun::create(['conversation_id' => $run->conversation_id, 'user_id' => $run->user_id, 'input_message_id' => $message->id]);
+            return AgentRun::create(['conversation_id' => $run->conversation_id, 'user_id' => $run->user_id, 'input_message_id' => $message->id, 'attachment_ids' => $run->attachment_ids]);
         });
     }
 
@@ -176,7 +176,7 @@ class ExecuteApprovedAction implements ShouldQueue
             $message = Message::create(['conversation_id' => $run->conversation_id, 'role' => 'system', 'content' => 'A validação local falhou antes do envio ao BI. A IA retomará a correção do arquivo e preparará uma nova revisão se necessário.', 'status' => 'completed', 'metadata' => ['approval_id' => $approval->id, 'continuation' => true, 'validation_repair' => true, 'validation_repair_attempt' => $attempt, 'tool_result' => ['status' => 'validation_failed', 'validation' => $failure->diagnostics], 'action' => $approval->payload['action']]]);
             Audit::record($approval->user_id, 'agent.validation_repair.queued', 'IA retomada para corrigir uma validação local, sem repetir alterações no BI.', $approval->project_id, ['approval_id' => $approval->id, 'attempt' => $attempt]);
 
-            return AgentRun::create(['conversation_id' => $run->conversation_id, 'user_id' => $run->user_id, 'input_message_id' => $message->id]);
+            return AgentRun::create(['conversation_id' => $run->conversation_id, 'user_id' => $run->user_id, 'input_message_id' => $message->id, 'attachment_ids' => $run->attachment_ids]);
         });
     }
 

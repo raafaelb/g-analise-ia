@@ -6,6 +6,7 @@ use App\Jobs\ExecuteApprovedAction;
 use App\Jobs\RunAgentTurn;
 use App\Models\AgentRun;
 use App\Models\Approval;
+use App\Models\Artifact;
 use App\Models\Connection;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -101,6 +102,8 @@ class BiResourceValidationTest extends TestCase
     {
         Queue::fake([RunAgentTurn::class]);
         [$user, $project, $run] = $this->context();
+        $attachment = Artifact::create(['user_id' => $user->id, 'project_id' => $project->id, 'name' => 'referencia.txt', 'kind' => 'attachment', 'mime' => 'text/plain', 'path' => 'uploads/test-reference']);
+        $run->update(['attachment_ids' => [$attachment->id]]);
         $review = Approval::create(['user_id' => $user->id, 'project_id' => $project->id, 'agent_run_id' => $run->id, 'status' => 'approved', 'title' => 'Sincronizar fluxo', 'fingerprint' => str_repeat('a', 64), 'payload' => ['action' => ['action' => 'push', 'resource' => 'flow:30']], 'expires_at' => now()->addMinutes(10)]);
         $broker = $this->mock(ActionBroker::class);
         $broker->shouldReceive('performApproved')->once()->andThrow(new BiValidationFailure(['no_remote_write' => true, 'resource' => 'flow:30', 'issues' => [['message' => 'yaml line 109']]]));
@@ -111,6 +114,7 @@ class BiResourceValidationTest extends TestCase
 
         $this->assertSame('failed', $review->fresh()->status);
         $next = AgentRun::where('conversation_id', $run->conversation_id)->where('id', '!=', $run->id)->firstOrFail();
+        $this->assertSame([$attachment->id], $next->attachment_ids);
         $input = Message::findOrFail($next->input_message_id);
         $this->assertTrue($input->metadata['validation_repair']);
         $this->assertSame(1, $input->metadata['validation_repair_attempt']);

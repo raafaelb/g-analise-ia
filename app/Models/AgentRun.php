@@ -16,7 +16,7 @@ class AgentRun extends Model
 
     protected function casts(): array
     {
-        return ['started_at' => 'datetime', 'finished_at' => 'datetime', 'heartbeat_at' => 'datetime'];
+        return ['attachment_ids' => 'array', 'started_at' => 'datetime', 'finished_at' => 'datetime', 'heartbeat_at' => 'datetime'];
     }
 
     public function conversation(): BelongsTo

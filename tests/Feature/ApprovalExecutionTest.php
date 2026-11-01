@@ -84,6 +84,7 @@ class ApprovalExecutionTest extends TestCase
     {
         [$user,$project,$conversation,$run] = $this->context();
         $this->travelTo(new \DateTimeImmutable('2026-10-30T20:00:00Z'));
+        $run->update(['attachment_ids' => []]);
         $project->update(['source_ref' => 'app:1']);
         $approval = $this->approval($user, $project, $run);
         $approval->update(['status' => 'approved']);
@@ -99,6 +100,7 @@ class ApprovalExecutionTest extends TestCase
         $this->assertSame('completed', $approval->fresh()->status);
         $this->assertSame('completed', $run->fresh()->status);
         $next = AgentRun::where('conversation_id', $conversation->id)->where('id', '!=', $run->id)->firstOrFail();
+        $this->assertSame([], $next->attachment_ids);
         $input = Message::findOrFail($next->input_message_id);
         $this->assertSame('system', $input->role);
         $this->assertTrue($input->metadata['continuation']);

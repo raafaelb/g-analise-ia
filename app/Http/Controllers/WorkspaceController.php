@@ -15,6 +15,7 @@ use App\Models\Message;
 use App\Models\Project;
 use App\Models\RefreshSchedule;
 use App\Services\ArtifactImages;
+use App\Services\AttachmentContext;
 use App\Services\Audit;
 use App\Services\BiCredentials;
 use App\Services\BiFlowWizard;
@@ -175,14 +176,19 @@ class WorkspaceController extends Controller
     public function message(Request $request, string $id): JsonResponse
     {
         $this->author($request);
-        $data = $request->validate(['content' => ['required', 'string', 'max:30000'], 'model' => ['nullable', 'string', 'max:100']]);
+        $data = $request->validate(['content' => ['required', 'string', 'max:30000'], 'model' => ['nullable', 'string', 'max:100'], 'attachment_ids' => ['sometimes', 'array', 'list', 'max:'.AttachmentContext::MAX_FILES], 'attachment_ids.*' => ['required', 'string', 'uuid', 'distinct:strict']], ['attachment_ids.max' => 'Selecione no máximo 12 arquivos por pedido.', 'attachment_ids.list' => 'Selecione arquivos válidos deste projeto.', 'attachment_ids.*.uuid' => 'Selecione arquivos válidos deste projeto.', 'attachment_ids.*.distinct' => 'Selecione cada arquivo apenas uma vez.']);
         $conversation = Conversation::where('user_id', $request->user()->id)->findOrFail($id);
         $result = DB::transaction(function () use ($request, $data, $conversation) {
             $project = Project::where('user_id', $request->user()->id)->lockForUpdate()->findOrFail($conversation->project_id);
             abort_if($project->status === 'archived', 409, 'Este projeto está arquivado. Reabra-o antes de enviar outra mensagem.');
             $conversation = Conversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
             abort_if($conversation->runs()->whereIn('status', ['queued', 'running', 'awaiting_approval', 'cancel_requested'])->exists(), 409, 'Já existe uma tarefa em execução nesta conversa.');
-            $inputMessage = Message::create(['conversation_id' => $conversation->id, 'role' => 'user', 'content' => $data['content']]);
+            try {
+                $attachments = app(AttachmentContext::class)->selection($project, $data['attachment_ids'] ?? null);
+            } catch (\RuntimeException $e) {
+                throw ValidationException::withMessages(['attachment_ids' => $e->getMessage()]);
+            }
+            $inputMessage = Message::create(['conversation_id' => $conversation->id, 'role' => 'user', 'content' => $data['content'], 'metadata' => ['attachments' => $attachments['files']]]);
             if ($conversation->title === 'Nova conversa') {
                 $conversation->title = Str::limit($data['content'], 65);
             }
@@ -191,7 +197,7 @@ class WorkspaceController extends Controller
             }
             $conversation->touch();
             $conversation->save();
-            $run = AgentRun::create(['conversation_id' => $conversation->id, 'user_id' => $request->user()->id, 'input_message_id' => $inputMessage->id]);
+            $run = AgentRun::create(['conversation_id' => $conversation->id, 'user_id' => $request->user()->id, 'input_message_id' => $inputMessage->id, 'attachment_ids' => $attachments['ids']]);
             Audit::record($request->user()->id, 'conversation.message', 'Mensagem enviada ao projeto.', $conversation->project_id);
 
             return $run;
