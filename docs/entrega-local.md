@@ -1,23 +1,37 @@
 # Entrega local e pendências de homologação
 
-Instalação de desenvolvimento: http://127.0.0.1:8088. Estado conferido em 30/10/2026. O código está preparado para execução Docker; esta entrega não declara a implantação central concluída.
+Instalação de desenvolvimento: http://127.0.0.1:8088. Estado consolidado em 01/11/2026. O código está preparado para execução Docker; esta entrega não declara a implantação central concluída.
 
 | Entrega | Implementado e verificado | Etapa restante |
 |---|---|---|
 | Catálogo por tenant | Oito tenants da conta real; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados e variáveis sem valores | Homologar módulos sem dados/permissão e conta real com acesso restrito |
 | ChatGPT | Login oficial OSS local, plano individual, modelos autorizados, inferência remota, Codex e ferramentas reais | Enquadramento/configuração oficial para hospedagem central; repetir no domínio público |
 | Criação completa | Clone, manutenção, consultas, criação nova, prévia PNG/interativa, histórico de prévias no projeto, revisão assíncrona, ações manuais de duplicação/exclusão e carga de teste | Ampliar a homologação real da substituição de versões; publicação como nova já autorizada e confirmada no BI |
-| Anexos | Extração limitada e privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; interpretação real de CSV, PDF, XLSX e imagens; consentimento individual de PNG BI | OCR não implementado; validar amostras de cada cliente no piloto |
-| Agendamento | Fontes compartilhadas, frequência preservada, duplicação recusada, agenda ativa e execução nova concluída confirmadas | Validar cenários adicionais de fontes privadas com autorização do titular |
-| Operação | HTTPS/subpasta/WebSocket em ensaio isolado, backup criptografado/restauração independente, retenção e saúde; testes de propriedade e concorrência | Domínio/certificado públicos, backup externo agendado, alertas e piloto de capacidade com contas independentes |
+| Anexos | Extração privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; interpretação real anterior de CSV, PDF, XLSX e imagens; preparo visual de PDF sem texto conferido sem nova inferência | Homologar interpretação real do PDF digitalizado com autorização; OCR não implementado; validar amostras do piloto |
+| Agendamento | Fontes compartilhadas, frequência preservada, duplicação recusada, agenda ativa e execução nova concluída; fonte geográfica publicada após autorização e carga concluída | Novas fontes privadas continuam exigindo autorização específica; não reutilizar a autorização geográfica em outro recurso |
+| Operação | HTTPS/subpasta/WebSocket em ensaio isolado, backup criptografado/restauração independente, retenção e saúde; testes de propriedade e concorrência; empacotamento do auxiliar oficial de sandbox corrigido | Isolamento completo do processo por usuário ainda não comprovado; este Docker bloqueia namespaces nativos; domínio/certificado, backup externo, alertas e piloto com contas independentes |
 
 ## Evidências e uso
 
-403 testes PHP e 2.362 verificações aprovados em SQLite e PostgreSQL isolado na revisão local ampliada; 32 testes de frontend e um teste operacional Python aprovados; Pint e build Vue/TypeScript aprovados. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+A regressão usada como base desta auditoria, commit `9686d8b`, passou com **1.215 testes / 9.015 asserções em SQLite**, mais três casos próprios do PostgreSQL ignorados nesse banco; **1.218 testes / 9.063 asserções em PostgreSQL isolado**; **188 testes de frontend**, TypeScript/build, Pint, testes operacionais Python e smoke do protocolo Codex. [CI aprovado dessa revisão](https://github.com/raafaelb/g-analise-ia/actions/runs/41275015775). As contagens nas seções históricas descrevem as respectivas revisões, não a cobertura atual. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
 A publicação como nova foi autorizada pelo próprio portal e confirmada na mesa de teste da Inovadora. Uma segunda consulta independente confirmou recurso, nome, quantidade de dashboards e destino. A versão compartilhada permanece vinculada ao projeto. Substituição de uma versão existente passou pelos testes isolados; o ciclo real de substituição ainda precisa de uma revisão e decisão próprias. Uma revisão expirada ou alterada exige nova validação antes da execução.
+
+## Auditoria das seis entregas — 01/11/2026
+
+O inventário real dos 13 grupos foi comparado novamente com as consultas nativas: IDs, resumos e disponibilidade coincidiram, sem mudar as contagens do portal. Essa conferência usa a conta BI já conectada; não comprova restrições de uma segunda identidade. Uma conta de homologação com acesso reduzido foi solicitada para fechar essa validação nativa.
+
+A publicação autorizada de `flow:100344` e `table:93362` foi confirmada na mesa de dados 1585 do tenant Inovadora. A agenda 4324 permaneceu ativa às 03h de Brasília; a execução de teste terminou com sucesso em 31/10/2026 às 18h11min52s. A aplicação geográfica `app:41453` continua privada. Essa autorização já foi consumida e não será repetida.
+
+O backup criptografado e a restauração em banco independente possuem recibos de integridade e conferência dos arquivos/credenciais. Não equivalem a backup externo agendado ou failover. A consulta de saúde de 01/11/2026 confirmou banco, cache, scheduler, três workers e disco, com filas vazias; esse comando não testa a elegibilidade OpenAI nem o isolamento de sistema operacional.
+
+O auxiliar `bubblewrap` já integra a dependência Codex 0.165.0; a imagem passou a preservá-lo. O ensaio sem rede, volumes ou credenciais encontrou inicialmente a ausência do auxiliar e, depois da correção, a recusa de criação de namespaces deste host Docker. Não foram ampliados privilégios, desativados filtros do Docker nem habilitada execução nativa. O smoke de CI confere o auxiliar e o protocolo, e não afirma que essa fronteira de isolamento foi homologada.
+
+A correção do empacotamento passou no build separado, no teste real do auxiliar e no initialize/thread/start sem inferência. O smoke passou a retornar código 1 ao falhar; a imagem antiga reproduziu esse erro e a corrigida terminou com código 0. Os dez testes do protocolo (37 asserções), os dois testes operacionais Python e o Pint passaram; o login local respondeu HTTP 200. Não houve alteração de interface, rotas, ajuda ou âncoras de tour nesta revisão interna.
+
+As pendências externas continuam explícitas: acesso oficial para oferta ChatGPT remota, segunda conta BI restrita, validação do isolamento/capacidade e infraestrutura definitiva. Nenhuma implantação em servidor foi autorizada ou realizada.
 
 ## Disponibilização
 

@@ -25,6 +25,10 @@ $send = fn ($m) => $input->write(json_encode($m, JSON_THROW_ON_ERROR)."\n");
 $buffer = new JsonRpcBuffer;
 $ok = false;
 try {
+    $sandboxHelper = new Process([dirname(config('horus.codex.binary')).'/codex-resources/bwrap', '--version'], $home, $env);
+    $sandboxHelper->setTimeout(10);
+    $sandboxHelper->mustRun();
+    echo "Codex: auxiliar bubblewrap executável; isolamento do host exige ensaio próprio.\n";
     $process->start();
     $send(['id' => 1, 'method' => 'initialize', 'params' => CodexProtocol::initialize()]);
     while ($process->isRunning()) {
@@ -49,9 +53,15 @@ try {
         throw new RuntimeException('Handshake não confirmado.');
     }
     echo "Codex: initialize e thread/start aceitos; nenhuma inferência solicitada.\n";
+} catch (Throwable $error) {
+    fwrite(STDERR, 'Codex smoke falhou: '.$error->getMessage()."\n");
 } finally {
     $input->close();
     if ($process->isRunning()) {
         $process->stop(1);
     }File::deleteDirectory($home);
+}
+
+if (! $ok) {
+    exit(1);
 }

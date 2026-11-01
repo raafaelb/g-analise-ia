@@ -1,6 +1,6 @@
 # Solicitação à OpenAI para a instalação central
 
-Página oficial: https://openai.com/pt-BR/form/sign-in-with-chatgpt-interest/
+Página oficial: [formulário de interesse — Sign in with ChatGPT](https://openai.com/form/sign-in-with-chatgpt-interest/)
 
 Referências: [visão geral](https://developers.openai.com/siwc/token-sharing-open-source) e [cookbook](https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt).
 
@@ -17,6 +17,10 @@ Referências: [visão geral](https://developers.openai.com/siwc/token-sharing-op
 - Homologação local do fluxo aberto concluída com resposta e ferramentas reais.
 
 ## O que solicitar
+
+No formulário, selecionar **Sign in and ChatGPT plan use for AI requests**, porque o projeto precisa de uso do plano, além da identificação da conta. Informar e-mail profissional, nome, empresa, site, função e a descrição do produto acima. Explicar expressamente que a ferramenta é gratuita e MIT, porém será hospedada em um servidor central para vários usuários.
+
+A documentação oficial foi reconferida em 01/11/2026: aplicações hospedadas remotamente precisam solicitar acesso mesmo quando são abertas e gratuitas. O fluxo aberto local já homologado não autoriza, por si só, essa oferta central. A orientação de VM própria trata do mesmo usuário/workspace; não confirma elegibilidade de uma instalação compartilhada entre clientes. As fontes consultadas não estabelecem a compra de ChatGPT Business como requisito para solicitar acesso e não garantem gratuidade do acesso solicitado.
 
 Confirmar elegibilidade da aplicação aberta/gratuita hospedada remotamente e o fluxo oficial para esse cenário; registro/configuração do cliente e callback HTTPS; escopos e autorização de uso do plano individual; regras de armazenamento/renovação/revogação, limites e eventuais requisitos de disponibilização.
 

@@ -32,6 +32,14 @@ As migrações `create_user_guide_progress_table` e `create_help_questions_table
 
 Os workers têm `restart: unless-stopped`. Alterações no código exigem reiniciar os workers; a fila é preservada. Em produção, use a nova imagem em todos os serviços. Timeout da fila é maior que o turno; ações remotas não têm repetição automática após resultado incerto. Não monte Docker socket no worker.
 
+## Sandbox do Codex e limites do host
+
+A imagem inclui `codex-resources` da mesma distribuição oficial fixada do Codex, incluindo seu auxiliar `bwrap`; não instala um pacote adicional nem baixa um auxiliar de outra origem. O build e `scripts/codex-smoke.php` verificam que o auxiliar executa. O smoke faz initialize/thread/start sem solicitar inferência e não verifica o isolamento completo de um usuário. Falhas do auxiliar ou do protocolo encerram o comando com código 1, para interromper o CI.
+
+Em 01/11/2026 o ensaio em contêiner descartável, sem rede, volumes ou credenciais, confirmou que este host Docker recusa a criação dos namespaces exigidos pelo sandbox nativo. A presença do auxiliar não resolve essa restrição do host. Não usar `privileged`, `seccomp=unconfined`, capacidades extras ou fallback sem sandbox para contorná-la. Os comandos e pedidos de permissões nativos continuam desabilitados/recusados pelo portal.
+
+O processo da aplicação ainda não tem isolamento completo de leitura de arquivos por identidade demonstrado no sistema operacional. Antes de uma oferta central, homologar uma fronteira adequada para os processos por usuário e as restrições do host escolhido, além dos testes lógicos de propriedade/projeto. O sucesso de `ganalise:health`, do protocolo ou das recusas de escrita não substitui essa evidência. Não há implantação pública nesta etapa.
+
 ## Backup criptografado
 
 Requer Python 3, Docker e imagem oficial Restic 0.19.1. Prepare um arquivo de senha 0600 em cofre, separado do repositório; nunca coloque seu conteúdo na linha de comando. Repositório e arquivos de senha reais não entram no Git.

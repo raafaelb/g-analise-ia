@@ -1,6 +1,16 @@
 FROM node:24-alpine AS codex-tools
 ARG CODEX_VERSION=0.165.0
-RUN npm install --global @openai/codex@${CODEX_VERSION} && find /usr/local/lib/node_modules/@openai -type f -name codex -exec cp {} /codex \; && test -x /codex && find /usr/local/lib/node_modules/@openai -type f -name codex-code-mode-host -exec cp {} /codex-code-mode-host \; && test -x /codex-code-mode-host
+RUN set -eu; \
+    npm install --global @openai/codex@${CODEX_VERSION}; \
+    codex_binary="$(find /usr/local/lib/node_modules/@openai -type f -path '*/bin/codex' -print)"; \
+    codex_vendor="$(dirname "$(dirname "$codex_binary")")"; \
+    cp "$codex_binary" /codex; \
+    cp "$codex_vendor/bin/codex-code-mode-host" /codex-code-mode-host; \
+    cp -R "$codex_vendor/codex-resources" /codex-resources; \
+    test -x /codex; \
+    test -x /codex-code-mode-host; \
+    test -x /codex-resources/bwrap; \
+    /codex-resources/bwrap --version
 
 FROM alpine:3.22 AS lumo-tools
 ARG LUMO_VERSION=3.44.0
@@ -12,6 +22,7 @@ RUN apk add --no-cache libpq git curl libstdc++ libgcc tini poppler-utils libzip
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY --from=codex-tools /codex /usr/local/bin/codex
 COPY --from=codex-tools /codex-code-mode-host /usr/local/bin/codex-code-mode-host
+COPY --from=codex-tools /codex-resources /usr/local/bin/codex-resources
 COPY --from=lumo-tools /lumo /usr/local/bin/lumo
 WORKDIR /var/www/html
 ENTRYPOINT ["/sbin/tini", "--"]
