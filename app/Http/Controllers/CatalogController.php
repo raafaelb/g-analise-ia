@@ -6,7 +6,7 @@ use App\Models\Conversation;
 use App\Models\Project;
 use App\Services\Audit;
 use App\Services\BiCatalog;
-use App\Services\BiFlowDeletions;
+use App\Services\BiDraftDeletions;
 use App\Services\BiInspector;
 use App\Services\BiManualActions;
 use App\Services\BiPublications;
@@ -69,7 +69,7 @@ class CatalogController extends Controller
         }
     }
 
-    public function reconcileDeletion(Request $request, string $id, BiFlowDeletions $deletions): JsonResponse
+    public function reconcileDeletion(Request $request, string $id, BiDraftDeletions $deletions): JsonResponse
     {
         try {
             return response()->json($deletions->reconcile($request->user(), $id));

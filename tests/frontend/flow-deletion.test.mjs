@@ -72,3 +72,26 @@ test('a verified deletion receipt remains visible in activity',async()=>{
  assert.match(html,/ETL e tabelas excluídos e conferidos/);
  assert.doesNotMatch(html,/Conferir exclusão<\/button>/);
 });
+
+function appDeletion(status='pending'){
+ const item=approval(status);item.payload.action.resource='app:2';
+ item.payload.revision={tenant_id:'100',resource:'app:2',info:{data:{nome:'Aplicação de teste'}},app_deletion:{kind:'app',resource:'app:2',name:'Aplicação de teste',dashboard_count:1,tables:[],preserved_table_refs:['table:500'],impact:'As tabelas vinculadas e a aplicação original serão preservadas. O checkpoint não é restauração automática.'}};
+ return item;
+}
+test('application deletion discloses dashboard removal and source preservation separately',async()=>{
+ const html=await render(Review,{approval:appDeletion(),tenants});
+ assert.match(html,/Excluir esta aplicação de teste/);assert.match(html,/1 dashboard será removido/);assert.match(html,/1 tabela vinculada será preservada/);assert.match(html,/não é restauração automática/);assert.doesNotMatch(html,/Excluir este ETL|dados de teste já carregados/);
+});
+test('a failed application deletion can be reconciled without deleting its tables',async()=>{
+ const item=appDeletion('failed');const html=await render(Recovery,{approval:item,request});
+ assert.match(html,/Conferir exclusão/);assert.match(html,/aplicação foi removida e as tabelas vinculadas foram preservadas/);assert.match(html,/não exclui novamente/);
+ delete item.payload.revision.app_deletion;
+ assert.doesNotMatch(await render(Recovery,{approval:item,request}),/Conferir exclusão/);
+});
+
+test('a known refusal is not offered as an uncertain deletion to reconcile',async()=>{
+ for(const item of [approval('failed'),appDeletion('failed')]){
+  item.payload.deletion_attempt.native_refused_at='2026-10-31T12:00:01Z';item.payload.deletion_attempt.native_exit_code=13;
+  assert.doesNotMatch(await render(Recovery,{approval:item,request}),/Conferir exclusão/);
+ }
+});

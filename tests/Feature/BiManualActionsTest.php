@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 class BiManualActionsTest extends TestCase
@@ -34,7 +35,7 @@ class BiManualActionsTest extends TestCase
 
     private function nativeState(array $ids = [1]): object
     {
-        return (object) ['ids' => $ids, 'body' => ['nome' => 'Estoque de teste', '_state' => ['deskId' => null], 'dashboards' => [['id' => 21, 'widgets' => [['id' => 31, 'title' => 'Versão original']]]], 'private_reference' => 'synthetic-private-reference'], 'clones' => 0, 'deletions' => 0, 'on_info' => null];
+        return (object) ['ids' => $ids, 'body' => ['nome' => 'Estoque de teste', '_state' => ['deskId' => null], 'tables' => [], 'dashboards' => [['id' => 21, 'widgets' => [['id' => 31, 'title' => 'Versão original']]]], 'private_reference' => 'synthetic-private-reference'], 'clones' => 0, 'deletions' => 0, 'on_info' => null];
     }
 
     private function native(object $state): LumoClient
@@ -48,12 +49,25 @@ class BiManualActionsTest extends TestCase
             if ($args[0] === 'list' && $args[1] === 'app') {
                 return ['data' => ['results' => array_map(fn (int $id): array => ['id' => $id, 'nome' => 'Aplicação '.$id], $state->ids), 'matched' => count($state->ids)]];
             }
+            if ($args === ['pull', 'app:2']) {
+                $path = app(WorkspaceFiles::class)->path($project).'/apps';
+                File::ensureDirectoryExists($path, 0700, true);
+                File::put($path.'/copia--2.yaml', Yaml::dump(['kind' => 'app', 'id' => 2, 'tenantId' => 100])."---\n".Yaml::dump($state->copied_body ?? $state->body, 30, 2));
+
+                return ['data' => []];
+            }
+            if ($args === ['diff', 'app:2', '--include-remote']) {
+                return ['data' => ['workingVsServer' => ['equal' => true]]];
+            }
             if ($args[0] === 'info') {
+                if ($args[1] === 'app:2' && $state->deletions > 0) {
+                    throw new RuntimeException('Synthetic missing resource', 5);
+                }
                 if ($state->on_info !== null) {
                     ($state->on_info)($connection);
                 }
 
-                return ['data' => ['payload' => ['header' => ['tenantId' => 100], 'body' => $args[1] === 'app:2' ? ($state->copied_body ?? $state->body) : $state->body]]];
+                return ['data' => ['payload' => ['header' => ['id' => (int) substr($args[1], 4), 'kind' => 'app', 'tenantId' => 100], 'body' => $args[1] === 'app:2' ? ($state->copied_body ?? $state->body) : $state->body]]];
             }
             if ($args === ['app', 'clone', 'app:1', '--name', 'Cópia de teste']) {
                 $state->clones++;
@@ -63,6 +77,7 @@ class BiManualActionsTest extends TestCase
             }
             if ($args === ['rm', 'app:2', '--force']) {
                 $state->deletions++;
+                $state->ids = array_values(array_filter($state->ids, fn (int $id): bool => $id !== 2));
 
                 return ['exit_code' => 0, 'data' => ['removed' => 'app:2']];
             }
@@ -273,8 +288,8 @@ class BiManualActionsTest extends TestCase
         ManagedBiResource::create(['user_id' => $user->id, 'project_id' => $project->id, 'tenant_id' => '100', 'resource' => 'app:2', 'origin' => 'clone_app', 'receipt' => []]);
         $path = app(WorkspaceFiles::class)->path($project);
         File::ensureDirectoryExists($path.'/apps');
-        File::put($path.'/apps/copia--2.yaml', "kind: app\nid: 2\ntenantId: 100\n---\nnome: Cópia\n");
         $state = $this->nativeState([2]);
+        File::put($path.'/apps/copia--2.yaml', Yaml::dump(['kind' => 'app', 'id' => 2, 'tenantId' => 100])."---\n".Yaml::dump($state->body, 30, 2));
         $this->native($state);
         try {
             $response = $this->actingAs($user)->postJson('/api/catalog/100/apps/2/actions', ['action' => 'delete_draft', 'request_id' => (string) Str::uuid()])->assertCreated();

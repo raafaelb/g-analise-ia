@@ -91,7 +91,8 @@ class ManagedBiResourceTest extends TestCase
     {
         [$project,$run] = $this->context();
         ManagedBiResource::create(['user_id' => $project->user_id, 'project_id' => $project->id, 'tenant_id' => '100', 'resource' => 'app:2000', 'origin' => 'clone_app', 'receipt' => []]);
-        $this->mock(LumoClient::class)->shouldReceive('run')->once()->withArgs(fn ($c, $args) => $args === ['info', 'app:2000'])->andReturn(['data' => ['payload' => ['body' => ['_state' => ['deskId' => 10]]]]]);
+        Connection::where('user_id', $project->user_id)->firstOrFail()->update(['metadata' => ['tenants' => [['id' => '100', 'name' => 'Homologação']]]]);
+        $this->mock(LumoClient::class)->shouldReceive('run')->once()->withArgs(fn ($c, $args) => $args === ['info', 'app:2000', '--full'])->andReturn(['data' => ['payload' => ['header' => ['id' => 2000, 'kind' => 'app', 'tenantId' => 100], 'body' => ['_state' => ['deskId' => 10]]]]]);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('já foi publicada');
         app(ActionBroker::class)->execute($run, 'horus_action', ['action' => 'delete_draft', 'resource' => 'app:2000']);

@@ -145,3 +145,10 @@ Aguarde a autorização na conversa. O portal confere novamente autoria sincroni
 
 
 Os contadores `RowsIn`/`RowsOut` do histórico e `rows_in`/`rows_out` normalizados descrevem processamento informado pelo BI, não uma contagem física do destino. Não apresente `rows_out` como registros gravados na tabela nem deduza duplicação física comparando-o diretamente com uma amostra. Uma mesma linha pode atravessar várias etapas. Valores ausentes não são zero. Valide a granularidade, os indicadores e os dados por consultas autorizadas antes de concluir que há divergência; não repita cargas para igualar contadores. Em `overview.nodes` e nas etapas da configuração, `executed_at` e `rows` vêm de metadados que podem ser herdados na duplicação. Não os trate como prova de execução da cópia; consulte o estado e histórico nativos vinculados à fonte e a confirmação da tarefa quando existente.
+
+
+## Exclusão de aplicações de teste
+
+`delete_draft` também usa revisão e conferência durável para `app:<id>` em rascunho criado e registrado por este projeto. A proposta identifica a aplicação, seus dashboards e as tabelas vinculadas preservadas; excluir a aplicação remove seus dashboards, preservando ETLs, tabelas, conexões, agendas e a versão original. Não use essa ação em aplicações preexistentes ou publicadas. A configuração recebe checkpoint, sem restauração automática. Uma aceitação do comando não confirma a ausência do recurso: só use o comprovante com `deletion.verified:true` para declarar a exclusão conferida.
+
+Se uma tentativa autorizada ficar sem confirmação, use `deletion_status` com o mesmo `approval_id`, sem reenviar a remoção. Uma recusa conhecida do BI não é uma operação em andamento; resolva o motivo e prepare uma revisão nova. Uma tentativa recusada, substituída ou sem registro íntegro não pode confirmar a remoção de outra operação. A aplicação pendente fica bloqueada para novas escritas; leituras continuam disponíveis. Não fabrique confirmação retroativa para revisões antigas sem o novo plano. Verifique o catálogo e prepare nova autorização quando a revisão antiga ainda não executada não corresponder ao contrato atual.

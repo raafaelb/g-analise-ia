@@ -19,7 +19,7 @@ use Symfony\Component\Process\Process;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 
-class BiFlowDeletions
+class BiDraftDeletions
 {
     public function __construct(private BiCatalog $catalog, private LumoClient $lumo) {}
 
@@ -27,6 +27,9 @@ class BiFlowDeletions
     {
         $this->managed($project, $ref);
         [$context, $user] = $this->context($connection, $project);
+        if (str_starts_with($ref, 'app:')) {
+            return $this->appRevision($connection, $project, $ref);
+        }
         $generation = $connection->metadata['session_generation'] ?? null;
         $snapshot = $this->catalog->snapshot($user, (string) $project->tenant_id, true);
         $metadata = $this->catalog->workingMetadata($context);
@@ -104,11 +107,89 @@ class BiFlowDeletions
         return ['tenant_id' => $project->tenant_id, 'resource' => $ref, 'info' => ['data' => ['id' => substr($ref, 5), 'nome' => $this->name($body, $ref)]], 'changes' => [], 'flow_deletion' => ['kind' => 'flow', 'resource' => $ref, 'name' => $this->name($body, $ref), 'sha256' => $this->digest($body), 'tables' => $tables, 'cascade' => false, 'impact' => 'O ETL em rascunho e suas tabelas de destino serão excluídos, incluindo dados de teste já carregados. A conexão e a versão original serão preservadas. Dependências recusadas pelo BI não serão removidas em cascata. Uma revisão local preserva a configuração, mas não os dados das tabelas.']];
     }
 
+    public function plan(array $revision): ?array
+    {
+        $ref = $revision['resource'] ?? null;
+        if (! is_string($ref) || ! preg_match('/^(app|flow):[1-9][0-9]*$/D', $ref, $match)) {
+            return null;
+        }
+        $plan = $revision[$match[1].'_deletion'] ?? null;
+
+        return is_array($plan) && ($plan['kind'] ?? null) === $match[1] && ($plan['resource'] ?? null) === $ref ? $plan : null;
+    }
+
+    private function appRevision(Connection $connection, Project $project, string $ref): array
+    {
+        $generation = $connection->metadata['session_generation'] ?? null;
+        $data = $this->lumo->run($connection, ['info', $ref, '--full'], $project)['data'];
+        $payload = is_array($data) ? ($data['payload'] ?? $data) : [];
+        $header = is_array($payload['header'] ?? null) ? $payload['header'] : [];
+        $info = $payload['body'] ?? null;
+        if ((string) ($header['id'] ?? '') !== substr($ref, 4) || ($header['kind'] ?? null) !== 'app' || (string) ($header['tenantId'] ?? '') !== (string) $project->tenant_id || ! is_array($info)) {
+            throw new RuntimeException('O BI não confirmou a identidade completa desta aplicação no tenant. Nenhuma exclusão foi preparada.');
+        }
+        $this->assertPrivateApp($info);
+        $infoTables = $this->appTableRefs($info);
+        $this->lumo->run($connection, ['pull', $ref], $project, 90);
+        $diff = $this->lumo->run($connection, ['diff', $ref, '--include-remote'], $project);
+        $body = $this->catalog->workingMetadata($project, [$ref])[$ref] ?? null;
+        if (($diff['data']['workingVsServer']['equal'] ?? false) !== true || ! is_array($body)) {
+            throw new RuntimeException('Há alterações locais ou remotas não conferidas. Revise o rascunho antes de preparar a exclusão.');
+        }
+        $this->assertPrivateApp($body);
+        $preserved = $this->appTableRefs($body);
+        if ($infoTables !== $preserved || count($info['dashboards']) !== count($body['dashboards']) || $this->name($info, $ref) !== $this->name($body, $ref)) {
+            throw new RuntimeException('Os detalhes e a configuração sincronizada da aplicação divergem em nome, dashboards ou tabelas. Consulte novamente antes de preparar a exclusão.');
+        }
+        $this->context($connection, $project);
+        if (($connection->fresh()?->metadata['session_generation'] ?? null) !== $generation) {
+            throw new RuntimeException('A sessão BI mudou durante a preparação. Atualize os acessos e prepare uma nova revisão.');
+        }
+
+        return ['tenant_id' => $project->tenant_id, 'resource' => $ref, 'info' => ['data' => ['id' => substr($ref, 4), 'nome' => $this->name($body, $ref)]], 'changes' => [], 'app_deletion' => ['kind' => 'app', 'resource' => $ref, 'name' => $this->name($body, $ref), 'sha256' => $this->digest($body), 'tables' => [], 'dashboard_count' => count($body['dashboards']), 'preserved_table_refs' => $preserved, 'cascade' => false, 'impact' => 'A aplicação de teste e seus dashboards serão excluídos. As tabelas vinculadas, os ETLs, as conexões, as agendas e a aplicação original serão preservados. Dependências recusadas pelo BI não serão removidas em cascata. Um checkpoint preserva a configuração, mas não representa restauração automática da aplicação.']];
+    }
+
+    private function assertPrivateApp(array $body): void
+    {
+        $known = false;
+        foreach ([$body, is_array($body['_state'] ?? null) ? $body['_state'] : []] as $state) {
+            foreach (['deskId', 'desk_id'] as $key) {
+                if (array_key_exists($key, $state)) {
+                    $known = true;
+                    if ($state[$key] !== null) {
+                        throw new RuntimeException('Esta aplicação já foi publicada. A exclusão permite somente rascunhos criados pelo portal.');
+                    }
+                }
+            }
+        }
+        if (! $known || (is_string($body['_state'] ?? null) && $body['_state'] !== 'draft')) {
+            throw new RuntimeException('O estado privado da aplicação não foi confirmado pelo BI.');
+        }
+    }
+
+    private function appTableRefs(array $body): array
+    {
+        if (! is_array($body['dashboards'] ?? null) || ! array_is_list($body['dashboards']) || ! is_array($body['tables'] ?? null) || ! array_is_list($body['tables'])) {
+            throw new RuntimeException('A lista de dashboards e tabelas desta aplicação não foi identificada. Confira os vínculos antes de excluir.');
+        }
+        $refs = [];
+        foreach ($body['tables'] as $table) {
+            if (! is_array($table) || (! is_int($table['tableId'] ?? null) && ! is_string($table['tableId'] ?? null)) || ! preg_match('/^[1-9][0-9]*$/D', (string) $table['tableId'])) {
+                throw new RuntimeException('Uma tabela da aplicação não foi identificada para conferir sua preservação.');
+            }
+            $refs[] = 'table:'.$table['tableId'];
+        }
+        $refs = array_values(array_unique($refs));
+        sort($refs);
+
+        return $refs;
+    }
+
     public function execute(Approval $approval, Connection $connection, Project $project, array $plan): array
     {
         $ref = $plan['resource'] ?? '';
         $managed = $this->managed($project, $ref);
-        if ($approval->status !== 'executing' || isset($approval->payload['deletion_attempt']) || ($approval->payload['revision']['flow_deletion'] ?? null) !== $plan) {
+        if ($approval->status !== 'executing' || isset($approval->payload['deletion_attempt']) || $this->plan($approval->payload['revision'] ?? []) !== $plan) {
             throw new RuntimeException('Esta exclusão exige uma revisão atual ainda não enviada. Confira o resultado existente antes de repetir.');
         }
         $checkpoint = $this->checkpoint($project, $plan);
@@ -127,7 +208,15 @@ class BiFlowDeletions
             $native = $this->lumo->run($connection, ['rm', $ref, '--force'], $project, 90);
         } catch (Throwable $error) {
             if (in_array($error->getCode(), [3, 4, 8, 13, 14], true)) {
-                $managed->refresh()->update(['status' => 'draft']);
+                DB::transaction(function () use ($approval, $managed, $error): void {
+                    $current = Approval::whereKey($approval->id)->lockForUpdate()->firstOrFail();
+                    $resource = ManagedBiResource::whereKey($managed->id)->lockForUpdate()->firstOrFail();
+                    $this->assertRecordedAttempt($resource, $approval->id, (string) $current->payload['deletion_attempt']['plan_sha256']);
+                    $refusal = ['native_refused_at' => now()->toIso8601String(), 'native_exit_code' => $error->getCode()];
+                    $current->update(['payload' => [...$current->payload, 'deletion_attempt' => [...$current->payload['deletion_attempt'], ...$refusal]]]);
+                    $resource->update(['status' => 'draft', 'receipt' => [...$resource->receipt, 'deletion_attempt' => [...$resource->receipt['deletion_attempt'], ...$refusal]]]);
+                    $approval->setRawAttributes($current->getAttributes(), true);
+                });
             }
             if ($error->getCode() === 13) {
                 throw new RuntimeException('O BI recusou a exclusão porque há dependências. Nenhuma exclusão em cascata foi autorizada. Confira os vínculos antes de preparar outra revisão.', 13);
@@ -136,9 +225,9 @@ class BiFlowDeletions
         }
         $approval->refresh()->update(['payload' => [...$approval->payload, 'deletion_attempt' => [...$approval->payload['deletion_attempt'], 'native_accepted_at' => now()->toIso8601String()]]]);
         $confirmation = $this->verify($connection, $project, $plan);
-        $this->recordVerified($project, $confirmation);
+        $this->recordVerified($project, $confirmation, $approval->id, (string) $approval->payload['deletion_attempt']['plan_sha256']);
         Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
-        Audit::record($project->user_id, 'bi.flow_draft.deleted', 'ETL de teste e seus destinos removidos após revisão e conferência, sem cascata.', $project->id, ['resource' => $ref, 'tables' => array_column($plan['tables'], 'resource'), 'approval_id' => $approval->id]);
+        Audit::record($project->user_id, 'bi.'.$plan['kind'].'_draft.deleted', $plan['kind'] === 'app' ? 'Aplicação de teste removida e fontes preservadas após revisão e conferência, sem cascata.' : 'ETL de teste e seus destinos removidos após revisão e conferência, sem cascata.', $project->id, ['resource' => $ref, 'tables' => array_column($plan['tables'], 'resource'), 'approval_id' => $approval->id]);
 
         return ['exit_code' => $native['exit_code'], 'deletion' => $confirmation];
     }
@@ -152,21 +241,24 @@ class BiFlowDeletions
             $project = Project::where('user_id', $user->id)->findOrFail($approval->project_id);
             $arguments = $approval->payload['action'] ?? [];
             $revision = $approval->payload['revision'] ?? [];
-            $plan = $revision['flow_deletion'] ?? null;
-            abort_unless(($run === null || $run->fresh()?->status === 'running') && $approval->permitsUserAccess($user) && $approval->decided_at !== null && ($arguments['action'] ?? null) === 'delete_draft' && is_array($plan) && ($plan['resource'] ?? null) === ($arguments['resource'] ?? null), 422, 'Esta revisão não contém uma exclusão de ETL autorizada para conferir.');
+            $plan = $this->plan($revision);
+            abort_unless(($run === null || $run->fresh()?->status === 'running') && $approval->permitsUserAccess($user) && $approval->decided_at !== null && ($arguments['action'] ?? null) === 'delete_draft' && is_array($plan) && ($plan['resource'] ?? null) === ($arguments['resource'] ?? null), 422, 'Esta revisão não contém uma exclusão de rascunho autorizada para conferir.');
             abort_unless(in_array($approval->status, ['failed', 'completed'], true), 409, 'Aguarde a execução terminar antes de conferir o resultado.');
             $fingerprint = hash('sha256', json_encode([$user->id, $project->id, $project->tenant_id, $arguments, $revision], JSON_THROW_ON_ERROR));
             $attempt = $approval->payload['deletion_attempt'] ?? [];
             abort_unless(hash_equals($approval->fingerprint, $fingerprint) && ! empty($attempt['started_at']) && hash_equals(hash('sha256', json_encode($plan, JSON_THROW_ON_ERROR)), (string) ($attempt['plan_sha256'] ?? '')), 409, 'Não há registro íntegro de envio desta exclusão. Confira a operação sem reenviá-la.');
+            abort_unless(empty($attempt['native_refused_at']), 409, 'O BI recusou esta tentativa. Prepare uma nova revisão depois de resolver o motivo; esta operação não pode confirmar outra remoção.');
+            $managed = ManagedBiResource::where('user_id', $user->id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $plan['resource'])->first();
+            $this->assertRecordedAttempt($managed, $approval->id, $attempt['plan_sha256']);
             [$connection] = $this->catalog->access($user, (string) $project->tenant_id);
             $confirmation = $this->verify($connection, $project, $plan);
             DB::transaction(function () use ($approval, $project, $confirmation, $fingerprint): void {
                 $current = Approval::whereKey($approval->id)->lockForUpdate()->firstOrFail();
                 abort_unless($current->status === $approval->status && $current->payload === $approval->payload && hash_equals($current->fingerprint, $fingerprint), 409, 'A operação mudou durante a conferência. Consulte novamente.');
-                $this->recordVerified($project, $confirmation);
+                $this->recordVerified($project, $confirmation, $approval->id, (string) $approval->payload['deletion_attempt']['plan_sha256']);
                 $current->update(['status' => 'completed', 'payload' => [...$current->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => ['deletion' => $confirmation]], 'reconciliation' => ['previous_status' => $approval->status, 'previous_message' => $approval->payload['execution']['message'] ?? null, 'checked_at' => now()->toIso8601String(), 'remote_read_only' => true]]]);
             });
-            Audit::record($user->id, 'bi.flow_draft.deletion_reconciled', 'Exclusão de ETL conferida por leitura, sem novo envio.', $project->id, ['approval_id' => $approval->id, 'resource' => $plan['resource']]);
+            Audit::record($user->id, 'bi.'.$plan['kind'].'_draft.deletion_reconciled', $plan['kind'] === 'app' ? 'Exclusão de aplicação conferida por leitura, sem novo envio.' : 'Exclusão de ETL conferida por leitura, sem novo envio.', $project->id, ['approval_id' => $approval->id, 'resource' => $plan['resource']]);
             Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
 
             return ['project' => $project->refresh(), 'approval' => $approval->refresh()];
@@ -186,16 +278,19 @@ class BiFlowDeletions
 
     private function verify(Connection $connection, Project $project, array $plan): array
     {
+        if (! in_array($plan['kind'] ?? null, ['app', 'flow'], true) || ! preg_match('/^'.preg_quote($plan['kind'], '/').':[1-9][0-9]*$/D', $plan['resource'] ?? '') || ! is_array($plan['tables'] ?? null) || ! array_is_list($plan['tables']) || ($plan['kind'] === 'app' && $plan['tables'] !== [])) {
+            throw new RuntimeException('A revisão não contém uma exclusão reconhecida para conferir.');
+        }
         [$context] = $this->context($connection, $project);
         $generation = $connection->metadata['session_generation'] ?? null;
-        foreach (['flow' => [$plan['resource']], 'table' => array_column($plan['tables'], 'resource')] as $kind => $refs) {
+        foreach ([$plan['kind'] => [$plan['resource']], 'table' => array_column($plan['tables'], 'resource')] as $kind => $refs) {
             if ($refs === []) {
                 continue;
             }
             $ids = array_map(fn (array $row): string => (string) $row['id'], $this->catalog->rows($connection, $context, $kind));
             foreach ($refs as $ref) {
                 if (! preg_match('/^'.preg_quote($kind, '/').':([1-9][0-9]*)$/D', $ref, $match) || in_array($match[1], $ids, true)) {
-                    throw new RuntimeException('A remoção do ETL e de todas as tabelas ainda não foi confirmada. Confira a exclusão sem reenviar.');
+                    throw new RuntimeException($plan['kind'] === 'app' ? 'A remoção da aplicação ainda não foi confirmada. Confira a exclusão sem reenviar.' : 'A remoção do ETL e de todas as tabelas ainda não foi confirmada. Confira a exclusão sem reenviar.');
                 }
                 try {
                     $this->lumo->run($connection, ['info', $ref], $context);
@@ -208,20 +303,33 @@ class BiFlowDeletions
                 throw new RuntimeException('O recurso ainda responde no BI. A exclusão não está confirmada; não repita o envio.');
             }
         }
+        $preserved = $plan['kind'] === 'app' ? ($plan['preserved_table_refs'] ?? null) : [];
+        if (! is_array($preserved) || ! array_is_list($preserved)) {
+            throw new RuntimeException('A lista de tabelas a preservar não foi confirmada nesta revisão.');
+        }
+        if ($preserved !== []) {
+            $ids = array_map(fn (array $row): string => (string) $row['id'], $this->catalog->rows($connection, $context, 'table'));
+            foreach ($preserved as $ref) {
+                if (! is_string($ref) || ! preg_match('/^table:([1-9][0-9]*)$/D', $ref, $match) || ! in_array($match[1], $ids, true)) {
+                    throw new RuntimeException('A preservação de uma tabela vinculada ainda não pôde ser confirmada. Consulte o resultado sem reenviar a exclusão.');
+                }
+            }
+        }
         $this->context($connection, $project);
         if (($connection->fresh()?->metadata['session_generation'] ?? null) !== $generation) {
             throw new RuntimeException('A sessão BI mudou durante a confirmação. Consulte o resultado novamente.');
         }
 
-        return ['verified' => true, 'kind' => 'flow', 'resource' => $plan['resource'], 'name' => $plan['name'], 'table_refs' => array_column($plan['tables'], 'resource'), 'checked_at' => now()->toIso8601String(), 'message' => 'ETL de teste e tabelas de destino excluídos e conferidos. A configuração foi preservada em uma revisão local; os dados das tabelas não fazem parte desse checkpoint.'];
+        return ['verified' => true, 'kind' => $plan['kind'], 'resource' => $plan['resource'], 'name' => $plan['name'], 'table_refs' => array_column($plan['tables'], 'resource'), ...($plan['kind'] === 'app' ? ['preserved_table_refs' => $preserved] : []), 'checked_at' => now()->toIso8601String(), 'message' => $plan['kind'] === 'app' ? 'Aplicação de teste excluída e tabelas vinculadas preservadas, com conferência no BI. A configuração foi preservada em um checkpoint, sem restauração automática.' : 'ETL de teste e tabelas de destino excluídos e conferidos. A configuração foi preservada em uma revisão local; os dados das tabelas não fazem parte desse checkpoint.'];
     }
 
-    private function recordVerified(Project $project, array $confirmation): void
+    private function recordVerified(Project $project, array $confirmation, string $approvalId, string $planHash): void
     {
-        DB::transaction(function () use ($project, $confirmation): void {
+        DB::transaction(function () use ($project, $confirmation, $approvalId, $planHash): void {
             $current = Project::where('user_id', $project->user_id)->lockForUpdate()->findOrFail($project->id);
             abort_unless($current->tenant_id === $project->tenant_id, 409, 'O ambiente do projeto mudou durante a conferência.');
             $managed = ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $confirmation['resource'])->lockForUpdate()->firstOrFail();
+            $this->assertRecordedAttempt($managed, $approvalId, $planHash);
             $managed->update(['status' => 'deleted', 'receipt' => [...($managed->receipt ?? []), 'deletion' => $confirmation]]);
             ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->whereIn('resource', $confirmation['table_refs'])->update(['status' => 'deleted']);
             foreach ($confirmation['table_refs'] as $ref) {
@@ -233,20 +341,26 @@ class BiFlowDeletions
         });
     }
 
+    private function assertRecordedAttempt(?ManagedBiResource $managed, string $approvalId, string $planHash): void
+    {
+        $attempt = $managed?->receipt['deletion_attempt'] ?? [];
+        abort_unless($managed !== null && in_array($managed->status, ['deletion_pending', 'deleted'], true) && ($attempt['approval_id'] ?? null) === $approvalId && empty($attempt['native_refused_at']) && hash_equals($planHash, (string) ($attempt['plan_sha256'] ?? '')), 409, 'O registro desta tentativa foi recusado, substituído ou não está mais disponível. Consulte a operação atual sem reenviar a exclusão.');
+    }
+
     private function managed(Project $project, string $ref): ManagedBiResource
     {
-        if (! preg_match('/^flow:[1-9][0-9]*$/D', $ref)) {
-            throw new RuntimeException('Escolha um ETL em rascunho criado pelo portal.');
+        if (! preg_match('/^(app|flow):[1-9][0-9]*$/D', $ref)) {
+            throw new RuntimeException('Escolha uma aplicação ou ETL em rascunho criado pelo portal.');
         }
 
-        return ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->where('status', 'draft')->first() ?? throw new RuntimeException('A exclusão permite somente ETLs em rascunho criados e registrados por este projeto. Recursos preexistentes não podem ser excluídos.');
+        return ManagedBiResource::where('user_id', $project->user_id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $ref)->where('status', 'draft')->first() ?? throw new RuntimeException('A exclusão permite somente aplicações ou ETLs em rascunho criados e registrados por este projeto. Recursos preexistentes não podem ser excluídos.');
     }
 
     private function context(Connection $connection, Project $project): array
     {
         $user = User::findOrFail($project->user_id);
         if (! $user->canStartWork() || $user->role === 'viewer' || $connection->user_id !== $project->user_id) {
-            throw new RuntimeException('Seu acesso não permite excluir este ETL.');
+            throw new RuntimeException('Seu acesso não permite excluir este recurso.');
         }
         [$current, $tenant] = $this->catalog->access($user, (string) $project->tenant_id);
         if ($current->id !== $connection->id || ($current->metadata['session_generation'] ?? null) !== ($connection->metadata['session_generation'] ?? null)) {
@@ -327,7 +441,10 @@ class BiFlowDeletions
         foreach ($expected as $ref => $hash) {
             [$kind, $id] = explode(':', $ref, 2);
             $matches = [];
-            foreach (File::files($root.'/'.($kind === 'flow' ? 'flows' : 'tables')) as $file) {
+            $folder = match ($kind) {
+                'app' => 'apps', 'flow' => 'flows', 'table' => 'tables', default => throw new RuntimeException('Tipo inválido no checkpoint da exclusão.')
+            };
+            foreach (File::files($root.'/'.$folder) as $file) {
                 if ($file->isLink() || $file->getSize() > 2_000_000 || ! in_array($file->getExtension(), ['yaml', 'yml'], true)) {
                     continue;
                 }
@@ -342,7 +459,7 @@ class BiFlowDeletions
                 if (! hash_equals($hash, $this->digest(Yaml::parse($parts[1])))) {
                     throw new RuntimeException('A configuração local mudou após a revisão. Prepare outra exclusão.');
                 }
-                $matches[] = ($kind === 'flow' ? 'flows' : 'tables').'/'.$file->getFilename();
+                $matches[] = $folder.'/'.$file->getFilename();
             }
             if (count($matches) !== 1) {
                 throw new RuntimeException('O checkpoint da exclusão está ausente ou ambíguo. Confira o rascunho.');

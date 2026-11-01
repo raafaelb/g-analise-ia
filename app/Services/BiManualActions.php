@@ -67,7 +67,7 @@ class BiManualActions
                     abort_unless($managed, 422, 'Esta ação exige um rascunho criado e registrado pelo portal.');
                     $project = Project::where('user_id', $user->id)->where('tenant_id', $tenant)->findOrFail($managed->project_id);
                 }
-                $revision = $arguments['action'] === 'delete_draft' && str_starts_with($arguments['resource'], 'flow:')
+                $revision = $arguments['action'] === 'delete_draft'
                     ? Cache::lock('project:'.$project->id, 630)->block(3, fn (): array => $this->broker->manualRevision($user, $project, $arguments))
                     : $this->broker->manualRevision($user, $project, $arguments);
                 if (! $project->exists && $arguments['action'] === 'publish_flow') {

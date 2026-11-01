@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.20",
+  "version": "2026-10-31.21",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -148,7 +148,7 @@
         {
           "id": "project-approval",
           "title": "Revise na própria conversa",
-          "description": "Quando uma ação precisar de autorização, uma solicitação destacada aparecerá no chat. Confira os valores e o destino antes de autorizar ou recusar.",
+          "description": "Quando uma ação precisar de autorização, uma solicitação destacada aparecerá no chat. Confira os valores e o destino antes de autorizar ou recusar. Uma exclusão sem confirmação pode ser conferida aqui, sem reenviar. Recusas conhecidas exigem resolver o motivo e preparar outra revisão.",
           "audience": "all"
         },
         {
@@ -228,7 +228,7 @@
         {
           "id": "catalog-edit",
           "title": "Ações claras no próprio catálogo",
-          "description": "Crie mesas e conexões quando autorizado. Nas conexões de dados, confira tabelas, colunas e relacionamentos declarados. Em Fontes / ETL, duplique uma cópia ou publique um rascunho com revisão do destino. Agendas e tabelas têm formulários próprios. Em Fontes / ETL, rascunhos criados pelo portal também permitem Excluir rascunho criado aqui. A revisão inclui as tabelas e seus dados de teste; dependências e vínculos são conferidos antes da remoção. Se uma exclusão ficar sem confirmação, confira o resultado antes de editar, duplicar ou publicar o recurso.",
+          "description": "Crie mesas e conexões quando autorizado e confira as estruturas das fontes. Aplicações e ETLs em rascunho criados pelo portal permitem Excluir rascunho criado aqui: revise o que será removido e preservado. Excluir uma aplicação remove seus dashboards e preserva as tabelas; excluir um ETL também pode remover seus destinos e dados de teste. Se o resultado ficar sem confirmação, use Conferir exclusão na conversa ou em Atividade antes de novas escritas. Uma recusa conhecida exige resolver o motivo e preparar outra revisão.",
           "audience": "authors"
         },
         {
@@ -348,7 +348,7 @@
         {
           "id": "activity-history",
           "title": "Use o histórico para investigar",
-          "description": "Abra Ver revisão desta operação para conferir a proposta e o efeito da decisão. A publicação conferida mostra o destino e as próximas verificações dos dados. Nas conversas, as solicitações também ficam no próprio chat. Contadores de entrada e saída medem processamento; confira os registros na tabela.",
+          "description": "Abra Ver revisão desta operação para conferir proposta e efeito da decisão. Em exclusões sem confirmação, Conferir exclusão consulta o resultado sem reenviar. Uma recusa conhecida exige resolver o motivo e preparar nova revisão. Publicações mostram destino e próximas verificações; contadores das cargas medem processamento, não o total da tabela. Você também resolve as solicitações na conversa.",
           "anchor": "activity-history",
           "audience": "all"
         },
@@ -906,7 +906,25 @@
       "id": "etl-draft-deletion",
       "title": "Como excluo um ETL de teste criado aqui?",
       "summary": "Abra o rascunho no catálogo, confira o ETL e as tabelas incluídas e autorize a exclusão. Dados de teste desses destinos também serão removidos.",
-      "body": "No **Catálogo BI → Fontes / ETL**, abra um ETL em rascunho criado ou duplicado pelo G-Analise IA e escolha **Excluir rascunho criado aqui**. A ação usa sua conexão BI e não inicia uma tarefa de IA. ETLs preexistentes e versões já publicadas não recebem essa opção de exclusão.\n\nA revisão mostra o nome do ETL, todas as tabelas de destino identificadas e a quantidade de campos. A exclusão inclui os **dados de teste já carregados** nessas tabelas. A conexão e a versão original da cópia são preservadas. A configuração do ETL e das tabelas recebe uma revisão local antes da remoção; esse checkpoint **não contém os dados** e não é uma restauração automática dos recursos.\n\nO portal confere os vínculos autorizados com aplicações e agendas e consulta novamente a configuração antes de executar. Se uma aplicação ainda usar uma tabela ou uma agenda ainda apontar para o ETL, resolva esse vínculo primeiro. Uma listagem indisponível ou metadados incompletos impedem preparar a exclusão. O BI também pode recusar dependências; o portal não usa exclusão em cascata para removê-las. Não é necessário apagar uma dashboard existente para limpar um teste: confira com cuidado os vínculos e escolha outro destino quando necessário.\n\nDepois da sua autorização, **Exclusão conferida** exige que o ETL e todas as tabelas da revisão não constem nas listagens atuais e que o BI confirme ausência por identificador. Falta de acesso não é tratada como remoção. Se a resposta da operação for interrompida, use **Conferir exclusão** na conversa, nos detalhes da operação ou em **Atividade**. Essa consulta verifica o resultado, sem excluir novamente ou iniciar inferência. Enquanto a situação estiver pendente, o portal bloqueia novas operações de escrita dessa conta no ETL e nas tabelas incluídas, como edição, duplicação, publicação e carga. A leitura e Conferir exclusão continuam disponíveis. Não peça outra exclusão nem sincronize arquivos antigos para recriar o recurso.\n\nUma exclusão concluída não apaga o projeto nem a conversa; eles preservam a revisão e o histórico. Você pode continuar o projeto com novos recursos.",
+      "body": "No **Catálogo BI → Fontes / ETL**, abra um ETL em rascunho criado ou duplicado pelo G-Analise IA e escolha **Excluir rascunho criado aqui**. A ação usa sua conexão BI e não inicia uma tarefa de IA. ETLs preexistentes e versões já publicadas não recebem essa opção de exclusão.\n\nA revisão mostra o nome do ETL, todas as tabelas de destino identificadas e a quantidade de campos. A exclusão inclui os **dados de teste já carregados** nessas tabelas. A conexão e a versão original da cópia são preservadas. A configuração do ETL e das tabelas recebe uma revisão local antes da remoção; esse checkpoint **não contém os dados** e não é uma restauração automática dos recursos.\n\nO portal confere os vínculos autorizados com aplicações e agendas e consulta novamente a configuração antes de executar. Se uma aplicação ainda usar uma tabela ou uma agenda ainda apontar para o ETL, resolva esse vínculo primeiro. Uma listagem indisponível ou metadados incompletos impedem preparar a exclusão. O BI também pode recusar dependências; o portal não usa exclusão em cascata para removê-las. Não é necessário apagar uma dashboard existente para limpar um teste: confira com cuidado os vínculos e escolha outro destino quando necessário.\n\nDepois da sua autorização, **Exclusão conferida** exige que o ETL e todas as tabelas da revisão não constem nas listagens atuais e que o BI confirme ausência por identificador. Falta de acesso não é tratada como remoção. Se a resposta da operação for interrompida, use **Conferir exclusão** na conversa, nos detalhes da operação ou em **Atividade**. Essa consulta verifica o resultado, sem excluir novamente ou iniciar inferência. Enquanto a situação estiver pendente, o portal bloqueia novas operações de escrita dessa conta no ETL e nas tabelas incluídas, como edição, duplicação, publicação e carga. A leitura e Conferir exclusão continuam disponíveis. Não peça outra exclusão nem sincronize arquivos antigos para recriar o recurso.\n\nUma exclusão concluída não apaga o projeto nem a conversa; eles preservam a revisão e o histórico. Você pode continuar o projeto com novos recursos.\n\nUma recusa conhecida do BI, por exemplo por dependências, não é uma exclusão em andamento. Resolva o motivo e prepare outra revisão. A consulta de uma tentativa recusada ou substituída não pode confirmar uma remoção feita por outra operação.",
+      "pages": [
+        "catalog",
+        "project",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir Catálogo BI"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "app-draft-deletion",
+      "title": "Como excluo uma aplicação de teste criada aqui?",
+      "summary": "Revise a aplicação e os dashboards que serão removidos, preservando as tabelas vinculadas e as fontes de dados.",
+      "body": "Abra **Catálogo BI → Aplicações**, filtre **Minha Mesa** e escolha uma aplicação em rascunho criada ou duplicada pelo G-Analise IA. Use **Excluir rascunho criado aqui**. Aplicações preexistentes, publicadas ou de outra conta não recebem essa autorização pelo portal. A ação usa sua conexão BI e não inicia uma tarefa de IA.\n\nA revisão apresenta a aplicação, a quantidade de dashboards que serão removidos com ela e as tabelas vinculadas que serão preservadas. **Excluir a aplicação remove seus dashboards**, preservando as tabelas, os ETLs, as conexões, as agendas e a aplicação original da cópia. Esse efeito é diferente da exclusão de um ETL, que também pode remover suas tabelas e dados de teste. O checkpoint conserva a configuração e não representa restauração automática da aplicação. O projeto, as conversas e o histórico continuam disponíveis.\n\nO portal confere novamente a configuração antes de executar. Uma alteração posterior exige outra revisão. **Exclusão conferida** exige que a aplicação esteja ausente na consulta do BI e que as tabelas da revisão continuem disponíveis. Falha de consulta e perda de permissão mantêm a conferência pendente. A confirmação não é uma contagem de registros das tabelas.\n\nSe o envio ficar sem resultado confirmado, use **Conferir exclusão** na conversa ou em **Atividade**. Essa consulta não envia outra exclusão. Novas escritas na aplicação ficam bloqueadas enquanto essa tentativa estiver pendente. Uma recusa conhecida, como um vínculo que impede excluir, exige resolver o motivo e preparar uma nova revisão; não é uma remoção em andamento. Uma tentativa substituída não pode receber o resultado de outra operação.\n\nOperações registradas em versões anteriores sem esse plano e comprovante não recebem confirmação retroativa. Consulte o catálogo antes de outra ação. Uma revisão antiga ainda não executada pode exigir uma autorização nova para conferir o efeito atual.",
       "pages": [
         "catalog",
         "project",
