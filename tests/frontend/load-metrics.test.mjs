@@ -43,3 +43,15 @@ test('an unexecuted step does not gain a timestamp or execution proof',async()=>
  assert.match(html,/Ler a fonte/);
  assert.doesNotMatch(html,/Data informada na etapa|linhas informadas|podem ter sido herdados/);
 });
+
+
+test('a technical failure in a requested load is summarized without losing the native outcome or executing another request',async()=>{
+ const item=execution({rows_in:0,rows_out:null});item.status='failed';item.proof.flows[0].status='failed';item.proof.flows[0].message='java.lang.IllegalStateException: <script>alert(1)</script>\n    at synthetic.reader.Extract.run(Extract.java:10)';
+ const html=await render(LoadStatus,{execution:item,request});
+ assert.match(html,/O BI informou uma falha nesta execução/);
+ assert.match(html,/<summary(?: [^>]*)?>Ver detalhes técnicos<\/summary>/);
+ assert.doesNotMatch(html,/<details[^>]*\bopen\b/);
+ assert.match(html,/Falhou/);
+ assert.match(html,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+ assert.doesNotMatch(html,/<script>/);
+});

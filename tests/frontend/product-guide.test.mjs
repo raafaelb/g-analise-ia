@@ -67,3 +67,8 @@ test('a pending ETL step finds the guide for checking the existing result withou
 test('cadastro questions find the dedicated read and export guide',()=>{
  assert.equal(searchGuideArticles(content.articles,'exportar planilha de cadastro','catalog')[0]?.id,'writeback-data');
 });
+
+
+test('questions about failed loads find the guide for checking the native execution message',()=>{
+ assert.equal(searchGuideArticles(content.articles,'por que carga falhou','catalog')[0]?.id,'execution-messages');
+});

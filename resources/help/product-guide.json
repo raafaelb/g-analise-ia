@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-31.22",
+  "version": "2026-10-31.23",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -200,7 +200,7 @@
         {
           "id": "catalog-search",
           "title": "Localize e confira",
-          "description": "Use a busca e os filtros e abra um cartão para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso.",
+          "description": "Use a busca e os filtros e abra um cartão para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso. Mensagens extensas ficam em Ver detalhes técnicos, sem mudar o resultado informado pelo BI.",
           "anchor": "catalog-search",
           "audience": "all"
         },
@@ -318,7 +318,7 @@
         {
           "id": "refresh-result",
           "title": "Enfileirado ainda não é sucesso",
-          "description": "Atualização diária verificada confirma agenda, última carga e teste da configuração consultada. Fonte nova pode solicitar sua primeira carga; aguarde a conclusão. Configuração a conferir pede nova consulta antes de decidir sobre a agenda. Contadores de processamento não comprovam o total de registros da tabela.",
+          "description": "Atualização diária verificada confirma agenda, última carga e teste da configuração consultada. Fonte nova pode solicitar sua primeira carga; aguarde a conclusão. Configuração a conferir pede nova consulta antes de decidir sobre a agenda. Contadores de processamento não comprovam o total de registros da tabela. Mensagens técnicas extensas aparecem resumidas, com Ver detalhes técnicos para investigar.",
           "audience": "all"
         },
         {
@@ -348,7 +348,7 @@
         {
           "id": "activity-history",
           "title": "Use o histórico para investigar",
-          "description": "Abra Ver revisão desta operação para conferir proposta e efeito da decisão. Em exclusões sem confirmação, Conferir exclusão consulta o resultado sem reenviar. Uma recusa conhecida exige resolver o motivo e preparar nova revisão. Publicações mostram destino e próximas verificações; contadores das cargas medem processamento, não o total da tabela. Você também resolve as solicitações na conversa.",
+          "description": "Abra Ver revisão desta operação para conferir proposta e efeito da decisão. Em exclusões sem confirmação, Conferir exclusão consulta o resultado sem reenviar. Uma recusa conhecida exige resolver o motivo e preparar nova revisão. Publicações mostram destino e próximas verificações; contadores das cargas medem processamento, não o total da tabela. Você também resolve as solicitações na conversa. Mensagens extensas ficam em Ver detalhes técnicos, sem alterar o resultado do BI.",
           "anchor": "activity-history",
           "audience": "all"
         },
@@ -937,6 +937,29 @@
         }
       ],
       "audience": "authors"
+    },
+    {
+      "id": "execution-messages",
+      "audience": "all",
+      "title": "Por que uma carga falhou e como consulto o motivo?",
+      "summary": "Leia o aviso e, quando necessário, abra os detalhes técnicos da execução sem enviar outra carga.",
+      "pages": [
+        "catalog",
+        "refresh",
+        "activity",
+        "project"
+      ],
+      "body": "Uma carga pode falhar por motivos diferentes. O estado exibido vem do resultado informado pelo BI; uma mensagem técnica, sozinha, não muda uma execução concluída para falha nem confirma o sucesso de uma execução pendente.\n\nNo **Catálogo BI**, abra o ETL e consulte **Última execução** ou **Histórico de cargas**. Na conversa ou em **Atividade**, acompanhe o resultado da carga autorizada. Mensagens breves continuam visíveis. Quando o conteúdo for extenso ou técnico, o portal apresenta um aviso em português e o controle **Ver detalhes técnicos**, inicialmente fechado. Abra-o para consultar a mensagem disponibilizada pelo histórico. Os detalhes podem estar limitados pelo retorno e pelos controles do portal; não constituem um diagnóstico automático da causa.\n\nConfira a fonte, o horário e a execução antes de decidir o próximo passo. Consultar o histórico ou abrir os detalhes não repete a carga e não inicia uma tarefa de IA. Uma falha anterior pode continuar no histórico mesmo depois de outra execução ter dado certo. Não autorize uma nova carga apenas para esconder um aviso antigo.\n\nOs contadores de entrada e saída indicam processamento, sem comprovar a quantidade física de registros da tabela. Se precisar investigar ou corrigir a preparação dos dados, retome o projeto correspondente, descreva a dificuldade e confira a proposta antes de autorizar qualquer alteração. Não envie senhas ou valores protegidos ao chat.",
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir Catálogo BI"
+        },
+        {
+          "page": "activity",
+          "label": "Ver Atividade"
+        }
+      ]
     }
   ]
 }

@@ -5,12 +5,15 @@ import {parse,compileScript} from '@vue/compiler-sfc';
 import ts from 'typescript';
 import {createRenderer,h,nextTick,ref} from 'vue';
 
-const path=new URL('../../resources/js/Components/ResourceInspector.vue',import.meta.url);
-const {descriptor}=parse(await readFile(path,'utf8'));
-let script=compileScript(descriptor,{id:'inspector-regression',inlineTemplate:true}).content;
-script=script.replace(/from (['"])(vue|lucide-vue-next)\1/g,(_,quote,name)=>`from ${quote}${import.meta.resolve(name)}${quote}`);
-const code=ts.transpileModule(script,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ESNext}}).outputText;
-const Inspector=(await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))).default;
+async function componentUrl(name,bindings={}){
+ const {descriptor}=parse(await readFile(new URL(`../../resources/js/Components/${name}.vue`,import.meta.url),'utf8'));
+ let script=compileScript(descriptor,{id:name+'-regression',inlineTemplate:true}).content;
+ script=script.replace(/from (['"])([^'"]+)\1/g,(_,quote,dependency)=>{const target=bindings[dependency]??(['vue','lucide-vue-next'].includes(dependency)?import.meta.resolve(dependency):null);assert.ok(target,`Resolve the actual component dependency ${dependency}`);return `from ${quote}${target}${quote}`;});
+ const code=ts.transpileModule(script,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ESNext}}).outputText;
+ return 'data:text/javascript;base64,'+Buffer.from(code).toString('base64');
+}
+const messageUrl=await componentUrl('BiExecutionMessage',{'../lib/execution-message':new URL('../../resources/js/lib/execution-message.ts',import.meta.url).href});
+const Inspector=(await import(await componentUrl('ResourceInspector',{'./BiExecutionMessage.vue':messageUrl}))).default;
 function node(kind,text=''){return {kind,text,props:{},children:[],parent:null};}
 const renderer=createRenderer({
  createElement:kind=>node(kind),createText:text=>node('text',text),createComment:text=>node('comment',text),
@@ -23,7 +26,7 @@ const renderer=createRenderer({
 });
 function text(item){return item.text+item.children.map(text).join('');}
 function find(item,predicate){if(predicate(item))return item;return item.children.map(child=>find(child,predicate)).find(Boolean);}
-function mount(request,kind='table',download){const root=node('root'),repaint=ref(0),resource=ref(kind+':90');const app=renderer.createApp({setup:()=>()=>{repaint.value;return h(Inspector,{tenant:'923',resource:{kind:resource.value.split(':')[0],id:resource.value.split(':')[1],ref:resource.value},request,download});}});app.mount(root);return {root,repaint,resource,close:()=>app.unmount(),inspect:()=>find(root,item=>item.kind==='button'&&text(item).includes('Amostra')).props.onClick(),history:()=>find(root,item=>item.kind==='button'&&text(item).includes('Histórico de cargas')).props.onClick(),export:()=>find(root,item=>item.kind==='button'&&text(item).includes('Exportar XLSX')).props.onClick()};}
+function mount(request,kind='table',download){const root=node('root'),repaint=ref(0),resource=ref(kind+':90');const app=renderer.createApp({setup:()=>()=>{repaint.value;return h(Inspector,{tenant:'923',resource:{kind:resource.value.split(':')[0],id:resource.value.split(':')[1],ref:resource.value},request,download});}});app.mount(root);return {root,repaint,resource,close:()=>app.unmount(),inspect:()=>find(root,item=>item.kind==='button'&&text(item).includes('Amostra')).props.onClick(),history:()=>find(root,item=>item.kind==='button'&&text(item).includes('Histórico de cargas')).props.onClick(),events:()=>find(root,item=>item.kind==='button'&&text(item).includes('Ocorrências')).props.onClick(),export:()=>find(root,item=>item.kind==='button'&&text(item).includes('Exportar XLSX')).props.onClick()};}
 test('a pending table preview and its result survive unrelated parent repaints with the same resource',async()=>{
  let resolve,calls=0;const view=mount(()=>{calls++;return new Promise(done=>resolve=done);});
  try{const pending=view.inspect();view.repaint.value++;await nextTick();resolve({checked_at:'2026-10-31T15:00:00Z',table:{columns:['STATUS'],rows:[{STATUS:'record-confirmed'}]}});await pending;await nextTick();assert.match(text(view.root),/record-confirmed/);view.repaint.value++;await nextTick();assert.match(text(view.root),/record-confirmed/);assert.equal(calls,1);}finally{view.close();}
@@ -54,4 +57,17 @@ test('flow history keeps zero counters and labels them as processing rather than
 test('unknown flow counters are not displayed as zero or as a physical table count',async()=>{
  const view=mount(async()=>({history:[{id:'synthetic-run',state:'succeeded',started_at:'2026-10-31T10:00:00Z',finished_at:'2026-10-31T10:01:00Z',duration_ms:null,rows_in:null,rows_out:null,message:null}]}),'flow');
  try{await view.history();await nextTick();const value=text(view.root);assert.match(value,/Concluída com sucesso/);assert.doesNotMatch(value,/Linhas de entrada|Linhas de saída|Linhas gravadas|Contadores do processamento/);}finally{view.close();}
+});
+
+
+test('technical load failures show a readable summary and collapsed details while keeping the failed state',async()=>{
+ const message='java.lang.IllegalStateException: Falha da fonte\n    at synthetic.reader.Extract.run(Extract.java:10)';
+ const view=mount(async()=>({history:[{id:'synthetic-failure',state:'failed',started_at:null,finished_at:null,duration_ms:null,rows_in:null,rows_out:null,message}]}),'flow');
+ try{await view.history();await nextTick();assert.match(text(view.root),/O BI informou uma falha nesta execução/);const details=find(view.root,item=>item.kind==='details');assert.ok(details);assert.equal(details.props.open,undefined);assert.match(text(details),/Ver detalhes técnicos/);assert.match(text(details),/synthetic.reader/);assert.match(text(view.root),/Falha/);}finally{view.close();}
+});
+
+
+test('agent occurrences use the same readable message and remain scoped to the authorized resource endpoint',async()=>{
+ const requests=[];const view=mount(async(...args)=>{requests.push(args);return {events:[{name:'Ocorrência sintética',state:'ERROR',expected_at:null,started_at:null,recovered_at:null,message:'Traceback (most recent call last):\n    synthetic reader failed'}]};},'agent');
+ try{await view.events();await nextTick();assert.equal(requests.length,1);assert.equal(requests[0][0],'/catalog/923/resources/agent/90/inspect/events');assert.match(text(view.root),/O BI informou uma falha nesta execução/);const details=find(view.root,item=>item.kind==='details');assert.ok(details);assert.equal(details.props.open,undefined);assert.match(text(details),/synthetic reader failed/);}finally{view.close();}
 });
