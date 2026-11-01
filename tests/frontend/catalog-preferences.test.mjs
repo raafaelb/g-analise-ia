@@ -1,11 +1,12 @@
 import {readFile} from 'node:fs/promises';
 import {after,before,test} from 'node:test';
+import {setImmediate as yieldEventLoop} from 'node:timers/promises';
 import assert from 'node:assert/strict';
 import {createServer} from 'vite';
 import vue from '@vitejs/plugin-vue';
 import {parse,compileScript} from '@vue/compiler-sfc';
 import ts from 'typescript';
-import {createRenderer,h,nextTick,toRaw} from 'vue';
+import {createRenderer,h,nextTick,toRaw,ref} from 'vue';
 
 let server,Catalog;
 before(async()=>{
@@ -42,7 +43,7 @@ const renderer=createRenderer({
 });
 function find(item,predicate){if(predicate(item))return item;return item.children.map(child=>find(child,predicate)).find(Boolean);}
 function text(item){return item.text+item.children.map(text).join('');}
-function mount(storageDescriptor,{apps=[]}={}){
+function mount(storageDescriptor,{apps=[],onRequest=null,tenants=[{id:'923',name:'Ambiente de teste'}]}={}){
  const previous=Object.fromEntries(['window','document','localStorage','Document','ShadowRoot'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  const windowStub={addEventListener(){},removeEventListener(){},matchMedia(){return {matches:true};}};
  Object.defineProperty(windowStub,'localStorage',{configurable:true,...storageDescriptor});
@@ -55,25 +56,26 @@ function mount(storageDescriptor,{apps=[]}={}){
  const kinds=['app','bi-desk','dw-desk','table','flow','schedule','agent','writeback','deck','presentation','investigation','credential','variables'];
  const snapshot={tenant:{id:'923',name:'Ambiente de teste',read_only:false},resources:Object.fromEntries(kinds.map(kind=>[kind,[]])),capabilities:Object.fromEntries(kinds.map(kind=>[kind,{status:'available',count:0}])),tags:[],warnings:[],synced_at:'2026-10-31T12:00:00Z'};
  snapshot.resources.app=apps;snapshot.capabilities.app.count=apps.length;
- const app=renderer.createApp({setup:()=>()=>h(Catalog,{tenants:[{id:'923',name:'Ambiente de teste'}],connected:true,userId:17,role:'admin',request:async(...args)=>{requests.push(args);return snapshot;}})});
+ const connected=ref(true);
+ const app=renderer.createApp({setup:()=>()=>h(Catalog,{tenants,connected:connected.value,userId:17,role:'admin',request:async(...args)=>{requests.push(args);return onRequest?onRequest(...args):{...snapshot,section:args[0].split('/sections/')[1]?.split('?')[0]};}})});
  app.config.errorHandler=error=>errors.push(error.message);app.mount(root);
- return {root,requests,errors,changeServerApps:apps=>{snapshot.resources.app=apps;snapshot.capabilities.app.count=apps.length;},choose:()=>find(root,item=>item.props['aria-label']==='Tenant do catálogo').props['onUpdate:modelValue']('923'),close:()=>{app.unmount();for(const [key,descriptor]of Object.entries(previous)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}};
+ return {root,requests,errors,setConnected:value=>connected.value=value,chooseTenant:value=>find(root,item=>item.props['aria-label']==='Tenant do catálogo').props['onUpdate:modelValue'](value),changeServerApps:apps=>{snapshot.resources.app=apps;snapshot.capabilities.app.count=apps.length;},choose:()=>find(root,item=>item.props['aria-label']==='Tenant do catálogo').props['onUpdate:modelValue']('923'),close:()=>{app.unmount();for(const [key,descriptor]of Object.entries(previous)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}};
 }
-async function settled(){await nextTick();await nextTick();await nextTick();}
+async function settled(){await nextTick();await yieldEventLoop();await nextTick();}
 
 test('blocked browser storage does not prevent selecting a tenant and loading its catalog',async()=>{
  const view=mount({get(){throw new Error('Storage access denied');}});
- try{view.choose();await settled();assert.deepEqual(view.errors,[]);assert.equal(view.requests.length,1);assert.equal(view.requests[0][0],'/catalog/923');assert.match(text(view.root),/Nenhum recurso nesta área/);}finally{view.close();}
+ try{view.choose();await settled();assert.deepEqual(view.errors,[]);assert.equal(view.requests.length,1);assert.equal(view.requests[0][0],'/catalog/923/sections/app');assert.match(text(view.root),/Nenhum recurso nesta área/);}finally{view.close();}
 });
 
 test('a preference write rejected by the browser quota still allows the catalog request',async()=>{
  const view=mount({value:{getItem(){return null;},setItem(){throw new Error('Quota exceeded');}}});
- try{view.choose();await settled();assert.deepEqual(view.errors,[]);assert.equal(view.requests.length,1);assert.equal(view.requests[0][0],'/catalog/923');}finally{view.close();}
+ try{view.choose();await settled();assert.deepEqual(view.errors,[]);assert.equal(view.requests.length,1);assert.equal(view.requests[0][0],'/catalog/923/sections/app');}finally{view.close();}
 });
 
 test('the saved authorized tenant still opens automatically when preferences are available',async()=>{
  const view=mount({value:{getItem(key){return key==='g-analise:tenant:17'?'923':null;},setItem(){}}});
- try{await settled();assert.deepEqual(view.errors,[]);assert.equal(view.requests.length,1);assert.equal(view.requests[0][0],'/catalog/923');}finally{view.close();}
+ try{await settled();assert.deepEqual(view.errors,[]);assert.equal(view.requests.length,1);assert.equal(view.requests[0][0],'/catalog/923/sections/app');}finally{view.close();}
 });
 
 
@@ -103,4 +105,45 @@ test('pagination moves to the new results heading without another BI request',as
 test('refreshing a smaller catalog restores a valid page instead of leaving an empty result area',async()=>{
  const view=mount({value:{getItem:key=>key==='g-analise:tenant:17'?'923':null,setItem(){}}},{apps:Array.from({length:19},(_,index)=>syntheticApp(index+1))});
  try{await settled();await find(view.root,item=>item.kind==='button'&&text(item).trim()==='Próxima').props.onClick();await settled();view.changeServerApps([syntheticApp(99)]);await find(view.root,item=>item.kind==='button'&&text(item).trim()==='Atualizar catálogo').props.onClick();await settled();assert.equal(resourceButtons(view.root).length,1);assert.match(text(resourceButtons(view.root)[0]),/Painel de teste 99/);assert.equal(view.requests.length,2);assert.equal(view.requests[1][0],'/catalog/923?refresh=1');assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+function section(kind,name,{tenant='923'}={}){
+ const resource={...syntheticApp(40),kind,ref:kind+':40',name};
+ return {section:kind,tenant:{id:tenant,name:'Ambiente '+tenant,read_only:false},resources:{[kind]:[resource]},capabilities:{[kind]:{status:'available',count:1}},tags:[],warnings:[],synced_at:'2026-11-01T00:00:00Z'};
+}
+function category(view,name){return find(view.root,item=>item.kind==='button'&&text(item).startsWith(name));}
+const savedTenant={value:{getItem:key=>key==='g-analise:tenant:17'?'923':null,setItem(){}}};
+
+test('opening a category loads that section and does not present unqueried totals as zero',async()=>{
+ const view=mount(savedTenant,{onRequest:async path=>path.endsWith('/flow')?section('flow','Fonte consultada'):section('app','Aplicação consultada')});
+ try{await settled();assert.equal(view.requests[0][0],'/catalog/923/sections/app');assert.match(text(category(view,'Conexões de dados')),/Consultar/);assert.match(text(view.root),/Aplicação consultada/);category(view,'Fontes / ETL').props.onClick();await settled();assert.deepEqual(view.requests.map(args=>args[0]),['/catalog/923/sections/app','/catalog/923/sections/flow']);assert.match(text(view.root),/Fonte consultada/);assert.equal(resourceButtons(view.root).length,1);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('fast category changes keep navigation available and query only the last queued selection',async()=>{
+ let release;const pending=new Promise(resolve=>release=resolve);
+ const view=mount(savedTenant,{onRequest:async path=>path.includes('/credential')?section('credential','Última categoria'):pending});
+ try{await settled();assert.equal(view.requests.length,1);assert.ok(category(view,'Fontes / ETL'));category(view,'Fontes / ETL').props.onClick();await nextTick();category(view,'Conexões de dados').props.onClick();await settled();assert.equal(view.requests.length,1);release(section('app','Resposta antiga'));await settled();assert.deepEqual(view.requests.map(args=>args[0]),['/catalog/923/sections/app','/catalog/923/sections/credential']);assert.match(text(view.root),/Última categoria/);assert.doesNotMatch(text(view.root),/Resposta antiga/);assert.deepEqual(view.errors,[]);}finally{release(section('app','Resposta antiga'));await settled();view.close();}
+});
+
+test('an error from a superseded category cannot hide the latest successful selection',async()=>{
+ let reject;const pending=new Promise((_resolve,failure)=>reject=failure);
+ const view=mount(savedTenant,{onRequest:async path=>path.includes('/credential')?section('credential','Categoria disponível'):pending});
+ try{await settled();category(view,'Conexões de dados').props.onClick();await settled();reject(new Error('Erro antigo de leitura'));await settled();assert.match(text(view.root),/Categoria disponível/);assert.doesNotMatch(text(view.root),/Erro antigo de leitura/);assert.deepEqual(view.errors,[]);}finally{reject(new Error('Erro antigo de leitura'));await settled();view.close();}
+});
+
+test('a late response from another tenant is discarded before querying the new tenant',async()=>{
+ let release;const pending=new Promise(resolve=>release=resolve);
+ const view=mount(savedTenant,{tenants:[{id:'923',name:'Primeiro ambiente'},{id:'999',name:'Segundo ambiente'}],onRequest:async path=>path.includes('/999')?section('app','Dados do segundo ambiente',{tenant:'999'}):pending});
+ try{await settled();view.chooseTenant('999');await settled();assert.equal(view.requests.length,1);release(section('app','Dados do primeiro ambiente'));await settled();assert.deepEqual(view.requests.map(args=>args[0]),['/catalog/923/sections/app','/catalog/999/sections/app']);assert.match(text(view.root),/Dados do segundo ambiente/);assert.doesNotMatch(text(view.root),/Dados do primeiro ambiente/);assert.deepEqual(view.errors,[]);}finally{release(section('app','Dados do primeiro ambiente'));await settled();view.close();}
+});
+
+test('a payload for the wrong tenant cannot become the visible catalog',async()=>{
+ const view=mount(savedTenant,{onRequest:async()=>section('app','Conteúdo de outro ambiente',{tenant:'999'})});
+ try{await settled();assert.equal(resourceButtons(view.root).length,0);assert.doesNotMatch(text(view.root),/Conteúdo de outro ambiente/);assert.match(text(view.root),/não corresponde/);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('disconnecting while a category loads discards its result and clears the tenant',async()=>{
+ let release;const pending=new Promise(resolve=>release=resolve);
+ const view=mount(savedTenant,{onRequest:async()=>pending});
+ try{await settled();view.setConnected(false);await settled();release(section('app','Resposta após desconexão'));await settled();assert.equal(view.requests.length,1);assert.equal(resourceButtons(view.root).length,0);assert.match(text(view.root),/Conecte seu G-Analise BI/);assert.doesNotMatch(text(view.root),/Resposta após desconexão/);view.setConnected(true);await settled();assert.equal(find(view.root,item=>item.props['aria-label']==='Tenant do catálogo').value,'');assert.match(text(view.root),/Escolha um tenant/);assert.doesNotMatch(text(view.root),/Resposta após desconexão/);assert.deepEqual(view.errors,[]);}finally{release(section('app','Resposta após desconexão'));await settled();view.close();}
 });

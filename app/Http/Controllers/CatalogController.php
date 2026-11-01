@@ -102,6 +102,17 @@ class CatalogController extends Controller
         }
     }
 
+    public function section(Request $request, string $tenant, string $kind, BiCatalog $catalog): JsonResponse
+    {
+        try {
+            return response()->json($catalog->section($request->user(), $tenant, $kind, $request->boolean('refresh')))->header('Cache-Control', 'private, no-store');
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            throw ValidationException::withMessages(['catalog' => $e->getMessage()]);
+        }
+    }
+
     public function detail(Request $request, string $tenant, string $kind, string $id, BiCatalog $catalog): JsonResponse
     {
         try {

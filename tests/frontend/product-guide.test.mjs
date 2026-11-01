@@ -72,3 +72,13 @@ test('cadastro questions find the dedicated read and export guide',()=>{
 test('questions about failed loads find the guide for checking the native execution message',()=>{
  assert.equal(searchGuideArticles(content.articles,'por que carga falhou','catalog')[0]?.id,'execution-messages');
 });
+
+
+test('questions about catalog delays find category loading and full inventory refresh guidance',()=>{
+ assert.equal(searchGuideArticles(content.articles,'por que catálogo demora','catalog')[0]?.id,'catalog-loading');
+});
+
+
+test('agent availability questions find the read-only status guide',()=>{
+ assert.equal(searchGuideArticles(content.articles,'agente online','catalog')[0]?.id,'agent-availability');
+});
