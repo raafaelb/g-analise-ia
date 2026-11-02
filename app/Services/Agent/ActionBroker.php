@@ -19,6 +19,7 @@ use App\Services\BiAppSettings;
 use App\Services\BiCatalog;
 use App\Services\BiCloneNames;
 use App\Services\BiCredentials;
+use App\Services\BiDashboardCreation;
 use App\Services\BiDesks;
 use App\Services\BiDraftDeletions;
 use App\Services\BiFlowClones;
@@ -266,6 +267,9 @@ class ActionBroker
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiSchedules::ACTIONS, true)) {
             return app(BiSchedules::class)->executeApproved($approval);
+        }
+        if (in_array($approval->payload['action']['action'] ?? '', BiDashboardCreation::ACTIONS, true)) {
+            return app(BiDashboardCreation::class)->executeApproved($approval);
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiAppSettings::ACTIONS, true)) {
             return app(BiAppSettings::class)->executeApproved($approval);

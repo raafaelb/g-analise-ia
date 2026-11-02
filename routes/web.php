@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BiAppCreationController;
 use App\Http\Controllers\BiAppSettingsController;
 use App\Http\Controllers\BiCredentialController;
+use App\Http\Controllers\BiDashboardCreationController;
 use App\Http\Controllers\BiDeskController;
 use App\Http\Controllers\BiFlowWizardController;
 use App\Http\Controllers\BiLoadController;
@@ -66,6 +67,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/catalog/{tenant}/variables/{id}/configuration', [BiVariableController::class, 'describe'])->whereNumber('tenant')->where('id', '[a-f0-9]+')->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/variables/actions', [BiVariableController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::post('/bi-actions/{id}/variable-verification', [BiVariableController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/apps/{id}/dashboard-builder', [BiDashboardCreationController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/apps/{id}/dashboard-builder/actions', [BiDashboardCreationController::class, 'prepare'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
+        Route::post('/bi-actions/{id}/dashboard-creation-verification', [BiDashboardCreationController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/apps/{id}/dashboards', [BiAppSettingsController::class, 'dashboards'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/{id}/dashboards/actions', [BiAppSettingsController::class, 'prepareDashboards'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/catalog/{tenant}/apps/{id}/settings', [BiAppSettingsController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');

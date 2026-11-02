@@ -13,6 +13,7 @@ use App\Services\Audit;
 use App\Services\BiAppSettings;
 use App\Services\BiBusy;
 use App\Services\BiCredentials;
+use App\Services\BiDashboardCreation;
 use App\Services\BiDesks;
 use App\Services\BiSchedules;
 use App\Services\BiTablePresentation;
@@ -121,6 +122,9 @@ class ExecuteApprovedAction implements ShouldQueue
             if (in_array($approval->payload['action']['action'] ?? '', BiVariables::ACTIONS, true)) {
                 app(BiVariables::class)->cleanup($approval);
             }
+            if (in_array($approval->payload['action']['action'] ?? '', BiDashboardCreation::ACTIONS, true)) {
+                app(BiDashboardCreation::class)->cleanup($approval);
+            }
             if (in_array($approval->payload['action']['action'] ?? '', BiAppSettings::ACTIONS, true)) {
                 app(BiAppSettings::class)->cleanup($approval);
             }
@@ -209,6 +213,9 @@ class ExecuteApprovedAction implements ShouldQueue
             }
             if (in_array($approval->payload['action']['action'] ?? '', BiVariables::ACTIONS, true)) {
                 app(BiVariables::class)->cleanup($approval);
+            }
+            if (in_array($approval->payload['action']['action'] ?? '', BiDashboardCreation::ACTIONS, true)) {
+                app(BiDashboardCreation::class)->cleanup($approval);
             }
             if (in_array($approval->payload['action']['action'] ?? '', BiAppSettings::ACTIONS, true)) {
                 app(BiAppSettings::class)->cleanup($approval);

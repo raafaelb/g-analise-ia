@@ -1,0 +1,103 @@
+<script setup lang="ts">
+import {computed,nextTick,onMounted,onUnmounted,ref,watch} from 'vue';
+import {AlertCircle,Check,CheckCircle2,Copy,Eye,LayoutDashboard,LoaderCircle,RefreshCw,ShieldCheck,X} from 'lucide-vue-next';
+import ApprovalReview from './ApprovalReview.vue';
+import {createRequestGuard} from '../lib/async-response';
+import {conversationReviewState} from '../lib/conversation-approvals';
+type Item=Record<string,any>;
+type Field={id:number;label:string;table_name:string;numeric:boolean;date:boolean;groupable:boolean};
+type Source={resource:string;name:string;version:string;state:string;desk_id:string|null;dashboard_count:number;fields:Field[];aggregations:Record<string,string>};
+const props=defineProps<{tenant:string;tenantName:string;resource:Item;request:(path:string,method?:string,data?:unknown)=>Promise<any>}>();
+const emit=defineEmits<{close:[];updated:[];created:[result:{resource:string;dashboard_id:number}];duplicate:[];setup:[];notice:[message:string]}>();
+const source=ref<Source|null>(null);const name=ref('');const metricId=ref('');const groupId=ref('');const aggregation=ref('');const grain=ref('YEARMONTH');const format=ref('default');const metricTitle=ref('');
+const loading=ref(false);const busy=ref(false);const polling=ref(false);const verifying=ref(false);const error=ref('');const review=ref<Item|null>(null);const uncertain=ref(false);const preparedInput=ref<Item|null>(null);const clock=ref(Date.now());
+const nameInput=ref<HTMLInputElement|null>(null);const reviewHeading=ref<HTMLElement|null>(null);const guard=createRequestGuard();const fieldId='dashboard-create-'+crypto.randomUUID();let requestId=crypto.randomUUID();let completionSent=false;let timer:ReturnType<typeof setInterval>|undefined;
+const resourceRef=computed(()=>`app:${props.resource.id}`);
+const fields=computed(()=>source.value?.fields??[]);
+const metricFields=computed(()=>fields.value.filter(field=>aggregation.value==='COUNT'||field.numeric));
+const groupFields=computed(()=>fields.value.filter(field=>field.groupable));
+const selectedMetric=computed(()=>fields.value.find(field=>String(field.id)===metricId.value));
+const selectedGroup=computed(()=>fields.value.find(field=>String(field.id)===groupId.value));
+const valid=computed(()=>!!source.value&&source.value.state==='draft'&&source.value.desk_id===null&&source.value.dashboard_count<100&&name.value.trim().length>0&&name.value.trim().length<=100&&metricTitle.value.trim().length<=100&&!!source.value.aggregations[aggregation.value]&&!!selectedMetric.value&&(aggregation.value==='COUNT'||selectedMetric.value.numeric)&&!!selectedGroup.value?.groupable);
+const status=computed(()=>review.value?conversationReviewState(review.value,clock.value):'');
+const running=computed(()=>['approved','executing'].includes(status.value));
+const result=computed<Item>(()=>review.value?.payload?.execution?.result??{});
+const receipt=computed<Item>(()=>result.value.dashboard_creation??{});
+const confirmed=computed(()=>status.value==='completed'&&result.value.configuration_verified===true&&result.value.resource===resourceRef.value&&receipt.value.verified===true&&Number.isInteger(receipt.value.dashboard_id)&&receipt.value.dashboard_id>0&&receipt.value.state==='draft'&&receipt.value.name===review.value?.payload?.action?.name);
+const rejectionVerified=computed(()=>review.value?.payload?.dashboard_creation_resolution?.state==='rejected'&&review.value.payload.dashboard_creation_resolution.native_rejection_verified===true);
+const canVerify=computed(()=>!rejectionVerified.value&&!!review.value?.payload?.dashboard_creation_attempt?.started_at&&review.value.payload.dashboard_creation_attempt.resource===resourceRef.value&&['failed','expired','cancelled'].includes(status.value));
+const canRestart=computed(()=>['rejected','expired','cancelled','failed'].includes(status.value)&&!canVerify.value);
+watch(aggregation,()=>{if(aggregation.value==='COUNT')format.value='integer';if(selectedMetric.value&&aggregation.value!=='COUNT'&&!selectedMetric.value.numeric)metricId.value='';});
+watch(groupId,()=>{grain.value='YEARMONTH';});
+async function begin(){
+ const current=guard.next();loading.value=true;error.value='';source.value=null;review.value=null;preparedInput.value=null;uncertain.value=false;completionSent=false;requestId=crypto.randomUUID();
+ try{const data=await props.request(`/catalog/${props.tenant}/apps/${props.resource.id}/dashboard-builder`);if(!current())return;if(data.resource!==resourceRef.value||typeof data.name!=='string'||!(/^[a-f0-9]{64}$/.test(data.version??''))||!Array.isArray(data.fields)||!Number.isInteger(data.dashboard_count)||typeof data.aggregations!=='object'||data.aggregations===null||data.fields.some((field:Item)=>!Number.isInteger(field.id)||field.id<1||typeof field.label!=='string'||typeof field.table_name!=='string'||typeof field.numeric!=='boolean'||typeof field.date!=='boolean'||typeof field.groupable!=='boolean'))throw new Error('Os campos recebidos não correspondem a esta aplicação. Reabra o assistente.');source.value=data;if(!data.fields.some((field:Field)=>String(field.id)===metricId.value))metricId.value='';if(!data.fields.some((field:Field)=>String(field.id)===groupId.value))groupId.value='';}
+ catch(e){if(current())error.value=(e as Error).message;}
+ finally{if(current()){loading.value=false;await nextTick();nameInput.value?.focus();}}
+}
+async function prepare(){
+ if(busy.value||(!preparedInput.value&&!valid.value))return;const current=guard.current();busy.value=true;error.value='';
+ preparedInput.value??={request_id:requestId,version:source.value!.version,name:name.value.trim(),metric_id:Number(metricId.value),group_id:Number(groupId.value),aggregation:aggregation.value,grain:selectedGroup.value?.date?grain.value:'AGP',format:aggregation.value==='COUNT'?'integer':format.value,metric_title:metricTitle.value.trim()||null};
+ try{const response=await props.request(`/catalog/${props.tenant}/apps/${props.resource.id}/dashboard-builder/actions`,'POST',preparedInput.value);if(!current())return;if(response.approval?.payload?.action?.action!=='create_dashboard'||response.approval?.payload?.action?.resource!==resourceRef.value||response.approval?.payload?.action?.name!==preparedInput.value?.name||typeof response.approval?.fingerprint!=='string')throw new Error('Não foi possível confirmar esta revisão. Consulte a mesma solicitação antes de continuar.');review.value=response.approval;emit('updated');await nextTick();reviewHeading.value?.focus();}
+ catch(e){if(current())error.value=(e as Error).message;}
+ finally{if(current())busy.value=false;}
+}
+function notifyCompletion(){if(!confirmed.value||completionSent)return;completionSent=true;emit('updated');emit('notice',result.value.message??'Dashboard privado criado e conferido.');}
+async function refreshStatus(force=false){
+ if(polling.value||!review.value||(!force&&!running.value&&!uncertain.value))return;const current=guard.current();const id=review.value.id;polling.value=true;
+ try{const response=await props.request(`/bi-actions/${id}`);if(!current()||review.value?.id!==id)return;if(response.approval?.id!==id)throw new Error('A consulta não corresponde a esta criação.');review.value=response.approval;uncertain.value=false;error.value='';notifyCompletion();}
+ catch(e){if(current())error.value=(e as Error).message;}
+ finally{if(current())polling.value=false;}
+}
+async function decide(decision:'approved'|'rejected'){
+ if(status.value!=='pending'||busy.value||uncertain.value||!review.value)return;const current=guard.current();const id=review.value.id;busy.value=true;error.value='';
+ try{const response=await props.request(`/approvals/${id}/decide`,'POST',{decision,fingerprint:review.value.fingerprint});if(!current())return;if(response.id!==id)throw new Error('A decisão não corresponde a esta revisão. Confira a solicitação.');review.value=response;emit('updated');if(decision==='approved')await refreshStatus(true);}
+ catch(e){if(current()){uncertain.value=true;error.value=(e as Error).message;}}
+ finally{if(current())busy.value=false;}
+}
+async function verify(){
+ if(!canVerify.value||verifying.value||!review.value)return;const current=guard.current();const id=review.value.id;verifying.value=true;error.value='';
+ try{const response=await props.request(`/bi-actions/${id}/dashboard-creation-verification`,'POST');if(!current()||review.value?.id!==id)return;if(response.approval?.id!==id)throw new Error('O resultado não corresponde a esta revisão.');review.value=response.approval;emit('updated');notifyCompletion();}
+ catch(e){if(current())error.value=(e as Error).message;}
+ finally{if(current())verifying.value=false;}
+}
+function close(){guard.invalidate();emit('close');}
+watch(()=>[props.tenant,props.resource.id],()=>{void begin();});
+onMounted(()=>{void begin();timer=setInterval(()=>{clock.value=Date.now();if(!document.hidden)void refreshStatus();},2200);});
+onUnmounted(()=>{guard.invalidate();if(timer)clearInterval(timer);});
+</script>
+<template>
+ <section class="dashboard-creation-form" aria-label="Novo dashboard" data-tour="dashboard-builder">
+  <header><LayoutDashboard :size="21"/><div><h3>Novo dashboard</h3><p>{{tenantName}} · Um resumo com indicador, gráfico e tabela.</p></div></header>
+  <div v-if="loading" class="dashboard-progress" role="status"><LoaderCircle class="spin" :size="21"/>Conferindo aplicação e campos disponíveis…</div>
+  <div v-else-if="!review&&source&&source.state==='published'" class="dashboard-progress attention"><div><strong>Crie o novo painel em uma cópia</strong><p>Esta aplicação está publicada. Duplique para sua mesa para preparar o painel e conferir a prévia. A publicação da cópia terá sua própria revisão.</p><div class="dashboard-footer"><button class="primary-button" @click="emit('duplicate')"><Copy :size="16"/>Duplicar para minha mesa</button><button class="secondary-button" @click="close">Voltar</button></div></div></div>
+  <div v-else-if="!review&&source&&(!fields.length||!groupFields.length||source.state!=='draft'||source.desk_id!==null||source.dashboard_count>=100)" class="dashboard-progress attention"><div><strong>{{source.dashboard_count>=100?'Esta aplicação atingiu o limite do assistente':'Prepare os dados desta aplicação'}}</strong><p>O assistente precisa de campos identificados e uma aplicação privada com menos de 100 dashboards. Abra um projeto para investigar as fontes, os campos e a atualização dos dados com a IA.</p><div class="dashboard-footer"><button class="primary-button" @click="emit('setup')">Preparar dados no projeto</button><button class="secondary-button" @click="close">Voltar</button></div></div></div>
+  <form v-else-if="!review&&source" @submit.prevent="prepare">
+   <fieldset :disabled="busy||!!preparedInput" class="dashboard-fields">
+    <div class="dashboard-field full"><label :for="fieldId+'-name'">Nome do dashboard</label><input :id="fieldId+'-name'" ref="nameInput" v-model="name" required maxlength="100" placeholder="Ex.: Visão financeira por mês"></div>
+    <div class="dashboard-field"><label :for="fieldId+'-calculation'">O que você quer calcular?</label><select :id="fieldId+'-calculation'" v-model="aggregation" required><option value="" disabled>Escolha o cálculo</option><option v-for="(label,key) in source.aggregations" :key="key" :value="key">{{label}}</option></select></div>
+    <div class="dashboard-field"><label :for="fieldId+'-metric'">Qual informação será medida?</label><select :id="fieldId+'-metric'" v-model="metricId" required><option value="" disabled>Escolha um campo</option><option v-for="field in metricFields" :key="field.id" :value="String(field.id)">{{field.table_name}} · {{field.label}}</option></select></div>
+    <div class="dashboard-field"><label :for="fieldId+'-group'">Como deseja comparar?</label><select :id="fieldId+'-group'" v-model="groupId" required><option value="" disabled>Escolha uma categoria ou data</option><option v-for="field in groupFields" :key="field.id" :value="String(field.id)">{{field.table_name}} · {{field.label}}</option></select><small>{{selectedGroup?.date?'O painel terá um gráfico de evolução no tempo.':'O painel terá um gráfico de comparação por categoria.'}}</small></div>
+    <div v-if="selectedGroup?.date" class="dashboard-field"><label :for="fieldId+'-grain'">Agrupar por</label><select :id="fieldId+'-grain'" v-model="grain"><option value="DATE">Dia</option><option value="YEARMONTH">Mês</option><option value="YEAR">Ano</option></select></div>
+    <div class="dashboard-field"><label :for="fieldId+'-format'">Como mostrar os valores?</label><select :id="fieldId+'-format'" v-model="format" :disabled="aggregation==='COUNT'"><option value="default">Formato da fonte</option><option value="decimal">Número com casas decimais</option><option value="integer">Número inteiro</option><option value="currency">Valor monetário</option></select><small v-if="aggregation==='COUNT'">Contagens são apresentadas como números inteiros.</small></div>
+    <div class="dashboard-field full"><label :for="fieldId+'-title'">Nome do indicador <span>opcional</span></label><input :id="fieldId+'-title'" v-model="metricTitle" maxlength="100" placeholder="Ex.: Receita total"><small>Se não preencher, o nome será montado com o cálculo e o campo escolhido.</small></div>
+   </fieldset>
+   <details class="dashboard-calculation-help"><summary>Como escolher o cálculo correto?</summary><p>Some valores que possam ser acumulados, como receitas, despesas ou quantidades. Use a média para observações individuais, como notas ou temperaturas. Contar valores preenchidos desconsidera valores ausentes.</p><p>Percentuais, margens e médias já calculadas precisam de uma fórmula própria. Saldos e estoques também precisam considerar o período. Prepare esses indicadores com a IA antes de usar um total ou uma média simples.</p></details>
+   <p class="dashboard-note"><ShieldCheck :size="17"/><span>Os dashboards existentes serão preservados. Antes da revisão, conferimos os dados e a atualização automática ao menos diária. Esta ação não publica nem executa uma carga.</span></p>
+   <p v-if="error" class="form-error" role="alert">{{error}}</p><p v-if="preparedInput" class="dashboard-hint">A proposta está guardada para recuperar a mesma revisão. Reabrir os campos permite preparar outra proposta.</p>
+   <div class="dashboard-footer"><button type="button" class="secondary-button" :disabled="busy" @click="close">Cancelar</button><button v-if="preparedInput" type="button" class="secondary-button" :disabled="busy" @click="begin">Reabrir campos</button><button class="primary-button" :disabled="busy||(!preparedInput&&!valid)"><LoaderCircle v-if="busy" class="spin" :size="16"/><Eye v-else :size="16"/>{{busy?'Conferindo campos, dados e agendas…':preparedInput?'Conferir esta solicitação':'Conferir prévia e criação'}}</button></div>
+  </form>
+  <div v-else-if="!review"><p class="form-error" role="alert">{{error}}</p><div class="dashboard-footer"><button class="secondary-button" @click="close">Fechar</button><button class="primary-button" @click="begin">Tentar novamente</button></div></div>
+  <template v-else>
+   <template v-if="status==='pending'"><h4 ref="reviewHeading" tabindex="-1">Confira o painel antes de criar</h4><ApprovalReview :approval="review" :tenants="[{id:tenant,name:tenantName}]"/><div class="dashboard-footer"><button class="secondary-button" :disabled="busy||uncertain" @click="decide('rejected')"><X :size="15"/>Recusar</button><button class="primary-button" :disabled="busy||uncertain" @click="decide('approved')"><LoaderCircle v-if="busy" class="spin" :size="15"/><Check v-else :size="15"/>Autorizar criação do dashboard</button></div></template>
+   <div v-else-if="running" class="dashboard-progress" role="status"><LoaderCircle class="spin" :size="23"/><div><strong>Criando e conferindo o dashboard</strong><p>Confirmamos o novo painel e preservamos a configuração dos anteriores.</p></div></div>
+   <div v-else-if="confirmed" class="dashboard-progress success" role="status"><CheckCircle2 :size="23"/><div><strong>Dashboard privado criado</strong><p>{{receipt.name}}</p><p>Indicador, gráfico e tabela conferidos. Abra o painel interativo para explorar os dados e filtros.</p></div></div>
+   <div v-else class="dashboard-progress attention" role="status"><AlertCircle :size="23"/><div><strong>{{status==='rejected'||rejectionVerified?'Criação recusada':status==='expired'?'Revisão expirada':status==='cancelled'?'Criação cancelada':'A criação precisa de conferência'}}</strong><p>{{status==='failed'?review.payload.execution?.message:'Consulte o estado atual antes de preparar outra criação.'}}</p></div></div>
+   <p v-if="error" class="form-error" role="alert">{{error}}</p><p v-if="uncertain" class="dashboard-hint">A decisão ficou sem confirmação. Confira a solicitação antes de decidir novamente.</p><p v-if="canVerify" class="dashboard-hint">Conferir criação apenas consulta o BI. O sistema não enviará outro pedido para criar o mesmo painel.</p><p v-if="confirmed" class="dashboard-hint">Se continuar a autoria em um projeto desta aplicação, confira a versão recebida do BI. Edições locais pendentes serão preservadas.</p>
+   <div class="dashboard-footer"><button v-if="uncertain||running" class="secondary-button" :disabled="polling" @click="refreshStatus(true)"><RefreshCw :size="15"/>Conferir solicitação</button><button v-if="canVerify" class="primary-button" :disabled="verifying" @click="verify"><LoaderCircle v-if="verifying" class="spin" :size="15"/><RefreshCw v-else :size="15"/>Conferir criação</button><button v-if="confirmed" class="primary-button" @click="emit('created',{resource:resourceRef,dashboard_id:receipt.dashboard_id})"><Eye :size="16"/>Ver dashboard interativo</button><button v-if="canRestart" class="secondary-button" @click="begin">Editar proposta</button><button class="secondary-button" :disabled="busy||verifying" @click="close">Fechar</button></div>
+  </template>
+ </section>
+</template>
+<style scoped>
+.dashboard-creation-form{min-width:0;color:#314b6b}.dashboard-creation-form>header{display:flex;gap:11px;align-items:flex-start;margin:0 0 20px}.dashboard-creation-form>header>svg{color:#1263ed;flex-shrink:0;margin-top:3px}.dashboard-creation-form h3{font-size:18px;margin:0 0 7px}.dashboard-creation-form header p,.dashboard-hint{font-size:12px;line-height:1.8;color:#7689a3;margin:0}.dashboard-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:17px;border:0;padding:0;margin:0;min-width:0}.dashboard-field{min-width:0}.dashboard-field.full{grid-column:1/-1}.dashboard-field label{display:block;font-size:12px;font-weight:600;margin-bottom:7px;color:#4d6688}.dashboard-field label span{font-weight:400;color:#8b9bb1;margin-left:4px}.dashboard-field input,.dashboard-field select{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit;font-size:13px;line-height:1.5;color:#304969;border:1px solid #dbe4f2;border-radius:8px;background:#fff;padding:11px}.dashboard-field select{padding-right:24px;text-overflow:ellipsis}.dashboard-field small{display:block;font-size:10px;color:#8597af;line-height:1.6;margin-top:6px}.dashboard-calculation-help{margin-top:19px;background:#f8faff;border:1px solid #e1eaf7;border-radius:8px;padding:12px;font-size:12px;line-height:1.8}.dashboard-calculation-help summary{cursor:pointer;font-weight:600;color:#5576a3}.dashboard-calculation-help p{margin:10px 0 0;color:#71839d}.dashboard-note{display:flex;gap:9px;font-size:12px;line-height:1.8;color:#57749c;background:#edf5ff;padding:12px;border-radius:8px;margin:18px 0 0}.dashboard-note>svg{flex-shrink:0;margin-top:3px}.dashboard-footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:20px}.dashboard-progress{display:flex;align-items:flex-start;gap:12px;padding:18px;background:#f2f6fd;color:#55769e;border-radius:9px;font-size:13px;line-height:1.8}.dashboard-progress>svg{flex-shrink:0;margin-top:3px}.dashboard-progress p{font-size:12px;margin:7px 0 0}.dashboard-progress.attention{background:#fff8eb;color:#876831}.dashboard-progress.success{background:#eef8f2;color:#2d7855}.dashboard-hint{margin-top:14px}.dashboard-creation-form .form-error{margin-top:16px}.dashboard-creation-form :is(h3,h4,p,strong){overflow-wrap:anywhere}.dashboard-creation-form :is(input,select,button,summary):focus-visible{outline:2px solid #1163e9;outline-offset:2px}@media(max-width:620px){.dashboard-fields{grid-template-columns:minmax(0,1fr);gap:15px}.dashboard-field input,.dashboard-field select{font-size:16px}.dashboard-footer{flex-direction:column;align-items:stretch}.dashboard-progress{padding:14px}.dashboard-creation-form>header{gap:8px}.dashboard-creation-form h3{font-size:17px}}
+</style>

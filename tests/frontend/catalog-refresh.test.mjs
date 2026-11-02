@@ -8,14 +8,15 @@ import {createRenderer,h,nextTick,ref} from 'vue';
 let Catalog,activeFixture;
 const kinds=['app','bi-desk','dw-desk','table','flow','schedule','agent','writeback','deck','presentation','investigation','credential','variables'];
 function resource(kind,id,name){if(kind==='variables'){const key='QA_VAR_'+id;return{id:Buffer.from(key).toString('hex'),ref:'{{'+key+'}}',kind,name:key,description:'Valor protegido',state:'available',desk_id:null,desk_known:false,tags:[],dashboards:[],dashboard_count:null,table_count:null,active:null};}return {id:String(id),ref:kind+':'+id,kind,name:name??kind+' de teste '+id,description:'Referência fictícia',state:'draft',desk_id:null,desk_known:true,tags:[],dashboards:[],dashboard_count:null,table_count:null,active:null};}
-function stub(name){return {props:['resource','kind'],setup(props,{emit}){return()=>{
+function stub(name){return {props:['resource','kind','dashboard'],setup(props,{emit}){return()=>{
  const save=(kind,id)=>{const row=activeFixture.save(kind,id);emit('saved',row.ref);};
  if(name==='BiCredentialForm'||name==='BiCredentialActions')return h('button',{onClick:()=>save('credential',props.resource?.id??42)},'Concluir conexão de teste');
  if(name==='BiAppCreationDialog')return h('button',{onClick:()=>{const row=activeFixture.save('app',42);emit('created',row.ref);}},'Concluir criação de aplicação');
  if(name==='BiVariableForm')return h('button',{onClick:()=>{const row=activeFixture.save('variables',42);emit('saved',row.name);}},'Concluir variável de teste');
  if(name==='BiDeskForm')return h('button',{onClick:()=>save(props.kind,props.resource?.id??42)},'Concluir mesa de teste');
  if(name==='BiScheduleForm')return h('button',{onClick:()=>save('schedule',props.resource?.id??42)},'Concluir agenda de teste');
- if(name==='BiManualAction')return h('div',[h('button',{onClick:()=>{const row=activeFixture.save(props.resource.kind,44);emit('published',row.ref);}},'Concluir publicação de teste'),h('button',{onClick:()=>{activeFixture.remove(props.resource.kind,props.resource.id);emit('deleted');}},'Concluir exclusão de teste')]);
+ if(name==='BiLiveViewer')return h('div',{},'Prévia nativa '+props.dashboard);
+ if(name==='BiManualAction')return h('div',[h('button',{onClick:()=>{const row=activeFixture.dashboard(props.resource.id);emit('dashboardCreated',{resource:row.ref,dashboard_id:91});}},'Concluir criação de dashboard'),h('button',{onClick:()=>{const row=activeFixture.save(props.resource.kind,44);emit('published',row.ref);}},'Concluir publicação de teste'),h('button',{onClick:()=>{activeFixture.remove(props.resource.kind,props.resource.id);emit('deleted');}},'Concluir exclusão de teste')]);
  if(name==='ResourceOverview')return h('button',{onClick:()=>emit('open',resource('credential',1))},'Abrir conexão relacionada de teste');
  return h('div');
  }}};}
@@ -54,7 +55,7 @@ function mount({onRequest=null,role='admin',readOnly=false}={}){
  for(const name of ['Document','ShadowRoot','HTMLElement'])Object.defineProperty(globalThis,name,{configurable:true,writable:true,value:class{}});
  Object.defineProperty(globalThis,'localStorage',{configurable:true,writable:true,value:{getItem:key=>key==='g-analise:tenant:17'?'923':null,setItem(){}}});
  const resources=new Map(kinds.map(kind=>[kind,[resource(kind,1)]]));
- const fixture={save(kind,id){const row=resource(kind,id,kind+' atualizado '+id);resources.set(kind,[...resources.get(kind).filter(item=>item.id!==row.id),row]);return row;},remove(kind,id){resources.set(kind,resources.get(kind).filter(item=>item.id!==String(id)));}};
+ const fixture={dashboard(id){const row={...resources.get('app').find(item=>item.id===String(id)),dashboard_count:2,dashboards:[{id:90,name:'Existente',widget_count:1},{id:91,name:'Novo painel',widget_count:3}]};resources.set('app',resources.get('app').map(item=>item.id===row.id?row:item));return row;},save(kind,id){const row=resource(kind,id,kind+' atualizado '+id);resources.set(kind,[...resources.get(kind).filter(item=>item.id!==row.id),row]);return row;},remove(kind,id){resources.set(kind,resources.get(kind).filter(item=>item.id!==String(id)));}};
  activeFixture=fixture;
  const requests=[],errors=[],root=node('root'),connected=ref(true);
  const request=async(...args)=>{
@@ -127,4 +128,12 @@ test('a confirmed application creation refreshes the draft list without opening 
 
 for(const scenario of [{role:'admin',readOnly:false,label:'Trabalhar neste recurso'},{role:'admin',readOnly:true,label:'Abrir projeto de análise'},{role:'viewer',readOnly:false,label:null}])test(`an application without dashboards offers the permitted next step for ${scenario.role} and read-only ${scenario.readOnly}`,async()=>{
  const view=mount({...scenario,onRequest:(path,response)=>path.includes('/resources/app/')?{...response,metadata_complete:true,resource:{...response.resource,dashboard_count:0,dashboards:[]}}:response});try{await settled();view.openFirst();await settled();assert.match(text(modal(view)),/ainda não tem dashboards/);assert.equal(view.button('Prévia interativa'),undefined);assert.equal(view.button('Prévia visual'),undefined);assert.equal(view.button('Conferir dados'),undefined);if(scenario.label)assert.ok(find(modal(view),item=>item.kind==='button'&&text(item).includes(scenario.label)));else{assert.match(text(modal(view)),/Peça ao responsável/);assert.equal(find(modal(view),item=>item.kind==='button'&&text(item).includes('Trabalhar neste recurso')),undefined);}assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+
+test('a created dashboard refreshes its application once and opens the new interactive tab',async()=>{
+ const view=mount({onRequest:(path,response)=>path.includes('/resources/app/')?{...response,viewer_available:true,metadata_complete:true}:response});try{await settled();view.openFirst();await settled();view.button('Concluir criação de dashboard').props.onClick();await settled();await settled();assert.deepEqual(freshRequests(view),['/catalog/923/sections/app?refresh=1']);assert.match(text(modal(view)),/Prévia nativa 91/);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+test('a newer selection in the same application supersedes a pending created-dashboard navigation',async()=>{
+ let reads=0,release;const view=mount({onRequest:(path,response)=>{if(path==='/catalog/923/resources/app/1'){reads++;response={...response,viewer_available:true,metadata_complete:true};if(reads===2)return new Promise(resolve=>release=()=>resolve(response));}return response;}});try{await settled();view.openFirst();await settled();view.button('Concluir criação de dashboard').props.onClick();await settled();assert.equal(typeof release,'function');find(modal(view),item=>item.kind==='button'&&String(item.props.class??'').includes('modal-close')).props.onClick();await settled();view.openFirst();await settled();find(view.root,item=>item.props['aria-label']==='Dashboard da aplicação').props['onUpdate:modelValue']('90');await settled();release();await settled();assert.doesNotMatch(text(modal(view)),/Prévia nativa 91/);assert.equal(find(view.root,item=>item.props['aria-label']==='Dashboard da aplicação').props.value??find(view.root,item=>item.props['aria-label']==='Dashboard da aplicação').value,'90');assert.deepEqual(view.errors,[]);}finally{release?.();view.close();}
 });

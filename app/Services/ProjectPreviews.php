@@ -22,7 +22,7 @@ class ProjectPreviews
     public function recordCompletedChange(Approval $approval): bool
     {
         $payload = $approval->payload ?? [];
-        if ($approval->status !== 'completed' || ($payload['execution']['status'] ?? null) !== 'completed' || ! $approval->project_id) {
+        if ($approval->status !== 'completed' || ($payload['execution']['status'] ?? null) !== 'completed') {
             return false;
         }
         $arguments = $payload['action'] ?? [];
@@ -31,6 +31,7 @@ class ProjectPreviews
             'push' => $arguments['resource'] ?? null,
             'publish_app' => ($result['publication']['verified'] ?? false) === true ? ($result['published_resource'] ?? null) : null,
             'clone_app' => $result['managed_resource'] ?? null,
+            'create_dashboard' => ($result['dashboard_creation']['verified'] ?? false) === true ? ($result['resource'] ?? null) : null,
             default => null,
         };
         $tenant = $payload['revision']['tenant_id'] ?? null;
@@ -38,10 +39,14 @@ class ProjectPreviews
             return false;
         }
 
-        return Project::whereKey($approval->project_id)->where('user_id', $approval->user_id)
+        if (! $approval->project_id && ($arguments['action'] ?? null) !== 'create_dashboard') {
+            return false;
+        }
+
+        return Project::when($approval->project_id !== null, fn ($query) => $query->whereKey($approval->project_id))->where('status', '!=', 'archived')->where('user_id', $approval->user_id)
             ->where('tenant_id', (string) $tenant)->where('source_ref', $resource)
             ->where(fn ($query) => $query->whereNull('preview_revision')->orWhere('preview_revision', '!=', $approval->id))
-            ->update(['preview_revision' => $approval->id, 'preview_changed_at' => now()]) === 1;
+            ->update(['preview_revision' => $approval->id, 'preview_changed_at' => now()]) > 0;
     }
 
     /** @return array<string, mixed> */

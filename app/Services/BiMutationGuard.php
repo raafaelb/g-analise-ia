@@ -11,21 +11,24 @@ class BiMutationGuard
 {
     private const PENDING = 'Este recurso tem uma exclusão em conferência. Use Conferir exclusão antes de editar, publicar, duplicar ou executar outra carga.';
 
-    public function assertAvailable(int $userId, string $tenant, string $ref): void
+    public function assertAvailable(int $userId, string $tenant, string $ref, ?string $ignoredApproval = null): void
     {
-        $reason = $this->reason($userId, $tenant, $ref);
+        $reason = $this->reason($userId, $tenant, $ref, $ignoredApproval);
         if ($reason !== null) {
             throw new RuntimeException($reason);
         }
     }
 
-    public function reason(int $userId, string $tenant, string $ref): ?string
+    public function reason(int $userId, string $tenant, string $ref, ?string $ignoredApproval = null): ?string
     {
         $managed = ManagedBiResource::where('user_id', $userId)->where('tenant_id', $tenant)->where('resource', $ref)->whereIn('status', ['deleted', 'deletion_pending'])->first();
         if ($managed !== null) {
             return $managed->status === 'deleted'
                 ? 'Este recurso foi excluído. Não recrie um recurso a partir de arquivos antigos; crie um novo rascunho quando necessário.'
                 : self::PENDING;
+        }
+        if (str_starts_with($ref, 'app:') && Approval::where('user_id', $userId)->whereIn('status', ['failed', 'expired', 'cancelled'])->where('payload->action->action', 'create_dashboard')->where('payload->action->resource', $ref)->where('payload->revision->tenant_id', $tenant)->whereNotNull('payload->dashboard_creation_attempt->started_at')->where(fn ($query) => $query->whereNull('payload->dashboard_creation_resolution->state')->orWhere('payload->dashboard_creation_resolution->state', '!=', 'rejected'))->when($ignoredApproval !== null, fn ($query) => $query->whereKeyNot($ignoredApproval))->exists()) {
+            return 'Este recurso tem uma criação de dashboard em conferência. Use Conferir criação antes de editar, duplicar ou publicar a aplicação.';
         }
         if (! str_starts_with($ref, 'table:')) {
             return null;
