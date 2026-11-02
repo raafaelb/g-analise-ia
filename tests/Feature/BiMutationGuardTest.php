@@ -81,6 +81,8 @@ class BiMutationGuardTest extends TestCase
             'comparison' => [['diff', 'flow:2', '--include-remote']],
             'recorded delete' => [['rm', 'flow:2', '--force']],
             'unrelated table' => [['push', 'table:500']],
+            'explicit variables' => [['push', 'variables']],
+            'variables dry run' => [['push', 'variables', '--dry-run']],
         ];
     }
 
@@ -179,5 +181,31 @@ class BiMutationGuardTest extends TestCase
 
         $this->assertFileExists($marker);
         $this->assertTrue($result['data']['verified']);
+    }
+
+    public static function ambiguousVariablePushes(): array
+    {
+        return ['sem destino' => [['push']], 'variáveis e outro recurso' => [['push', 'variables', 'app:9']], 'sobrescrita forçada' => [['push', 'variables', '--force-ours']]];
+    }
+
+    #[DataProvider('ambiguousVariablePushes')]
+    public function test_ambiguous_or_forced_variable_pushes_are_refused_before_the_cli(array $arguments): void
+    {
+        [$user, $project] = $this->pending();
+        [$connection, $marker] = $this->nativeFixture($user);
+        try {
+            app(LumoClient::class)->run($connection, $arguments, $project);
+            $this->fail('Envio sem destino único chegou ao CLI.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('explícit', $error->getMessage());
+        }
+        $this->assertFileDoesNotExist($marker);
+    }
+
+    public function test_variable_push_requires_the_same_valid_account_and_tenant_context(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('projeto vinculado a um usuário e tenant válidos');
+        app(BiMutationGuard::class)->command(new Project(['tenant_id' => '100']), ['push', 'variables']);
     }
 }

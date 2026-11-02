@@ -15,8 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [CanonicalLocalOrigin::class, HandleInertiaRequests::class, SecurityHeaders::class, EnsureUserAccess::class]);
         $middleware->redirectGuestsTo(fn () => url('/login'));
         $mcpQuery = fn (Request $request): bool => $request->is('api/catalog/*/apps/*/mcp');
-        $middleware->convertEmptyStringsToNull(except: [$mcpQuery]);
-        $middleware->trimStrings(except: ['values.password', 'values.JsonKey', 'values.odbcconnection', 'columns.*.key', $mcpQuery]);
+        $variableWrite = fn (Request $request): bool => $request->is('api/catalog/*/variables/actions');
+        $middleware->convertEmptyStringsToNull(except: [$mcpQuery, $variableWrite]);
+        $middleware->trimStrings(except: ['values.password', 'values.JsonKey', 'values.odbcconnection', 'columns.*.key', $mcpQuery, $variableWrite]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is('api/*') || $request->expectsJson());

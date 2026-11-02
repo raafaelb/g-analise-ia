@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-01.9",
+  "version": "2026-11-02.1",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -267,6 +267,13 @@
           "audience": "authors"
         },
         {
+          "id": "catalog-variables-management",
+          "title": "Configure variáveis sem expor valores",
+          "description": "Em Variáveis, use Adicionar variável ou abra uma referência para editar a configuração. Escolha a proteção de segredo e, se necessário, valores por agente. Valores já cadastrados não aparecem no formulário. Confira a revisão antes de autorizar; a alteração vale no tenant e não executa cargas.",
+          "anchor": "catalog-types",
+          "audience": "authors"
+        },
+        {
           "id": "catalog-menu",
           "title": "As outras áreas estão no menu",
           "description": "No celular, use o botão de menu para acessar Projetos, Catálogo, Conexões e as demais áreas autorizadas.",
@@ -376,7 +383,7 @@
         {
           "id": "activity-history",
           "title": "Use o histórico para investigar",
-          "description": "Abra Ver revisão desta operação para conferir proposta e efeito da decisão. Em exclusões sem confirmação, Conferir exclusão consulta o resultado sem reenviar. Uma recusa conhecida exige resolver o motivo e preparar nova revisão. Publicações mostram destino e próximas verificações; contadores das cargas medem processamento, não o total da tabela. Você também resolve as solicitações na conversa. Mensagens extensas ficam em Ver detalhes técnicos, sem alterar o resultado do BI. Em edições de nome e descrição, Conferir resultado consulta o que foi salvo na aplicação sem repetir a alteração.",
+          "description": "Abra Ver revisão desta operação para conferir proposta e efeito da decisão. Em exclusões sem confirmação, Conferir exclusão consulta o resultado sem reenviar. Uma recusa conhecida exige resolver o motivo e preparar nova revisão. Publicações mostram destino e próximas verificações; contadores das cargas medem processamento, não o total da tabela. Você também resolve as solicitações na conversa. Mensagens extensas ficam em Ver detalhes técnicos, sem alterar o resultado do BI. Em edições de nome e descrição, Conferir resultado consulta o que foi salvo na aplicação sem repetir a alteração. Variáveis também oferecem Conferir resultado sem reenviar valores; segredos sem recebimento confirmado não são comprovados pela leitura mascarada.",
           "anchor": "activity-history",
           "audience": "all"
         },
@@ -474,6 +481,27 @@
         }
       ],
       "audience": "all"
+    },
+    {
+      "id": "tenant-variables-management",
+      "title": "Para que servem as variáveis e como configuro?",
+      "summary": "Reutilize configurações, proteja segredos e defina valores por agente com revisão.",
+      "body": "Variáveis guardam valores reutilizados pelos recursos de um tenant. Por exemplo, uma janela de carga pode usar um número de dias configurado em um único lugar. Elas são uma configuração opcional: você não precisa editá-las para começar um projeto ou pedir um dashboard à IA.\n\nNo **Catálogo BI → Variáveis**, use **Adicionar variável**, informe um nome com letras maiúsculas, números e sublinhado, a descrição e o valor padrão. O nome não pode começar por número. Para editar, abra uma variável existente. O nome é mantido nesta edição, preservando suas referências. O formulário não exclui variáveis.\n\nOs valores já cadastrados, mesmo comuns, não são devolvidos ao formulário nem à IA. Marque **Substituir valor padrão** somente quando quiser informar outro. Espaços e quebras de linha são mantidos; um campo de substituição vazio define um valor vazio. **Proteger o valor como segredo no BI** impede a devolução dos valores pela API do provedor. Para remover essa proteção, informe novos valores para o padrão e para cada agente mantido, ou remova essas definições; o segredo anterior não será revelado.\n\nEm **Valores por agente**, escolha um agente autorizado e informe um valor próprio. Agentes sem definição própria usam o padrão. Uma definição existente mantém o valor se a substituição não for marcada. Remover uma linha faz aquele agente voltar ao padrão. A consulta de agentes pode depender de suas permissões; ela não impede preservar as definições existentes, mas é necessária para definir novos valores por agente. A interface permite até 32 definições, 64 KB por valor e 128 KB por revisão.\n\nUse **Conferir configuração**, confira o tenant, a proteção, o valor padrão a substituir ou manter e as definições por agente. **Autorizar criação** ou **Autorizar alteração** salva no BI; **Recusar** descarta os valores temporários. A alteração vale no tenant e pode afetar recursos que usam a referência. Ela não inicia IA, cargas, reinícios ou publicação. As demais variáveis são preservadas. É necessário um perfil de autoria no portal e permissão de gestão de variáveis no BI.\n\nO portal confere os valores comuns por leitura. Segredos não são devolvidos pelo BI: o recibo distingue confirmação do envio e conferência da configuração de uma leitura do segredo, que não ocorreu. Mudanças externas apenas no valor de um segredo não aparecem na comparação. Se a decisão ficar sem resposta, use **Conferir solicitação**. Se o resultado ficar incerto, **Conferir resultado**, também em **Atividade**, apenas consulta a configuração, sem reenviar valores. Sem confirmação do recebimento de um segredo, a leitura mascarada não comprova sua gravação; uma nova definição exige outra revisão explícita.\n\nDepois da confirmação, **Ver variável no catálogo** renova essa categoria e abre a referência salva. Fechar o formulário, sozinho, não executa essa atualização. Se as variáveis mudarem após a abertura do formulário, reabra a configuração atual antes de preparar outra revisão.",
+      "pages": [
+        "catalog",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir Catálogo BI"
+        },
+        {
+          "page": "activity",
+          "label": "Conferir minhas operações"
+        }
+      ],
+      "audience": "authors"
     },
     {
       "id": "projects",

@@ -20,6 +20,7 @@ use App\Services\Audit;
 use App\Services\BiCredentials;
 use App\Services\BiFlowWizard;
 use App\Services\BiMcpIdentity;
+use App\Services\BiVariables;
 use App\Services\LocalPreview;
 use App\Services\OpenAiIdentity;
 use App\Services\ProjectPreviews;
@@ -241,6 +242,9 @@ class WorkspaceController extends Controller
 
         if ($approval->status === 'rejected' && in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
             app(BiCredentials::class)->cleanup($approval);
+        }
+        if ($approval->status === 'rejected' && in_array($approval->payload['action']['action'] ?? '', BiVariables::ACTIONS, true)) {
+            app(BiVariables::class)->cleanup($approval);
         }
         if ($approval->status === 'approved') {
             ExecuteApprovedAction::dispatch($approval->id)->onQueue('actions');

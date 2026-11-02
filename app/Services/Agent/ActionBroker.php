@@ -31,6 +31,7 @@ use App\Services\BiScheduleRuns;
 use App\Services\BiSchedules;
 use App\Services\BiTablePresentation;
 use App\Services\BiValidationFailure;
+use App\Services\BiVariables;
 use App\Services\BiViewer;
 use App\Services\BiWorkspaceSync;
 use App\Services\LumoClient;
@@ -276,6 +277,9 @@ class ActionBroker
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
             return app(BiCredentials::class)->executeApproved($approval);
+        }
+        if (in_array($approval->payload['action']['action'] ?? '', BiVariables::ACTIONS, true)) {
+            return app(BiVariables::class)->executeApproved($approval);
         }
         $user = User::findOrFail($approval->user_id);
         $project = Project::where('user_id', $user->id)->findOrFail($approval->project_id);

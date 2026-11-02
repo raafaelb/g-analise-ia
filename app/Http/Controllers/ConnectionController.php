@@ -9,6 +9,7 @@ use App\Models\HelpQuestion;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\BiCredentials;
+use App\Services\BiVariables;
 use App\Services\ChatGptUsage;
 use App\Services\ChatGptVerifier;
 use App\Services\LumoClient;
@@ -184,6 +185,9 @@ class ConnectionController extends Controller
             foreach (Approval::where('user_id', $request->user()->id)->where('type', 'manual')->where('status', 'cancelled')->whereNull('project_id')->cursor() as $approval) {
                 if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
                     app(BiCredentials::class)->cleanup($approval);
+                }
+                if (in_array($approval->payload['action']['action'] ?? '', BiVariables::ACTIONS, true)) {
+                    app(BiVariables::class)->cleanup($approval);
                 }
             }
         }

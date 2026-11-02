@@ -30,6 +30,9 @@ class UserAccessRevocation
             if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
                 app(BiCredentials::class)->cleanup($approval);
             }
+            if (in_array($approval->payload['action']['action'] ?? '', BiVariables::ACTIONS, true)) {
+                app(BiVariables::class)->cleanup($approval);
+            }
         }
         AgentRun::where('user_id', $user->id)->whereIn('status', ['queued', 'awaiting_approval'])->update(['status' => 'cancelled', 'finished_at' => now()]);
         AgentRun::where('user_id', $user->id)->whereIn('status', ['running', 'cancel_requested'])->update(['status' => 'cancel_requested']);

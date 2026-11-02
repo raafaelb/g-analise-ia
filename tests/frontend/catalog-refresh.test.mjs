@@ -7,10 +7,11 @@ import ts from 'typescript';
 import {createRenderer,h,nextTick,ref} from 'vue';
 let Catalog,activeFixture;
 const kinds=['app','bi-desk','dw-desk','table','flow','schedule','agent','writeback','deck','presentation','investigation','credential','variables'];
-function resource(kind,id,name){return {id:String(id),ref:kind+':'+id,kind,name:name??kind+' de teste '+id,description:'Referência fictícia',state:'draft',desk_id:null,desk_known:true,tags:[],dashboards:[],dashboard_count:null,table_count:null,active:null};}
+function resource(kind,id,name){if(kind==='variables'){const key='QA_VAR_'+id;return{id:Buffer.from(key).toString('hex'),ref:'{{'+key+'}}',kind,name:key,description:'Valor protegido',state:'available',desk_id:null,desk_known:false,tags:[],dashboards:[],dashboard_count:null,table_count:null,active:null};}return {id:String(id),ref:kind+':'+id,kind,name:name??kind+' de teste '+id,description:'Referência fictícia',state:'draft',desk_id:null,desk_known:true,tags:[],dashboards:[],dashboard_count:null,table_count:null,active:null};}
 function stub(name){return {props:['resource','kind'],setup(props,{emit}){return()=>{
  const save=(kind,id)=>{const row=activeFixture.save(kind,id);emit('saved',row.ref);};
  if(name==='BiCredentialForm'||name==='BiCredentialActions')return h('button',{onClick:()=>save('credential',props.resource?.id??42)},'Concluir conexão de teste');
+ if(name==='BiVariableForm')return h('button',{onClick:()=>{const row=activeFixture.save('variables',42);emit('saved',row.name);}},'Concluir variável de teste');
  if(name==='BiDeskForm')return h('button',{onClick:()=>save(props.kind,props.resource?.id??42)},'Concluir mesa de teste');
  if(name==='BiScheduleForm')return h('button',{onClick:()=>save('schedule',props.resource?.id??42)},'Concluir agenda de teste');
  if(name==='BiManualAction')return h('div',[h('button',{onClick:()=>{const row=activeFixture.save(props.resource.kind,44);emit('published',row.ref);}},'Concluir publicação de teste'),h('button',{onClick:()=>{activeFixture.remove(props.resource.kind,props.resource.id);emit('deleted');}},'Concluir exclusão de teste')]);
@@ -45,24 +46,26 @@ const renderer=createRenderer({
  remove:item=>{if(item.parent){const index=item.parent.children.indexOf(item);if(index>=0)item.parent.children.splice(index,1);}item.parent=null;},parentNode:item=>item.parent,nextSibling:item=>item.parent?.children[item.parent.children.indexOf(item)+1]??null,
  insertStaticContent:(text,parent,anchor)=>{const item=node('static',text);const index=parent.children.indexOf(anchor);if(index<0)parent.children.push(item);else parent.children.splice(index,0,item);item.parent=parent;return[item,item];},
 });
-function mount({onRequest=null}={}){
+function mount({onRequest=null,role='admin',readOnly=false}={}){
  const previous=Object.fromEntries(['window','document','localStorage','Document','ShadowRoot','HTMLElement'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  Object.defineProperty(globalThis,'window',{configurable:true,writable:true,value:{addEventListener(){},removeEventListener(){},matchMedia(){return{matches:true};}}});
  Object.defineProperty(globalThis,'document',{configurable:true,writable:true,value:{activeElement:null}});
  for(const name of ['Document','ShadowRoot','HTMLElement'])Object.defineProperty(globalThis,name,{configurable:true,writable:true,value:class{}});
  Object.defineProperty(globalThis,'localStorage',{configurable:true,writable:true,value:{getItem:key=>key==='g-analise:tenant:17'?'923':null,setItem(){}}});
  const resources=new Map(kinds.map(kind=>[kind,[resource(kind,1)]]));
- const fixture={save(kind,id){const row=resource(kind,id,kind+' atualizado '+id);resources.set(kind,[...resources.get(kind).filter(item=>item.id!==String(id)),row]);return row;},remove(kind,id){resources.set(kind,resources.get(kind).filter(item=>item.id!==String(id)));}};
+ const fixture={save(kind,id){const row=resource(kind,id,kind+' atualizado '+id);resources.set(kind,[...resources.get(kind).filter(item=>item.id!==row.id),row]);return row;},remove(kind,id){resources.set(kind,resources.get(kind).filter(item=>item.id!==String(id)));}};
  activeFixture=fixture;
  const requests=[],errors=[],root=node('root'),connected=ref(true);
  const request=async(...args)=>{
   requests.push(args);const path=args[0];const tenant=path.split('/')[2].split('?')[0];const type=/\/sections\/([a-z-]+)/.exec(path)?.[1];const match=/\/resources\/([a-z-]+)\/([0-9]+)/.exec(path);
   let result;
-  if(match){const row=resources.get(match[1]).find(item=>item.id===match[2])??resource(match[1],match[2]);result={resource:row,tenant:{id:tenant,name:'Ambiente '+tenant,read_only:false},details:{},overview:[],related:[],management:{},viewer_available:false};}
-  else {const loaded=type?({app:['app','bi-desk'],'bi-desk':['bi-desk','app'],'dw-desk':['dw-desk','table','flow','writeback'],flow:['flow','dw-desk'],table:['table','dw-desk'],writeback:['writeback','dw-desk']}[type]??[type]):kinds;result={tenant:{id:tenant,name:'Ambiente '+tenant,read_only:false},...(type?{section:type}:{}),resources:Object.fromEntries(loaded.map(kind=>[kind,resources.get(kind)])),capabilities:Object.fromEntries(loaded.map(kind=>[kind,{status:'available',count:resources.get(kind).length}])),tags:[],warnings:[],synced_at:'2026-11-01T18:00:00Z'};}
+  const variableMatch=/\/variables\/([a-f0-9]+)$/.exec(path);
+  if(variableMatch){const row=resources.get('variables').find(item=>item.id===variableMatch[1]);result={resource:row,tenant:{id:tenant,name:'Ambiente '+tenant,read_only:readOnly},details:{value:'[protegido]'},overview:[],related:[]};}
+  else if(match){const row=resources.get(match[1]).find(item=>item.id===match[2])??resource(match[1],match[2]);result={resource:row,tenant:{id:tenant,name:'Ambiente '+tenant,read_only:readOnly},details:{},overview:[],related:[],management:{},viewer_available:false};}
+  else {const loaded=type?({app:['app','bi-desk'],'bi-desk':['bi-desk','app'],'dw-desk':['dw-desk','table','flow','writeback'],flow:['flow','dw-desk'],table:['table','dw-desk'],writeback:['writeback','dw-desk']}[type]??[type]):kinds;result={tenant:{id:tenant,name:'Ambiente '+tenant,read_only:readOnly},...(type?{section:type}:{}),resources:Object.fromEntries(loaded.map(kind=>[kind,resources.get(kind)])),capabilities:Object.fromEntries(loaded.map(kind=>[kind,{status:'available',count:resources.get(kind).length}])),tags:[],warnings:[],synced_at:'2026-11-01T18:00:00Z'};}
   const response=structuredClone(result);return onRequest?onRequest(path,response):response;
  };
- const app=renderer.createApp({setup:()=>()=>h(Catalog,{tenants:[{id:'923',name:'Primeiro ambiente'},{id:'999',name:'Segundo ambiente'}],connected:connected.value,userId:17,role:'admin',request})});
+ const app=renderer.createApp({setup:()=>()=>h(Catalog,{tenants:[{id:'923',name:'Primeiro ambiente'},{id:'999',name:'Segundo ambiente'}],connected:connected.value,userId:17,role,request})});
  app.config.errorHandler=error=>errors.push(error.message);app.mount(root);
  const button=label=>find(root,item=>item.kind==='button'&&text(item).trim()===label);
  return {root,requests,errors,button,category:label=>find(root,item=>item.kind==='button'&&text(item).trim().startsWith(label)&&!String(item.props.class??'').includes('catalog-resource')),chooseTenant:value=>find(root,item=>item.props['aria-label']==='Tenant do catálogo').props['onUpdate:modelValue'](value),disconnect:()=>connected.value=false,openFirst:()=>find(root,item=>item.kind==='button'&&item.props.class==='catalog-resource').props.onClick(),close:()=>{app.unmount();activeFixture=null;for(const[key,descriptor]of Object.entries(previous)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}};
@@ -105,4 +108,14 @@ test('a failed post-save read keeps retry scoped and never replays the already c
  let failed=false;
  const view=mount({onRequest:(path,response)=>{if(path.includes('refresh=1')&&!failed){failed=true;throw new Error('Consulta temporariamente indisponível.');}return response;}});
  try{await settled();await create(view,'Agendas','Nova agenda','Concluir agenda de teste');assert.equal(modal(view),undefined);assert.match(text(view.root),/Consulta temporariamente indisponível/);view.button('Tentar novamente').props.onClick();await settled();assert.equal(view.requests.at(-1)[0],'/catalog/923/sections/schedule');assert.equal(view.requests.every(args=>args[1]===undefined),true);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('opening a saved variable refreshes its category once and opens the hexadecimal identity',async()=>{
+ const view=mount();try{await settled();await create(view,'Variáveis','Adicionar variável','Concluir variável de teste');assert.deepEqual(freshRequests(view),['/catalog/923/sections/variables?refresh=1']);assert.match(text(modal(view)),/QA_VAR_42/);assert.ok(view.requests.some(args=>args[0]==='/catalog/923/variables/'+Buffer.from('QA_VAR_42').toString('hex')));assert.equal(view.requests.filter(args=>args[0]==='/catalog/923/sections/variables').length,1);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+for(const scenario of [{role:'viewer',readOnly:false},{role:'admin',readOnly:true}])test(`variable creation is hidden for ${scenario.role} with read-only tenant ${scenario.readOnly}`,async()=>{
+ const view=mount(scenario);try{await settled();await choose(view,'Variáveis');assert.equal(view.button('Adicionar variável'),undefined);view.openFirst();await settled();assert.equal(view.button('Concluir variável de teste'),undefined);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+test('a saved variable from an old tenant never reopens over a newer tenant selection',async()=>{
+ let release;const view=mount({onRequest:(path,response)=>path==='/catalog/923/sections/variables?refresh=1'?new Promise(resolve=>release=()=>resolve(response)):response});try{await settled();await choose(view,'Variáveis');view.button('Adicionar variável').props.onClick();await settled();view.button('Concluir variável de teste').props.onClick();await settled();assert.equal(typeof release,'function');view.chooseTenant('999');await settled();release();await settled();assert.equal(modal(view),undefined);assert.equal(view.requests.some(args=>args[0]==='/catalog/999/variables/'+Buffer.from('QA_VAR_42').toString('hex')),false);assert.deepEqual(view.errors,[]);}finally{view.close();}
 });

@@ -58,7 +58,11 @@ class BiMutationGuard
         $operation = $arguments[1] ?? '';
         $refs = [];
         if ($command === 'push') {
-            $refs = array_values(array_filter(array_slice($arguments, 1), fn ($argument): bool => is_string($argument) && preg_match('/^[a-z-]+:[1-9][0-9]*$/D', $argument)));
+            $variables = in_array($arguments, [['push', 'variables'], ['push', 'variables', '--dry-run']], true);
+            if (in_array('variables', array_slice($arguments, 1), true) && ! $variables) {
+                throw new RuntimeException('Envie somente o destino explícito de variáveis, sem outros recursos ou sobrescrita forçada.');
+            }
+            $refs = $variables ? ['variables'] : array_values(array_filter(array_slice($arguments, 1), fn ($argument): bool => is_string($argument) && preg_match('/^[a-z-]+:[1-9][0-9]*$/D', $argument)));
             if ($refs === []) {
                 throw new RuntimeException('O envio pelo portal exige identificadores explícitos dos recursos revisados.');
             }
@@ -79,7 +83,7 @@ class BiMutationGuard
             }
         }
         foreach (array_unique($refs) as $ref) {
-            if (is_string($ref) && preg_match('/^[a-z-]+:[1-9][0-9]*$/D', $ref)) {
+            if (is_string($ref) && ($ref === 'variables' || preg_match('/^[a-z-]+:[1-9][0-9]*$/D', $ref))) {
                 if (! is_int($project->user_id) || $project->user_id < 1 || ! preg_match('/^[1-9][0-9]*$/D', (string) $project->tenant_id)) {
                     throw new RuntimeException('Esta operação exige um projeto vinculado a um usuário e tenant válidos.');
                 }

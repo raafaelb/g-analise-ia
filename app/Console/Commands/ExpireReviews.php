@@ -7,6 +7,7 @@ use App\Models\AgentRun;
 use App\Models\Approval;
 use App\Services\Audit;
 use App\Services\BiCredentials;
+use App\Services\BiVariables;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -42,6 +43,9 @@ class ExpireReviews extends Command
                 $expired++;
                 if (in_array($approval->payload['action']['action'] ?? '', BiCredentials::ACTIONS, true)) {
                     app(BiCredentials::class)->cleanup($approval);
+                }
+                if (in_array($approval->payload['action']['action'] ?? '', BiVariables::ACTIONS, true)) {
+                    app(BiVariables::class)->cleanup($approval);
                 }
                 try {
                     event(new WorkspaceChanged($approval->user_id, $approval->agent_run_id));

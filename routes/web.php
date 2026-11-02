@@ -9,6 +9,7 @@ use App\Http\Controllers\BiLoadController;
 use App\Http\Controllers\BiMcpController;
 use App\Http\Controllers\BiScheduleController;
 use App\Http\Controllers\BiTablePresentationController;
+use App\Http\Controllers\BiVariableController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\ConnectionController;
 use App\Http\Controllers\HelpQuestionController;
@@ -60,6 +61,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/catalog/{tenant}/credentials/{id}/configuration', [BiCredentialController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/credentials/actions', [BiCredentialController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::post('/catalog/{tenant}/credentials/{id}/inspect/{action}', [BiCredentialController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['test', 'schema', 'relationships'])->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/variables/options', [BiVariableController::class, 'options'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/variables/{id}/configuration', [BiVariableController::class, 'describe'])->whereNumber('tenant')->where('id', '[a-f0-9]+')->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/variables/actions', [BiVariableController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
+        Route::post('/bi-actions/{id}/variable-verification', [BiVariableController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::get('/catalog/{tenant}/apps/{id}/settings', [BiAppSettingsController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/{id}/settings/actions', [BiAppSettingsController::class, 'prepare'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::post('/bi-actions/{id}/app-settings-verification', [BiAppSettingsController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');

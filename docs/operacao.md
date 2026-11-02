@@ -40,6 +40,8 @@ Após alterações no BI, os serviços invalidam o snapshot completo e os caches
 
 A edição manual de nome/descrição de aplicações também usa revisões e execução pela fila `actions`. Depois de atualizar o código, recarregue os workers de forma graciosa e confira a saúde; não há migração ou dependência nova nessa revisão. A consulta de resultado em Atividade é somente leitura e não deve ser substituída por um novo envio. Os workspaces temporários de edição/conferência são separados dos projetos existentes e removidos ao terminar; os arquivos de autoria dos projetos não são sobrescritos.
 
+A gestão de variáveis usa o mesmo processo de atualização graciosa dos workers, sem migração nova. Valores digitados ficam em cache criptografado apenas até a decisão/execução ou expiração da revisão; eles não entram no payload público nem no histórico da IA. A configuração completa é recebida em workspace temporário, preservando os projetos existentes. Não repetir uma escrita por falta de resposta: usar a conferência de resultado. O recebimento de segredos precisa de confirmação do envio, pois a leitura do BI é mascarada.
+
 ## Sandbox do Codex e limites do host
 
 A imagem inclui `codex-resources` da mesma distribuição oficial fixada do Codex, incluindo seu auxiliar `bwrap`; não instala um pacote adicional nem baixa um auxiliar de outra origem. O build e `scripts/codex-smoke.php` verificam que o auxiliar executa. O smoke faz initialize/thread/start sem solicitar inferência e não verifica o isolamento completo de um usuário. Falhas do auxiliar ou do protocolo encerram o comando com código 1, para interromper o CI.

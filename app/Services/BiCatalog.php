@@ -678,7 +678,7 @@ class BiCatalog
         $row = collect($this->rows($connection, $project, 'variables'))->firstWhere('id', $id);
         abort_unless($row, 404, 'Variável não disponível para esta sessão.');
 
-        return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $this->summary('variables', $row), 'details' => ['name' => $row['nome'], 'reference' => $row['reference'], 'value' => '[protegido]', 'message' => 'Valores não são enviados ao navegador ou à IA. Use a referência no recurso do BI.']];
+        return ['tenant' => [...$item, 'read_only' => $this->policy->isReadOnly($tenant, $connection)], 'resource' => $this->summary('variables', $row), 'details' => ['name' => $row['nome'], 'reference' => $row['reference'], 'value' => '[protegido]', 'message' => 'Os valores já cadastrados não são devolvidos ao navegador nem à IA. Use a referência no recurso do BI; perfis autorizados podem editar a configuração no formulário.']];
     }
 
     public function preview(User $user, string $tenant, string $appId, ?int $dashboard = null): array
