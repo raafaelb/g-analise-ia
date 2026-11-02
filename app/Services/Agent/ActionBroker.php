@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\ArtifactImages;
 use App\Services\AttachmentContext;
 use App\Services\Audit;
+use App\Services\BiAppCreation;
 use App\Services\BiAppSettings;
 use App\Services\BiCatalog;
 use App\Services\BiCloneNames;
@@ -247,6 +248,9 @@ class ActionBroker
 
     public function performApproved(Approval $approval): array
     {
+        if (in_array($approval->payload['action']['action'] ?? '', BiAppCreation::ACTIONS, true)) {
+            return app(BiAppCreation::class)->executeApproved($approval);
+        }
         $actor = User::find($approval->user_id);
         if (! $actor?->canStartWork()) {
             throw new RuntimeException('O acesso do usuário está inativo ou requer atualização da senha.');

@@ -11,6 +11,7 @@ function resource(kind,id,name){if(kind==='variables'){const key='QA_VAR_'+id;re
 function stub(name){return {props:['resource','kind'],setup(props,{emit}){return()=>{
  const save=(kind,id)=>{const row=activeFixture.save(kind,id);emit('saved',row.ref);};
  if(name==='BiCredentialForm'||name==='BiCredentialActions')return h('button',{onClick:()=>save('credential',props.resource?.id??42)},'Concluir conexão de teste');
+ if(name==='BiAppCreationDialog')return h('button',{onClick:()=>{const row=activeFixture.save('app',42);emit('created',row.ref);}},'Concluir criação de aplicação');
  if(name==='BiVariableForm')return h('button',{onClick:()=>{const row=activeFixture.save('variables',42);emit('saved',row.name);}},'Concluir variável de teste');
  if(name==='BiDeskForm')return h('button',{onClick:()=>save(props.kind,props.resource?.id??42)},'Concluir mesa de teste');
  if(name==='BiScheduleForm')return h('button',{onClick:()=>save('schedule',props.resource?.id??42)},'Concluir agenda de teste');
@@ -118,4 +119,12 @@ for(const scenario of [{role:'viewer',readOnly:false},{role:'admin',readOnly:tru
 });
 test('a saved variable from an old tenant never reopens over a newer tenant selection',async()=>{
  let release;const view=mount({onRequest:(path,response)=>path==='/catalog/923/sections/variables?refresh=1'?new Promise(resolve=>release=()=>resolve(response)):response});try{await settled();await choose(view,'Variáveis');view.button('Adicionar variável').props.onClick();await settled();view.button('Concluir variável de teste').props.onClick();await settled();assert.equal(typeof release,'function');view.chooseTenant('999');await settled();release();await settled();assert.equal(modal(view),undefined);assert.equal(view.requests.some(args=>args[0]==='/catalog/999/variables/'+Buffer.from('QA_VAR_42').toString('hex')),false);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('a confirmed application creation refreshes the draft list without opening another detail modal',async()=>{
+ const view=mount();try{await settled();view.button('Nova aplicação').props.onClick();await settled();view.button('Concluir criação de aplicação').props.onClick();await settled();assert.deepEqual(freshRequests(view),['/catalog/923/sections/app?refresh=1']);assert.match(text(view.root),/app atualizado 42/);assert.equal(modal(view),undefined);assert.equal(view.requests.some(args=>args[0].includes('/resources/')),false);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+for(const scenario of [{role:'admin',readOnly:false,label:'Trabalhar neste recurso'},{role:'admin',readOnly:true,label:'Abrir projeto de análise'},{role:'viewer',readOnly:false,label:null}])test(`an application without dashboards offers the permitted next step for ${scenario.role} and read-only ${scenario.readOnly}`,async()=>{
+ const view=mount({...scenario,onRequest:(path,response)=>path.includes('/resources/app/')?{...response,metadata_complete:true,resource:{...response.resource,dashboard_count:0,dashboards:[]}}:response});try{await settled();view.openFirst();await settled();assert.match(text(modal(view)),/ainda não tem dashboards/);assert.equal(view.button('Prévia interativa'),undefined);assert.equal(view.button('Prévia visual'),undefined);assert.equal(view.button('Conferir dados'),undefined);if(scenario.label)assert.ok(find(modal(view),item=>item.kind==='button'&&text(item).includes(scenario.label)));else{assert.match(text(modal(view)),/Peça ao responsável/);assert.equal(find(modal(view),item=>item.kind==='button'&&text(item).includes('Trabalhar neste recurso')),undefined);}assert.deepEqual(view.errors,[]);}finally{view.close();}
 });

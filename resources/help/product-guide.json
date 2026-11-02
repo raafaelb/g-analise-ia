@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-02.3",
+  "version": "2026-11-02.4",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -210,6 +210,13 @@
           "description": "Aplicações contêm dashboards. Mesas de aplicações reúnem painéis, e mesas de dados reúnem tabelas e ETLs. Cada categoria é consultada ao abrir. Consultar indica uma quantidade ainda não carregada, e não ausência de recursos. Você pode escolher outra categoria durante a consulta. Ao abrir o resultado de uma alteração, a categoria afetada é renovada. As demais quantidades podem voltar a Consultar até você abrir a área.",
           "anchor": "catalog-types",
           "audience": "all"
+        },
+        {
+          "id": "catalog-create-app",
+          "title": "Comece uma aplicação",
+          "description": "Em Aplicações, use Nova aplicação para definir o nome e o objetivo. Você pode escolher até oito tabelas ou investigar as fontes depois com a IA. Confira a revisão antes de autorizar e abra o projeto para montar os dashboards. A criação fica privada e não inclui gráficos ou publicação.",
+          "anchor": "catalog-create-app",
+          "audience": "authors"
         },
         {
           "id": "catalog-search",
@@ -1126,6 +1133,24 @@
         "project"
       ],
       "actions": [],
+      "audience": "authors"
+    },
+    {
+      "id": "app-create",
+      "title": "Como começo uma nova aplicação?",
+      "summary": "Defina o nome, escolha os dados quando quiser e continue a autoria em um projeto.",
+      "body": "Em **Catálogo BI → Aplicações**, use **Nova aplicação**. Uma aplicação reúne os dashboards de um assunto, como a visão financeira ou comercial. Informe um nome e, se quiser, descreva o que deseja acompanhar. O objetivo fica no projeto para orientar a autoria.\n\nVocê pode começar sem selecionar tabelas. Depois, abra o projeto e peça à IA para investigar as fontes disponíveis e montar seus indicadores. Se já conhece os dados, use **Escolher tabelas agora**, busque pelo nome e selecione até oito tabelas autorizadas. A seleção vincula essas tabelas existentes, sem copiar ou carregar seus dados. Se o catálogo de tabelas estiver indisponível, você ainda pode começar sem vínculos e conferir o acesso às fontes depois.\n\nUse **Preparar criação** e confira o ambiente, nome, objetivo e tabelas antes de **Autorizar criação**. Isso cria uma aplicação privada em **Minha Mesa** e um projeto para continuar o trabalho. A criação inicial não inclui gráficos, publicação, agenda ou carga. Abra **Continuar no projeto** e explique os indicadores e visualizações que precisa. A IA usa sua conexão própria; o assistente de criação não inicia inferência automaticamente.\n\nSe a resposta da preparação se perder, **Conferir esta solicitação** recupera a mesma proposta. Uma decisão sem resposta pode ser consultada em **Conferir solicitação**. Para uma criação enviada e encerrada sem confirmação, use **Conferir criação**, nesta janela ou em **Atividade**. Essa consulta não cria outra aplicação. Se o BI não tiver devolvido um identificador seguro, o sistema pede a conferência do catálogo e não adota um recurso apenas pelo nome. Resolva essa operação antes de pedir outra criação à IA no mesmo projeto.\n\nDurante a autoria, confira os dados, as fontes e sua atualização automática ao menos diária. Compartilhar a aplicação exige uma revisão própria de publicação, com destino e conteúdo conferidos. O acesso à aplicação e às tabelas continua dependendo das permissões da sua conta BI.\n\nApós a confirmação, o catálogo renova a lista de rascunhos. Ao abrir o projeto, uma aplicação sem dashboards mostra uma orientação para criar o primeiro painel, sem carregar o construtor de relatórios do BI. Quando a primeira versão do dashboard for confirmada, o acompanhamento poderá abrir a prévia interativa. No catálogo, uma aplicação confirmada sem dashboards oferece o caminho de autoria em vez de botões de prévia sem painel.",
+      "pages": [
+        "catalog",
+        "project",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir aplicações"
+        }
+      ],
       "audience": "authors"
     }
   ]

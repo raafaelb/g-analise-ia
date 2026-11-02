@@ -17,6 +17,7 @@ use App\Models\RefreshSchedule;
 use App\Services\ArtifactImages;
 use App\Services\AttachmentContext;
 use App\Services\Audit;
+use App\Services\BiAppCreation;
 use App\Services\BiCredentials;
 use App\Services\BiFlowWizard;
 use App\Services\BiMcpIdentity;
@@ -182,6 +183,7 @@ class WorkspaceController extends Controller
         $result = DB::transaction(function () use ($request, $data, $conversation) {
             $project = Project::where('user_id', $request->user()->id)->lockForUpdate()->findOrFail($conversation->project_id);
             abort_if($project->status === 'archived', 409, 'Este projeto está arquivado. Reabra-o antes de enviar outra mensagem.');
+            app(BiAppCreation::class)->assertConversationReady($project);
             $conversation = Conversation::whereKey($conversation->id)->lockForUpdate()->firstOrFail();
             abort_if($conversation->runs()->whereIn('status', ['queued', 'running', 'awaiting_approval', 'cancel_requested'])->exists(), 409, 'Já existe uma tarefa em execução nesta conversa.');
             try {

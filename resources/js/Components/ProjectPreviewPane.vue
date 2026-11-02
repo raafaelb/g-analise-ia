@@ -20,6 +20,7 @@ const dashboards=ref<Item[]>([]);const dashboard=ref('');const contextLoading=re
 const choices=computed(()=>dashboardPreviews(allChoices.value,dashboard.value||null,dashboards.value[0]?.id?String(dashboards.value[0].id):null));
 const follow=ref(true);const selectedId=ref<string|null>(null);const selected=computed(()=>choosePreview(choices.value,selectedId.value,follow.value));
 const canRender=computed(()=>sourceAvailable.value&&contextReady.value&&!contextLoading.value&&(dashboards.value.length>0||!listAvailable.value));
+const noDashboards=computed(()=>sourceAvailable.value&&contextReady.value&&!contextLoading.value&&listAvailable.value&&dashboards.value.length===0);
 const image=ref('');const loading=ref(false);const rendering=ref(false);const error=ref('');let version=0;let contextVersion=0;let disposed=false;
 function date(value:string){const time=new Date(value);return Number.isNaN(time.getTime())?'Data não informada':time.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});}
 function clear(){if(image.value)URL.revokeObjectURL(image.value);image.value='';}
@@ -52,7 +53,7 @@ onUnmounted(()=>{disposed=true;version++;contextVersion++;clear();});
   </div>
   <div class="project-preview-toolbar">
    <div class="project-preview-modes" role="group" aria-label="Tipo de prévia">
-    <button type="button" :aria-pressed="mode==='interactive'" :disabled="!interactiveAvailable||!contextReady" @click="mode='interactive'"><MousePointer2 :size="14"/>Interativa</button>
+    <button type="button" :aria-pressed="mode==='interactive'" :disabled="!interactiveAvailable||!contextReady||noDashboards" @click="mode='interactive'"><MousePointer2 :size="14"/>Interativa</button>
     <button type="button" :aria-pressed="mode==='image'" @click="mode='image'"><Image :size="14"/>Imagem</button>
    </div>
    <label v-if="dashboards.length" class="project-preview-dashboard"><span class="sr-only">Dashboard da prévia</span><select :value="dashboard" aria-label="Dashboard da prévia" :disabled="contextLoading||rendering" @change="selectDashboard"><option v-for="item in dashboards" :key="item.id" :value="String(item.id)">{{item.name}}</option></select></label>
@@ -71,14 +72,15 @@ onUnmounted(()=>{disposed=true;version++;contextVersion++;clear();});
   <p v-if="contextError" class="form-error" role="alert">{{contextError}}</p>
   <div v-if="contextLoading&&!contextReady" class="project-preview-loading" role="status"><LoaderCircle :size="23" class="spin"/><span>Abrindo seu dashboard…</span></div>
   <div v-if="!sourceAvailable&&mode==='interactive'" class="project-preview-empty"><Image :size="34"/><h3>Seu dashboard vai aparecer aqui</h3><p>Descreva na conversa o que deseja criar. Assim que a IA preparar a primeira versão, você poderá acompanhá-la neste espaço.</p></div>
-  <BiLiveViewer v-if="mode==='interactive'&&interactiveAvailable&&contextReady" :key="project.source_ref+':'+dashboard+':'+liveVersion" compact device-controls :active="visible!==false" v-model:device="device" :tenant="String(project.tenant_id)" :app-id="project.source_ref.slice(4)" :dashboard="dashboard||undefined" :request="request" @started="viewerStarted" @fallback="mode='image'"/>
+  <div v-if="noDashboards&&mode==='interactive'" class="project-preview-empty"><Image :size="34"/><h3>Sua aplicação ainda não tem dashboards</h3><p>Descreva na conversa os indicadores e visualizações que deseja criar. A prévia aparecerá aqui quando o primeiro dashboard estiver disponível.</p></div>
+  <BiLiveViewer v-if="mode==='interactive'&&interactiveAvailable&&contextReady&&!noDashboards" :key="project.source_ref+':'+dashboard+':'+liveVersion" compact device-controls :active="visible!==false" v-model:device="device" :tenant="String(project.tenant_id)" :app-id="project.source_ref.slice(4)" :dashboard="dashboard||undefined" :request="request" @started="viewerStarted" @fallback="mode='image'"/>
   <div v-if="mode==='image'" class="project-preview-image-body">
    <div v-if="choices.length>1" class="project-preview-version"><label for="preview-image-version">Versão da imagem</label><select id="preview-image-version" :value="selected?.id" aria-label="Versão da prévia" @change="select"><option v-for="artifact in choices" :key="artifact.id" :value="artifact.id">{{date(artifact.metadata?.generated_at??artifact.created_at)}}</option></select></div>
    <button v-if="selected&&choices[0]?.id!==selected.id" class="preview-latest" @click="follow=true">Ver a prévia mais recente</button>
    <div v-if="error" class="form-error" role="alert"><AlertCircle :size="16"/>{{error}}<button v-if="selected" class="text-button" @click="load">Tentar abrir novamente</button></div>
    <div v-if="loading" class="project-preview-loading" role="status"><LoaderCircle :size="22" class="spin"/>Carregando imagem…</div>
    <div v-else-if="image&&selected" class="project-preview-canvas"><button class="project-preview-enlarge" aria-label="Ampliar imagem do dashboard" @click="emit('inspect',selected)"><img :src="image" :alt="'Prévia real de '+project.name"></button></div>
-   <div v-else-if="!selected&&!loading" class="project-preview-empty"><Image :size="34"/><h3>Acompanhe o dashboard aqui</h3><p>{{sourceAvailable?'Gere uma imagem do dashboard selecionado ou use a prévia interativa.':'A primeira prévia aparecerá quando uma aplicação for criada neste projeto.'}}</p><button v-if="sourceAvailable" class="secondary-button" :disabled="rendering||!canRender" @click="generate"><RefreshCw :size="14"/>{{rendering?'Gerando imagem…':'Gerar imagem'}}</button></div>
+   <div v-else-if="!selected&&!loading" class="project-preview-empty"><Image :size="34"/><h3>Acompanhe o dashboard aqui</h3><p>{{noDashboards?'Sua aplicação ainda não tem dashboards. Descreva na conversa os indicadores e visualizações que deseja criar.':sourceAvailable?'Gere uma imagem do dashboard selecionado ou use a prévia interativa.':'A primeira prévia aparecerá quando uma aplicação for criada neste projeto.'}}</p><button v-if="sourceAvailable&&!noDashboards" class="secondary-button" :disabled="rendering||!canRender" @click="generate"><RefreshCw :size="14"/>{{rendering?'Gerando imagem…':'Gerar imagem'}}</button></div>
    <footer v-if="selected"><span>{{date(selected.metadata?.generated_at??selected.created_at)}} · Brasília</span><div><button class="secondary-button" :disabled="!image" @click="emit('inspect',selected)"><Maximize2 :size="14"/>Ampliar imagem</button><a class="secondary-button" :href="appUrl('/api/artifacts/'+selected.id+'/download')"><Download :size="14"/>Baixar</a></div><p>Para análise visual com IA, abra a imagem e autorize o envio para a conversa.</p></footer>
   </div>
  </aside>

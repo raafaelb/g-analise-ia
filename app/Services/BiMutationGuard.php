@@ -76,6 +76,16 @@ class BiMutationGuard
                     }
                 }
             }
+        } elseif ($command === 'new' && $operation === 'app') {
+            foreach ($arguments as $index => $argument) {
+                if ($argument === '--table') {
+                    $ref = $arguments[$index + 1] ?? null;
+                    if (! is_string($ref) || ! preg_match('/^table:[1-9][0-9]*$/D', $ref)) {
+                        throw new RuntimeException('A criação exige referências explícitas das tabelas escolhidas.');
+                    }
+                    $refs[] = $ref;
+                }
+            }
         } elseif ($command === 'new' && $operation === 'table') {
             $index = array_search('--from-flow', $arguments, true);
             if ($index !== false) {

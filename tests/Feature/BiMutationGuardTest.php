@@ -51,6 +51,7 @@ class BiMutationGuardTest extends TestCase
             'node execution' => [['flow', 'run-node', 'flow:2', '--node', 'load']],
             'flow execution' => [['flow', 'run', 'flow:2']],
             'table sync' => [['flow', 'sync-table', 'flow:2', '--node', 'load']],
+            'app linking pending table' => [['new', 'app', '--name', 'Análise', '--table', 'table:600']],
             'table creation' => [['new', 'table', '--from-flow', 'flow:2', '--node', 'load']],
             'table truncation' => [['table', 'truncate', 'table:600']],
             'table substitution from pending' => [['app', 'change-table', 'app:9', '--from-table', '600', '--to-table', '500']],
