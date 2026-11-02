@@ -76,6 +76,14 @@ Depois do push confirmado, execute `preview` da aplicação e inspecione os valo
 
 `project_image` retorna à IA um PNG exportado somente quando o usuário autorizou esse arquivo específico nesta conversa. Se faltar autorização, peça ao usuário que abra a prévia e use “Autorizar análise visual com IA”. A criação pode continuar com a validação de dados e a prévia no portal; não declare inspeção visual pela IA antes de receber a imagem.
 
+## Acesso à aplicação e aos dados
+
+Acesso à mesa de aplicações, liberação das tabelas e filtros de linha são controles distintos. `preview` pode retornar widgets com `status: ok`, zeros e uma linha de preenchimento mesmo quando a conta vê a aplicação mas não tem acesso à tabela. O status do widget confirma somente a resposta dessa operação; não comprova acesso integral aos registros. Não declare uma fonte vazia nem valide totais apenas por esses zeros. Um valor zero também pode ser legítimo: não diagnostique falta de permissão sem evidência.
+
+Quando o resultado contrariar os dados esperados, confira os filtros atuais, as fontes vinculadas, a atualização e os resultados autorizados disponíveis. `table_preview` usa o acesso ao DW, que pode ser recusado para uma conta de consulta mesmo quando o dashboard retorna seus dados autorizados. Não trate essa diferença isolada como contradição nem use outra identidade para contorná-la. As permissões MCP são independentes e não devem ser presumidas iguais às da conexão Lumo.
+
+Explique ao usuário o que foi confirmado, quais dados ficaram indisponíveis e qual acesso precisa ser conferido pelo administrador do BI, sem pedir senhas, SQL ou nomes técnicos que a ferramenta já possa descobrir. Uma negativa de acesso não autoriza recriar recursos, repetir cargas, publicar ou mudar permissões. Não confunda essa negativa com sessão expirada.
+
 ## Atualização automática
 
 Confira todas as tabelas da aplicação e seus `originFlowId`. Fontes compartilhadas são agendadas uma vez. Preserve agendas mais frequentes. Uma agenda inativa não cobre a fonte. Use America/Sao_Paulo, preferindo a madrugada para novas cargas diárias.
