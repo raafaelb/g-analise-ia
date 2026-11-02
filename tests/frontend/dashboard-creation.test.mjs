@@ -51,7 +51,7 @@ function mount({component=Form,onRequest=null,outcome='completed',verified=true,
   else {current=outcome==='completed'?receipt(current,verified,receiptResource):{...current,status:outcome,payload:{...current.payload,dashboard_creation_attempt:{resource:'app:11',started_at:'2026-11-02T12:00:00Z'},execution:{message:'Conferência pendente.'}}};response={approval:current};}
   response=JSON.parse(JSON.stringify(response));return onRequest?onRequest(path,method,data,response):response;
  };
- const app=renderer.createApp({setup:()=>()=>h(component,{...props.value,request,onUpdated:()=>events.push('updated'),onNotice:value=>events.push(['notice',value]),onCreated:value=>events.push(['created',value]),onDuplicate:()=>events.push('duplicate'),onSetup:()=>events.push('setup'),onConfirmed:value=>events.push(['confirmed',value])})});app.config.errorHandler=error=>errors.push(error.message);app.mount(root);
+ const app=renderer.createApp({setup:()=>()=>h(component,{...props.value,request,onUpdated:()=>events.push('updated'),onNotice:value=>events.push(['notice',value]),onCreated:value=>events.push(['created',value]),onDuplicate:()=>events.push('duplicate'),onSetup:()=>events.push('setup'),onConnect:()=>events.push('connect'),onConfirmed:value=>events.push(['confirmed',value])})});app.config.errorHandler=error=>errors.push(error.message);app.mount(root);
  return{root,calls,events,errors,props,button:label=>find(root,item=>item.kind==='button'&&text(item).trim()===label),field:(suffix,value)=>{const field=find(root,item=>String(item.props.id??'').endsWith('-'+suffix));assert.ok(field,'Campo '+suffix+' deve existir');field.props['onUpdate:modelValue'](value);},close:()=>{app.unmount();for(const[key,description]of Object.entries(previous)){if(description)Object.defineProperty(globalThis,key,description);else delete globalThis[key];}}};
 }
 async function settled(){await nextTick();await yieldEventLoop();await nextTick();}
@@ -118,9 +118,17 @@ test('a definite preparation refusal keeps the choices editable and does not pre
 });
 
 
-test('a suspended data query offers project authorship without a form, clone or creation request',async()=>{
- for(const state of ['draft','published']){
-  const view=mount({state,onRequest:(path,method,data,response)=>path.endsWith('/dashboard-builder')?{...response,creation_available:false,creation_unavailable_reason:'A consulta direta está temporariamente indisponível. Use Conferir dados.'}:response});
-  try{await settled();assert.match(text(view.root),/Assistente temporariamente indisponível/);assert.equal(text(globalThis.document.activeElement),'Assistente temporariamente indisponível');assert.match(text(view.root),/Conferir dados/);assert.equal(Boolean(find(view.root,item=>item.kind==='form')),false);assert.equal(Boolean(view.button('Duplicar para minha mesa')),false);assert.equal(Boolean(view.button('Conferir prévia e criação')),false);await click(view,'Continuar no projeto');assert.deepEqual(view.events,['setup']);assert.equal(view.calls.length,1);assert.deepEqual(view.errors,[]);}finally{view.close();}
- }
+test('missing personal MCP offers authorization in Connections and keeps the unavailable form hidden',async()=>{
+ const view=mount({onRequest:(path,method,data,response)=>path.endsWith('/dashboard-builder')?{...response,creation_available:false,creation_unavailable_reason:'Autorize as consultas deste ambiente na página Conexões antes de usar o MCP.'}:response});
+ try{await settled();assert.match(text(view.root),/Autorize a consulta dos dados/);assert.equal(text(globalThis.document.activeElement),'Autorize a consulta dos dados');assert.match(text(view.root),/Autorize as consultas deste ambiente/);assert.equal(Boolean(find(view.root,item=>item.kind==='form')),false);assert.equal(Boolean(view.button('Duplicar para minha mesa')),false);assert.equal(Boolean(view.button('Conferir prévia e criação')),false);await click(view,'Autorizar consultas em Conexões');assert.deepEqual(view.events,['connect']);assert.equal(view.calls.length,1);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('project authorship remains available without a personal MCP grant',async()=>{
+ const view=mount({onRequest:(path,method,data,response)=>path.endsWith('/dashboard-builder')?{...response,creation_available:false}:response});
+ try{await settled();await click(view,'Continuar no projeto');assert.deepEqual(view.events,['setup']);assert.equal(view.calls.length,1);assert.deepEqual(view.errors,[]);}finally{view.close();}
+});
+
+test('a published application can be duplicated before authorizing MCP for its private copy',async()=>{
+ const view=mount({state:'published',onRequest:(path,method,data,response)=>path.endsWith('/dashboard-builder')?{...response,creation_available:false}:response});
+ try{await settled();assert.match(text(view.root),/Crie o novo painel em uma cópia/);assert.equal(Boolean(find(view.root,item=>item.kind==='form')),false);await click(view,'Duplicar para minha mesa');assert.deepEqual(view.events,['duplicate']);assert.equal(view.calls.length,1);assert.deepEqual(view.errors,[]);}finally{view.close();}
 });

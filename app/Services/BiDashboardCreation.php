@@ -22,19 +22,19 @@ class BiDashboardCreation
 {
     public const ACTIONS = ['create_dashboard'];
 
-    public function __construct(private BiCatalog $catalog, private LumoClient $lumo, private TenantPolicy $policy, private BiDashboardBlueprint $blueprint) {}
+    public function __construct(private BiCatalog $catalog, private LumoClient $lumo, private TenantPolicy $policy, private BiDashboardBlueprint $blueprint, private BiDashboardData $dataQueries) {}
 
     public function describe(User $user, string $tenant, string $id): array
     {
         [$connection, $environment] = $this->access($user, $tenant, $id);
         $generation = $connection->metadata['session_generation'] ?? null;
 
-        return $this->withContext($connection, $environment, function (Project $context) use ($connection, $id, $generation): array {
+        return $this->withContext($connection, $environment, function (Project $context) use ($connection, $user, $tenant, $id, $generation): array {
             [, , $shape, $summary] = $this->document($connection, $context, 'app:'.$id);
             $fields = $this->fields($connection, $context, 'app:'.$id, $shape);
             $this->assertSession($connection, $generation);
 
-            return ['resource' => 'app:'.$id, 'name' => $shape->nome, 'version' => $this->blueprint->digest($shape), 'state' => $summary['state'], 'desk_id' => $summary['desk_id'], 'dashboard_count' => count($shape->dashboards), 'fields' => $fields, 'aggregations' => BiDashboardBlueprint::AGGREGATIONS, 'creation_available' => LumoClient::APP_QUERY_AVAILABLE, 'creation_unavailable_reason' => LumoClient::APP_QUERY_AVAILABLE ? null : BiNativeFailure::appQuerySuspended()->getMessage()];
+            return ['resource' => 'app:'.$id, 'name' => $shape->nome, 'version' => $this->blueprint->digest($shape), 'state' => $summary['state'], 'desk_id' => $summary['desk_id'], 'dashboard_count' => count($shape->dashboards), 'fields' => array_map(fn (array $field): array => array_diff_key($field, ['query_ref' => true]), $fields), 'aggregations' => BiDashboardBlueprint::AGGREGATIONS, ...$this->dataQueries->availability($user, $tenant)];
         });
     }
 
@@ -68,26 +68,17 @@ class BiDashboardCreation
                     }
                     $coverage = $this->coverage($user, $tenant, $data['resource']);
                     try {
-                        $total = $this->lumo->run($connection, ['app', 'query', $data['resource'], '--fields', $selection['metric_ref'], '--limit', '1'], $context, 60)['data'] ?? null;
-                        $groups = $this->lumo->run($connection, ['app', 'query', $data['resource'], '--fields', $selection['group_ref'].','.$selection['metric_ref'], '--order-by', ($selection['chart_type'] === 'line' ? $data['group_id'].':ASC' : $data['metric_id'].':DESC'), '--limit', '26'], $context, 60)['data'] ?? null;
+                        $query = $this->dataQueries->preview($user, $tenant, (int) substr($data['resource'], 4), $data, $selection);
                     } catch (RuntimeException $e) {
-                        if ($e instanceof BiNativeFailure) {
-                            throw $e;
-                        }
-                        if ($e->getCode() === 10) {
-                            throw ValidationException::withMessages(['dashboard' => 'O G-Analise BI apresentou uma falha ao consultar os valores desta aplicação. Nenhum dashboard foi criado. Suas escolhas foram preservadas; você pode conferir esta solicitação quando a consulta estiver disponível. A aplicação não será publicada para contornar essa falha.']);
-                        }
-                        throw $e;
-                    }
-                    if (! is_array($total) || ! is_array($groups)) {
-                        throw new RuntimeException('A consulta não retornou dados reconhecidos para a revisão.');
+                        throw ValidationException::withMessages(['dashboard' => $e->getMessage().' Nenhum dashboard foi criado. Suas escolhas foram preservadas.']);
                     }
                     $this->assertSession($connection, $generation);
 
-                    return ['tenant_id' => $tenant, 'resource' => $data['resource'], 'connection_generation' => $generation, 'source_digest' => $this->blueprint->digest($shape), 'preserved_digest' => $this->preservedDigest($shape), 'before_dashboard_ids' => $this->dashboardIds($shape, $data['resource'], $tenant), 'selection_digest' => $this->blueprint->digest($selection), 'expected_dashboard_digest' => $this->newDashboardDigest($new->body), 'dashboard_creation' => ['name' => $data['name'], 'app_name' => $shape->nome, 'dashboard_count_before' => count($shape->dashboards), 'widget_count' => 3, 'selection' => $selection, 'filter_behavior' => ($shape->filter_mode ?? null) === 'per_dashboard' ? 'O novo painel começa sem filtros fixos próprios. Os filtros das outras abas são preservados.' : 'O novo painel mantém o uso dos filtros globais da aplicação.', 'preview' => $this->blueprint->preview($total, $groups, $data, $selection), 'coverage' => $coverage], 'impact' => 'Adiciona somente um dashboard privado com indicador, gráfico e tabela nesta aplicação. Os painéis existentes, fontes, filtros e agendas são preservados. Não cria nem carrega tabelas e não publica a aplicação. A prévia interativa será aberta depois da criação conferida.'];
+                    return ['tenant_id' => $tenant, 'resource' => $data['resource'], 'connection_generation' => $generation, 'query_authorization' => $query['authorization'], 'source_digest' => $this->blueprint->digest($shape), 'preserved_digest' => $this->preservedDigest($shape), 'before_dashboard_ids' => $this->dashboardIds($shape, $data['resource'], $tenant), 'selection_digest' => $this->blueprint->digest($selection), 'expected_dashboard_digest' => $this->newDashboardDigest($new->body), 'dashboard_creation' => ['name' => $data['name'], 'app_name' => $shape->nome, 'dashboard_count_before' => count($shape->dashboards), 'widget_count' => 3, 'selection' => $selection, 'filter_behavior' => ($shape->filter_mode ?? null) === 'per_dashboard' ? 'O novo painel começa sem filtros fixos próprios. Os filtros das outras abas são preservados.' : 'O novo painel mantém o uso dos filtros globais da aplicação.', 'preview' => [...$this->blueprint->preview($query['total'], $query['groups'], $data, $selection), 'query_method' => 'mcp', 'data_as_of' => $query['data_as_of']], 'coverage' => $coverage], 'impact' => 'Adiciona somente um dashboard privado com indicador, gráfico e tabela nesta aplicação. Os painéis existentes, fontes, filtros e agendas são preservados. Não cria nem carrega tabelas e não publica a aplicação. A prévia interativa será aberta depois da criação conferida.'];
                 });
                 $approval = DB::transaction(function () use ($user, $connection, $tenant, $data, $revision, $requestHash): Approval {
                     $this->assertSession($connection, $revision['connection_generation']);
+                    $this->dataQueries->assertAuthorization($user, $tenant, $revision['query_authorization']);
                     $approval = Approval::create(['user_id' => $user->id, 'project_id' => null, 'agent_run_id' => null, 'type' => 'manual', 'title' => 'Criar dashboard na aplicação', 'description' => 'Confira os campos, o cálculo, os dados consultados e a atualização diária antes de adicionar este painel privado.', 'payload' => ['origin' => 'manual', 'action' => $data, 'revision' => $revision, 'request_id' => $data['request_id'], 'request_hash' => $requestHash], 'fingerprint' => $this->fingerprint($user->id, $tenant, $data, $revision), 'expires_at' => now()->addMinutes(12)]);
                     Audit::record($user->id, 'bi.dashboard.review_created', 'Novo dashboard preparado com amostra de dados e revisão.', null, ['approval_id' => $approval->id, 'tenant_id' => $tenant, 'resource' => $data['resource']]);
 
@@ -110,6 +101,7 @@ class BiDashboardCreation
         $this->assertExecution($approval, $user);
         [$connection, $environment] = $this->access($user, $tenant, substr($data['resource'], 4));
         $this->assertSession($connection, $revision['connection_generation']);
+        $this->dataQueries->assertAuthorization($user, $tenant, $revision['query_authorization'] ?? null);
         $this->policy->assertCommandAllowed($tenant, ['push', $data['resource']], $connection);
         try {
             return Cache::lock('bi-app-details-write:'.$tenant.':'.$data['resource'], 630)->block(3, function () use ($approval, $user, $tenant, $data, $revision, $connection, $environment): array {
@@ -125,9 +117,11 @@ class BiDashboardCreation
                         throw new RuntimeException('Os campos ou o cálculo mudaram depois da revisão. Confira a proposta atual.');
                     }
                     $this->coverage($user, $tenant, $data['resource']);
+                    $this->dataQueries->verifyAuthorization($user, $tenant, (int) substr($data['resource'], 4), $revision['query_authorization'], $selection);
                     $this->write($path, $header, $this->append($shape, $new));
                     $this->validate($connection, $context, $data['resource']);
                     $this->assertSession($connection, $revision['connection_generation']);
+                    $this->dataQueries->assertAuthorization($user, $tenant, $revision['query_authorization']);
                     app(BiMutationGuard::class)->assertAvailable($user->id, $tenant, $data['resource']);
                     $this->assertExecution($approval, $user);
                     $approval->update(['payload' => [...$approval->payload, 'dashboard_creation_attempt' => ['started_at' => now()->toIso8601String(), 'resource' => $data['resource']]]]);
@@ -383,6 +377,9 @@ class BiDashboardCreation
         [, , $shape] = $this->document($connection, $context, $data['resource']);
         $this->assertDraft($shape);
         $selection = $this->blueprint->selection($data, $this->fields($connection, $context, $data['resource'], $shape));
+        if (! array_key_exists('query_authorization', $revision)) {
+            unset($selection['metric']['query_ref'], $selection['group']['query_ref']);
+        }
         if (! hash_equals($revision['selection_digest'], $this->blueprint->digest($selection))) {
             throw new RuntimeException('Os campos ou seus significados mudaram durante a criação. Confira o painel atual.');
         }

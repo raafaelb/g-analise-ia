@@ -56,7 +56,7 @@ class BiDashboardBlueprint
                     throw new RuntimeException('Um campo retornou sem identidade ou tipo confirmado.');
                 }
                 $label = is_string($column['label'] ?? null) && trim($column['label']) !== '' ? $column['label'] : $column['column_name'];
-                $field = ['id' => $column['id'], 'table_id' => $table['tableId'], 'table_name' => Str::limit($table['nome'], 160, '…'), 'label' => Str::limit($label, 160, '…'), 'type' => $column['data_type'], 'numeric' => $column['data_type'] === 'Number', 'date' => in_array($column['data_type'], ['Date', 'DateTime'], true), 'groupable' => in_array($column['data_type'], ['String', 'Number', 'Date', 'DateTime', 'Boolean'], true)];
+                $field = ['id' => $column['id'], 'table_id' => $table['tableId'], 'table_name' => Str::limit($table['nome'], 160, '…'), 'label' => Str::limit($label, 160, '…'), 'query_ref' => $table['nome'].'.'.$label, 'type' => $column['data_type'], 'numeric' => $column['data_type'] === 'Number', 'date' => in_array($column['data_type'], ['Date', 'DateTime'], true), 'groupable' => in_array($column['data_type'], ['String', 'Number', 'Date', 'DateTime', 'Boolean'], true)];
                 if (isset($fields[$field['id']]) && $fields[$field['id']] !== $field) {
                     throw new RuntimeException('A aplicação usa o mesmo campo em contextos diferentes. Revise a modelagem com a IA antes de usar o assistente.');
                 }
@@ -153,7 +153,7 @@ class BiDashboardBlueprint
             $rows[] = ['label' => $row[$groupKey] === null ? 'Sem valor' : Str::limit((string) $row[$groupKey], 160, '…'), 'value' => $number($row[$valueKey])];
         }
 
-        return ['metric_title' => $selection['metric_title'], 'group_title' => $selection['group_title'], 'format' => $selection['format'], 'chart_type' => $selection['chart_type'], 'value' => $number($total['rows'][0][$valueKey]), 'rows' => $rows, 'truncated' => count($groups['rows']) > 25, 'checked_at' => now()->toIso8601String(), 'scope' => 'Amostra consultada com o acesso da sua conta. Os filtros iniciais e as seleções do painel interativo podem mudar os valores exibidos. A amostra mostra até 25 grupos; o gráfico e a tabela do novo painel mostram até 100.'];
+        return ['metric_title' => $selection['metric_title'], 'group_title' => $selection['group_title'], 'format' => $selection['format'], 'chart_type' => $selection['chart_type'], 'value' => $number($total['rows'][0][$valueKey]), 'rows' => $rows, 'truncated' => ($groups['truncated'] ?? false) || count($groups['rows']) > 25, 'checked_at' => now()->toIso8601String(), 'scope' => 'Amostra consultada pelo MCP com a conta autorizada para este ambiente. Os filtros iniciais e as seleções do painel interativo podem mudar os valores exibidos. A amostra mostra até 25 grupos; o gráfico e a tabela do novo painel mostram até 100.'];
     }
 
     public function digest(mixed $value): string
