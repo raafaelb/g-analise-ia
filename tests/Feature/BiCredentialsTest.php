@@ -184,11 +184,14 @@ class BiCredentialsTest extends TestCase
     public function test_creation_is_authorized_once_verified_and_not_confused_with_a_connectivity_test(): void
     {
         Queue::fake();
-        [$user, , $state] = $this->context();
+        [$user, $connection, $state] = $this->context();
         $this->native($state);
         $approval = $this->prepare($user, $this->input());
         $this->assertSame(0, $state->created);
+        $sectionKey = 'bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':100:section:'.'credential';
+        Cache::put($sectionKey, ['outdated' => true], 90);
         $this->execute($user, $approval);
+        $this->assertFalse(Cache::has($sectionKey));
         $this->getJson('/api/bi-actions/'.$approval->id)->assertOk()->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.execution.result.resource', 'credential:12')->assertJsonPath('approval.payload.execution.result.configuration_verified', true)->assertJsonPath('approval.payload.execution.result.connection_tested', false)->assertJsonPath('project', null);
         $this->assertSame('SYNTHETIC-PRIVATE-PASSWORD', $state->passwords[12]);
         $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'credential:12', 'project_id' => null, 'status' => 'configured']);

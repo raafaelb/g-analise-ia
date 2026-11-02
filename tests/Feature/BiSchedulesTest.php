@@ -11,6 +11,7 @@ use App\Services\Agent\ActionBroker;
 use App\Services\LumoClient;
 use App\Services\WorkspaceFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -223,11 +224,14 @@ class BiSchedulesTest extends TestCase
 
     public function test_a_new_schedule_uses_the_reviewed_brasilia_timezone_even_if_the_provider_stub_has_another_default(): void
     {
-        [$user] = $this->context();
+        [$user, $connection] = $this->context();
         $this->newTimezone = 'UTC';
         $approval = $this->prepare($user, $this->create());
 
+        $sectionKey = 'bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':321:section:'.'schedule';
+        Cache::put($sectionKey, ['outdated' => true], 90);
         $result = $this->execute($user, $approval);
+        $this->assertFalse(Cache::has($sectionKey));
 
         $this->assertSame('completed', $result->status, $result->payload['execution']['message'] ?? '');
         $this->assertSame('America/Sao_Paulo', $this->bodies['schedule:99']['timezone']);

@@ -147,7 +147,7 @@ class BiTablePresentation
                         throw $e;
                     } finally {
                         if ($started) {
-                            Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$context->tenant_id);
+                            $this->catalog->invalidate((string) $context->tenant_id, $connection);
                         }
                     }
                 }, $approval);

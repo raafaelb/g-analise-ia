@@ -205,12 +205,15 @@ class BiFlowPublicationsTest extends TestCase
     public function test_a_new_publication_preserves_the_original_and_confirms_the_schema_without_claiming_a_load(): void
     {
         Queue::fake();
-        [$user, $project,, $state] = $this->context();
+        [$user, $project, $connection, $state] = $this->context();
         $original = [$state->bodies['flow:1'], $state->bodies['table:500']];
         $state->large_receipt = true;
         $this->native($state);
         $approval = $this->prepare($user);
+        $sectionKey = 'bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':100:section:'.'flow';
+        Cache::put($sectionKey, ['outdated' => true], 90);
         $this->execute($user, $approval);
+        $this->assertFalse(Cache::has($sectionKey));
         $approval->refresh();
 
         $this->assertSame('completed', $approval->status);
@@ -463,7 +466,10 @@ class BiFlowPublicationsTest extends TestCase
         $connection->update(['metadata' => [...$connection->metadata, 'session_generation' => 'session-b']]);
         $state->lost_response = false;
 
+        $sectionKey = 'bi-catalog:v3:'.$connection->id.':session-b:100:section:flow';
+        Cache::put($sectionKey, ['outdated' => true], 90);
         $this->postJson('/api/approvals/'.$approval->id.'/publication/verify')->assertOk()->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.execution.result.published_resource', 'flow:1')->assertJsonPath('approval.payload.reconciliation.remote_read_only', true);
+        $this->assertFalse(Cache::has($sectionKey));
         $this->assertSame('flow:1', $project->fresh()->source_ref);
         $this->assertSame(1, $state->publishes);
         Queue::assertNotPushed(RunAgentTurn::class);

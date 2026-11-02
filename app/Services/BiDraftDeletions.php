@@ -226,7 +226,7 @@ class BiDraftDeletions
         $approval->refresh()->update(['payload' => [...$approval->payload, 'deletion_attempt' => [...$approval->payload['deletion_attempt'], 'native_accepted_at' => now()->toIso8601String()]]]);
         $confirmation = $this->verify($connection, $project, $plan);
         $this->recordVerified($project, $confirmation, $approval->id, (string) $approval->payload['deletion_attempt']['plan_sha256']);
-        Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+        $this->catalog->invalidate((string) $project->tenant_id, $connection);
         Audit::record($project->user_id, 'bi.'.$plan['kind'].'_draft.deleted', $plan['kind'] === 'app' ? 'Aplicação de teste removida e fontes preservadas após revisão e conferência, sem cascata.' : 'ETL de teste e seus destinos removidos após revisão e conferência, sem cascata.', $project->id, ['resource' => $ref, 'tables' => array_column($plan['tables'], 'resource'), 'approval_id' => $approval->id]);
 
         return ['exit_code' => $native['exit_code'], 'deletion' => $confirmation];
@@ -259,7 +259,7 @@ class BiDraftDeletions
                 $current->update(['status' => 'completed', 'payload' => [...$current->payload, 'execution' => ['status' => 'completed', 'finished_at' => now()->toIso8601String(), 'result' => ['deletion' => $confirmation]], 'reconciliation' => ['previous_status' => $approval->status, 'previous_message' => $approval->payload['execution']['message'] ?? null, 'checked_at' => now()->toIso8601String(), 'remote_read_only' => true]]]);
             });
             Audit::record($user->id, 'bi.'.$plan['kind'].'_draft.deletion_reconciled', $plan['kind'] === 'app' ? 'Exclusão de aplicação conferida por leitura, sem novo envio.' : 'Exclusão de ETL conferida por leitura, sem novo envio.', $project->id, ['approval_id' => $approval->id, 'resource' => $plan['resource']]);
-            Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+            $this->catalog->invalidate((string) $project->tenant_id, $connection);
 
             return ['project' => $project->refresh(), 'approval' => $approval->refresh()];
         };

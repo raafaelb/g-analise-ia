@@ -362,7 +362,7 @@ class ActionBroker
             }
             $result = app(BiFlowExecution::class)->run($connection, $project, $arguments, $approval);
             Audit::record($user->id, 'horus.run_flow_node', 'Etapa ETL executada após revisão.', $project->id, ['resource' => $arguments['resource'], 'node' => $arguments['node']]);
-            Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+            app(BiCatalog::class)->invalidate((string) $project->tenant_id, $connection);
 
             return $result;
         }
@@ -469,7 +469,7 @@ class ActionBroker
         }
         if (in_array($action, ['publish_app', 'publish_flow'], true)) {
             $approval->update(['payload' => [...$approval->payload, 'publication_attempt' => [...$approval->payload['publication_attempt'], 'native_accepted_at' => now()->toIso8601String()]]]);
-            Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+            app(BiCatalog::class)->invalidate((string) $project->tenant_id, $connection);
             $managed = ManagedBiResource::where('user_id', $user->id)->where('project_id', $project->id)->where('tenant_id', $project->tenant_id)->where('resource', $arguments['resource'])->first();
             if ($managed) {
                 $managed->update(['status' => 'publication_pending', 'receipt' => [...($managed->receipt ?? []), 'publication' => ['expected_resource' => $publication['target']['resource'], 'mode' => $publication['mode'], 'destination' => $publication['destination'], 'native_accepted_at' => now()->toIso8601String()]]]);
@@ -496,7 +496,7 @@ class ActionBroker
             }
         }
         if (in_array($action, ['new', 'clone_app', 'clone_flow', 'push', 'publish_app', 'publish_flow', 'delete_draft', 'resume_schedule', 'run_schedule', 'run_flow_node'], true)) {
-            Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+            app(BiCatalog::class)->invalidate((string) $project->tenant_id, $connection);
         }
         Audit::record($user->id, 'horus.'.$action, 'Operação G-Analise: '.$action.'.', $project->id, ['resource' => $arguments['resource'] ?? null]);
         if ($action === 'export') {

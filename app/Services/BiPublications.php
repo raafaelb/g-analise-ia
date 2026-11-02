@@ -155,7 +155,7 @@ class BiPublications
                     app(ProjectPreviews::class)->recordCompletedChange($current);
                     Audit::record($approval->user_id, 'bi.publication.reconciled', 'Publicação confirmada por nova consulta, sem reenviar a operação.', $project->id, ['approval_id' => $approval->id, 'resource' => $confirmation['resource'], 'tenant_id' => $project->tenant_id]);
                 });
-                Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$project->tenant_id);
+                $this->catalog->invalidate((string) $project->tenant_id, $connection);
 
                 return ['project' => $project->refresh(), 'approval' => $approval->refresh()];
             };

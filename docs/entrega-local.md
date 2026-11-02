@@ -156,3 +156,12 @@ O envio, a preparação do contexto, a recuperação após recarga e a separaç�
 O catálogo completo e as conferências de agendas, cobertura diária e dependências de exclusão passaram a usar os documentos identificados como sincronizados pelo status oficial do Lumo. Arquivos retidos fora desse conjunto, inclusive outro arquivo com o mesmo ID, não substituem detalhes atuais. Os arquivos permanecem preservados. Foram acrescentados 27 casos de regressão, com validação completa em SQLite/PostgreSQL, 202 testes de frontend e Pint; a ajuda e o tour acompanham a revisão `2026-11-01.7`.
 
 A medição real preservou IDs, quantidades e capacidades dos 13 grupos. A atualização completa ainda leva dezenas de segundos: as alternativas de leitura direcionada não melhoraram o tempo e foram retiradas. A investigação, os tempos e as próximas etapas estão na [matriz de gestão](gestao-completa.md). Essa rodada foi somente de leitura no BI e não iniciou inferência ou implantação.
+
+
+## Renovação da categoria após salvar — 01/11/2026
+
+Os atalhos para abrir uma conexão, mesa ou agenda salva consultam somente sua categoria e os grupos relacionados necessários. Publicações e exclusões confirmadas também renovam a área correspondente, sem repetir a escrita. As demais quantidades podem voltar a **Consultar**; **Atualizar catálogo** continua renovando todas as áreas. A invalidação no servidor agora inclui os caches de categoria da mesma conexão, sessão e tenant, preservando os arquivos de autoria.
+
+A criação revisada de uma mesa vazia no tenant de teste foi conferida pela interface. Seu resultado abriu após a consulta da seção; a mesa foi depois removida com checkpoint, simulação e conferência de ausência, sem cascata. O inventário preexistente permaneceu igual. A amostra da seção levou cerca de um segundo, sem comprovar um novo tempo para o inventário completo. Tour e ajuda acompanham a revisão **2026-11-01.8**, conferida em computador e celular sem reiniciar o tour já visto.
+
+Passaram 1.269 testes em SQLite, 1.272 em PostgreSQL isolado, 214 de frontend, TypeScript/build e Pint. O atendimento de ajuda foi reconferido com a conversa preservada: o histórico ocupou aproximadamente 439 px no computador e 395 px no celular, mantendo envio visível e rolagem própria. A [matriz de gestão](gestao-completa.md) registra a evidência e os limites. Não houve implantação, inferência ou alteração em ambiente de clientes.

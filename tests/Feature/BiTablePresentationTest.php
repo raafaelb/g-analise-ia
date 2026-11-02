@@ -13,6 +13,7 @@ use App\Services\Agent\ActionBroker;
 use App\Services\LumoClient;
 use App\Services\WorkspaceFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -223,7 +224,7 @@ class BiTablePresentationTest extends TestCase
     public function test_review_validates_without_writing_and_execution_changes_only_selected_fields_once(): void
     {
         Queue::fake([ExecuteApprovedAction::class, RunAgentTurn::class]);
-        [$user, , $state] = $this->actor();
+        [$user, $connection, $state] = $this->actor();
         $this->native($state);
         $original = $state->body;
         $form = $this->read($user);
@@ -233,7 +234,10 @@ class BiTablePresentationTest extends TestCase
         $this->assertSame('pending', $approval->status);
         $this->assertCount(3, $approval->payload['revision']['changes']);
 
+        $sectionKey = 'bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':321:section:'.'table';
+        Cache::put($sectionKey, ['outdated' => true], 90);
         $approval = $this->execute($user, $approval);
+        $this->assertFalse(Cache::has($sectionKey));
         $expected = $original;
         $expected['nome'] = 'Nome amigável da tabela';
         $expected['columns']['VALOR (Number)']['label'] = 'Valor atualizado';

@@ -167,13 +167,13 @@ class BiCredentials
                     $this->assertConfiguration($saved, $data);
                     $this->assertGeneration($connection, $revision['connection_generation'] ?? null);
                     ManagedBiResource::where('user_id', $user->id)->where('tenant_id', $context->tenant_id)->where('resource', $ref)->update(['status' => 'configured']);
-                    Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$context->tenant_id);
+                    $this->catalog->invalidate((string) $context->tenant_id, $connection);
                     Audit::record($user->id, 'bi.credential.configured', 'Configuração de conexão salva e conferida; teste de acesso ainda necessário.', null, ['approval_id' => $approval->id, 'tenant_id' => $context->tenant_id, 'resource' => $ref, 'created' => $created]);
 
                     return ['resource' => $ref, 'confirmed_name' => $saved['nome'], 'configuration_verified' => true, 'connection_tested' => false, 'created' => $created, 'message' => 'Configuração salva no BI. Use Testar conexão para conferir o acesso pelo agente.'];
                 } catch (Throwable $e) {
                     if ($ref) {
-                        Cache::forget('bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':'.$context->tenant_id);
+                        $this->catalog->invalidate((string) $context->tenant_id, $connection);
                     }
                     Audit::record($user->id, 'bi.credential.configuration_pending', 'A configuração da conexão requer conferência; a criação não será repetida automaticamente.', null, ['approval_id' => $approval->id, 'tenant_id' => $context->tenant_id, 'resource' => $ref, 'created' => $created, 'native_accepted' => $accepted, 'exception_type' => get_class($e), 'exception_code' => (string) $e->getCode()]);
                     throw new RuntimeException($created ? 'A conexão '.$ref.' foi criada, mas a configuração ainda precisa ser conferida. Abra essa conexão para continuar; não crie outra cópia.' : ($accepted ? 'O BI recebeu a configuração, mas a conferência final ficou pendente. Atualize os detalhes antes de solicitar outra alteração.' : 'Não foi possível confirmar o envio desta configuração. Confira permissões, agente e diferenças no BI antes de preparar outra revisão.'));

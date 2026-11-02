@@ -12,6 +12,7 @@ use App\Services\Agent\ActionBroker;
 use App\Services\LumoClient;
 use App\Services\WorkspaceFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -164,10 +165,16 @@ class BiDesksTest extends TestCase
     public function test_creation_is_confirmed_once_after_approval_without_starting_ai(string $kind): void
     {
         Queue::fake([ExecuteApprovedAction::class, RunAgentTurn::class]);
-        [$user, , $state] = $this->context();
+        [$user, $connection, $state] = $this->context();
         $this->native($state);
         $response = $this->actingAs($user)->postJson('/api/catalog/100/desks/'.$kind.'/actions', $this->input())->assertOk();
+        $sectionKey = 'bi-catalog:v3:'.$connection->id.':'.($connection->metadata['session_generation'] ?? 'initial').':100:section:'.$kind;
+        Cache::put($sectionKey, ['outdated' => true], 90);
+        $otherTenantKey = str_replace(':100:section:', ':200:section:', $sectionKey);
+        Cache::put($otherTenantKey, ['preserved' => true], 90);
         $approval = $this->execute($response->json('approval.id'));
+        $this->assertFalse(Cache::has($sectionKey));
+        $this->assertSame(['preserved' => true], Cache::get($otherTenantKey));
 
         $this->assertSame('completed', $approval->status);
         $this->assertSame($kind.':20', $approval->payload['execution']['result']['resource']);

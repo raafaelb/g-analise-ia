@@ -36,6 +36,8 @@ Os workers têm `restart: unless-stopped`. Alterações no código exigem reinic
 
 A leitura completa do catálogo confere o `status --filter clean` da versão homologada do Lumo, com tenant e caminhos relativos dos documentos sincronizados. Formato desconhecido ou identidade divergente impede confirmar detalhes; não substitua a resposta por arquivos antigos nem remova essa conferência para reduzir latência. Arquivos fora de escopo continuam preservados. Cobertura diária e dependências de exclusão usam a mesma leitura confirmada. Essa revisão não exige migração de banco; recarregue os workers após atualizar o código e confira a saúde.
 
+Após alterações no BI, os serviços invalidam o snapshot completo e os caches de categoria da mesma conexão, geração de sessão e tenant. A abertura de um resultado salvo, uma publicação confirmada ou uma exclusão confirmada renova a categoria correspondente; o botão **Atualizar catálogo** continua solicitando todas as áreas. Quantidades de outras áreas podem voltar a **Consultar**. Essa invalidação remove somente chaves de cache e não apaga YAML de autoria. A revisão também não exige migração de banco; use o mesmo procedimento de atualização graciosa dos workers e conferência de saúde.
+
 ## Sandbox do Codex e limites do host
 
 A imagem inclui `codex-resources` da mesma distribuição oficial fixada do Codex, incluindo seu auxiliar `bwrap`; não instala um pacote adicional nem baixa um auxiliar de outra origem. O build e `scripts/codex-smoke.php` verificam que o auxiliar executa. O smoke faz initialize/thread/start sem solicitar inferência e não verifica o isolamento completo de um usuário. Falhas do auxiliar ou do protocolo encerram o comando com código 1, para interromper o CI.
