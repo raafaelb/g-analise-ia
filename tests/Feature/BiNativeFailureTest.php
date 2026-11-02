@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Connection;
+use App\Models\Project;
 use App\Models\User;
 use App\Services\BiNativeFailure;
 use App\Services\LumoClient;
@@ -47,25 +48,61 @@ class BiNativeFailureTest extends TestCase
         $this->assertStringNotContainsString('expirou', $failure->getMessage());
     }
 
-    public function test_native_query_denial_preserves_the_connected_session_and_its_credentials(): void
+    public static function suspendedQueries(): array
+    {
+        return [
+            'editor without project' => ['editor', false, []],
+            'administrator without project' => ['admin', false, []],
+            'editor with project' => ['editor', true, []],
+            'administrator requesting SQL' => ['admin', true, ['--sql-only']],
+        ];
+    }
+
+    #[DataProvider('suspendedQueries')]
+    public function test_suspended_query_never_starts_the_cli_and_preserves_the_connected_session(string $role, bool $withProject, array $options): void
     {
         $root = storage_path('framework/testing/native-query-denied-'.Str::uuid());
         File::ensureDirectoryExists($root, 0700, true);
         $binary = $root.'/native';
-        File::put($binary, "#!/bin/sh\nprintf '%s\\n' 'Error: query app:10: User 42 has no access to app 10' >&2\nexit 10\n");
+        File::put($binary, '#!'.PHP_BINARY."\n<?php\n".'file_put_contents(__DIR__."/started", "unexpected"); echo "private-result"; exit(10);');
         chmod($binary, 0700);
         config(['horus.lumo.binary' => $binary]);
-        $user = User::factory()->create();
+        $user = User::factory()->create(['role' => $role]);
+        $project = $withProject ? Project::create(['user_id' => $user->id, 'name' => 'Projeto de teste', 'tenant_id' => '100', 'tenant_name' => 'Teste']) : null;
         $credentials = ['auth' => ['access_token' => 'synthetic-access', 'refresh_token' => 'synthetic-refresh']];
         $connection = Connection::create(['user_id' => $user->id, 'provider' => 'horus', 'status' => 'connected', 'credentials' => $credentials, 'metadata' => ['session_generation' => 'session-a']]);
         try {
-            app(LumoClient::class)->run($connection, ['app', 'query', 'app:10', '--fields', '501:SUM']);
+            app(LumoClient::class)->run($connection, ['app', 'query', 'app:10', '--fields', '501:SUM', ...$options], $project);
             $this->fail('A recusa da consulta deve ser informada.');
         } catch (BiNativeFailure $failure) {
-            $this->assertSame('app_query_access_denied', $failure->reason);
+            $this->assertSame('app_query_suspended', $failure->reason);
+            $this->assertStringContainsString('Conferir dados', $failure->getMessage());
+            $this->assertStringNotContainsString('private-result', $failure->getMessage());
+            $this->assertFileDoesNotExist($root.'/started');
             $this->assertSame('connected', $connection->fresh()->status);
             $this->assertSame($credentials, $connection->fresh()->credentials);
             $this->assertSame('session-a', $connection->fresh()->metadata['session_generation']);
+        } finally {
+            File::deleteDirectory($root);
+        }
+    }
+
+    public function test_suspending_direct_queries_preserves_scoped_dashboard_previews(): void
+    {
+        $root = storage_path('framework/testing/native-preview-'.Str::uuid());
+        File::ensureDirectoryExists($root, 0700, true);
+        $binary = $root.'/native';
+        File::put($binary, '#!'.PHP_BINARY."\n<?php\n".'echo json_encode(["data"=>["value"=>600],"schemaVersion"=>1,"command"=>"app dashboard-preview"]);');
+        chmod($binary, 0700);
+        config(['horus.lumo.binary' => $binary]);
+        $user = User::factory()->create();
+        $connection = Connection::create(['user_id' => $user->id, 'provider' => 'horus', 'status' => 'connected', 'credentials' => ['auth' => ['token' => 'synthetic']]]);
+
+        try {
+            $result = app(LumoClient::class)->run($connection, ['app', 'dashboard-preview', 'app:10']);
+
+            $this->assertSame(['value' => 600], $result['data']);
+            $this->assertSame('connected', $connection->fresh()->status);
         } finally {
             File::deleteDirectory($root);
         }

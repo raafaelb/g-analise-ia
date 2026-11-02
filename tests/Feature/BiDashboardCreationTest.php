@@ -85,6 +85,9 @@ class BiDashboardCreationTest extends TestCase
                 return ['exit_code' => ($state->invalid ?? false) ? 8 : 0, 'data' => ['valid' => ! ($state->invalid ?? false), 'errorCount' => ($state->invalid ?? false) ? 1 : 0]];
             }
             if ($arguments[0] === 'app' && $arguments[1] === 'query') {
+                if ($state->query_suspended ?? false) {
+                    throw BiNativeFailure::appQuerySuspended();
+                }
                 if ($state->query_denied ?? false) {
                     throw BiNativeFailure::detect($arguments, 10, '', 'Error: query app:11: User 42 has no access to app 11') ?? new RuntimeException('Recusa de consulta não reconhecida.');
                 }
@@ -199,7 +202,8 @@ class BiDashboardCreationTest extends TestCase
 
         $response = $this->actingAs($user)->getJson('/api/catalog/100/apps/11/dashboard-builder')->assertOk();
 
-        $response->assertJsonPath('resource', 'app:11')->assertJsonPath('fields.0.label', 'Valor')->assertJsonPath('fields.1.numeric', false)->assertJsonPath('fields.2.date', true)->assertJsonPath('dashboard_count', 1);
+        $response->assertJsonPath('resource', 'app:11')->assertJsonPath('fields.0.label', 'Valor')->assertJsonPath('fields.1.numeric', false)->assertJsonPath('fields.2.date', true)->assertJsonPath('dashboard_count', 1)->assertJsonPath('creation_available', false);
+        $this->assertStringContainsString('temporariamente indisponível', $response->json('creation_unavailable_reason'));
         $this->assertStringNotContainsString('SYNTHETIC-ORIGINAL-CONTENT', $response->getContent());
     }
 
@@ -339,6 +343,22 @@ class BiDashboardCreationTest extends TestCase
         $this->getJson('/api/catalog/100/apps/11/dashboard-builder')->assertUnprocessable();
         $this->assertArrayNotHasKey('dashboard_creation_resolution', $approval->fresh()->payload);
         $this->assertSame(1, $state->pushes);
+    }
+
+    public function test_suspended_query_returns_422_without_a_review_or_a_native_write(): void
+    {
+        [$user, $connection, $state] = $this->context();
+        $input = $this->input($user);
+        $state->query_suspended = true;
+
+        $response = $this->postJson('/api/catalog/100/apps/11/dashboard-builder/actions', $input)->assertUnprocessable()->assertJsonValidationErrors('dashboard');
+
+        $this->assertStringContainsString('temporariamente indisponível', $response->json('errors.dashboard.0'));
+        $this->assertStringNotContainsString('Conecte novamente', $response->json('errors.dashboard.0'));
+        $this->assertSame(0, $state->pushes);
+        $this->assertSame('connected', $connection->fresh()->status);
+        $this->assertDatabaseCount('approvals', 0);
+        $this->assertDatabaseCount('agent_runs', 0);
     }
 
     public function test_native_query_denial_is_actionable_and_never_creates_a_review_or_writes(): void

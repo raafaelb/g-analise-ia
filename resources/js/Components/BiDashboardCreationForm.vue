@@ -6,19 +6,19 @@ import {createRequestGuard} from '../lib/async-response';
 import {conversationReviewState} from '../lib/conversation-approvals';
 type Item=Record<string,any>;
 type Field={id:number;label:string;table_name:string;numeric:boolean;date:boolean;groupable:boolean};
-type Source={resource:string;name:string;version:string;state:string;desk_id:string|null;dashboard_count:number;fields:Field[];aggregations:Record<string,string>};
+type Source={resource:string;name:string;version:string;state:string;desk_id:string|null;dashboard_count:number;fields:Field[];aggregations:Record<string,string>;creation_available?:boolean;creation_unavailable_reason?:string|null};
 const props=defineProps<{tenant:string;tenantName:string;resource:Item;request:(path:string,method?:string,data?:unknown)=>Promise<any>}>();
 const emit=defineEmits<{close:[];updated:[];created:[result:{resource:string;dashboard_id:number}];duplicate:[];setup:[];notice:[message:string]}>();
 const source=ref<Source|null>(null);const name=ref('');const metricId=ref('');const groupId=ref('');const aggregation=ref('');const grain=ref('YEARMONTH');const format=ref('default');const metricTitle=ref('');
 const loading=ref(false);const busy=ref(false);const polling=ref(false);const verifying=ref(false);const error=ref('');const review=ref<Item|null>(null);const uncertain=ref(false);const preparedInput=ref<Item|null>(null);const clock=ref(Date.now());
-const nameInput=ref<HTMLInputElement|null>(null);const reviewHeading=ref<HTMLElement|null>(null);const guard=createRequestGuard();const fieldId='dashboard-create-'+crypto.randomUUID();let requestId=crypto.randomUUID();let completionSent=false;let timer:ReturnType<typeof setInterval>|undefined;
+const nameInput=ref<HTMLInputElement|null>(null);const availabilityTitle=ref<HTMLElement|null>(null);const reviewHeading=ref<HTMLElement|null>(null);const guard=createRequestGuard();const fieldId='dashboard-create-'+crypto.randomUUID();let requestId=crypto.randomUUID();let completionSent=false;let timer:ReturnType<typeof setInterval>|undefined;
 const resourceRef=computed(()=>`app:${props.resource.id}`);
 const fields=computed(()=>source.value?.fields??[]);
 const metricFields=computed(()=>fields.value.filter(field=>aggregation.value==='COUNT'||field.numeric));
 const groupFields=computed(()=>fields.value.filter(field=>field.groupable));
 const selectedMetric=computed(()=>fields.value.find(field=>String(field.id)===metricId.value));
 const selectedGroup=computed(()=>fields.value.find(field=>String(field.id)===groupId.value));
-const valid=computed(()=>!!source.value&&source.value.state==='draft'&&source.value.desk_id===null&&source.value.dashboard_count<100&&name.value.trim().length>0&&name.value.trim().length<=100&&metricTitle.value.trim().length<=100&&!!source.value.aggregations[aggregation.value]&&!!selectedMetric.value&&(aggregation.value==='COUNT'||selectedMetric.value.numeric)&&!!selectedGroup.value?.groupable);
+const valid=computed(()=>!!source.value&&source.value.creation_available!==false&&source.value.state==='draft'&&source.value.desk_id===null&&source.value.dashboard_count<100&&name.value.trim().length>0&&name.value.trim().length<=100&&metricTitle.value.trim().length<=100&&!!source.value.aggregations[aggregation.value]&&!!selectedMetric.value&&(aggregation.value==='COUNT'||selectedMetric.value.numeric)&&!!selectedGroup.value?.groupable);
 const status=computed(()=>review.value?conversationReviewState(review.value,clock.value):'');
 const running=computed(()=>['approved','executing'].includes(status.value));
 const result=computed<Item>(()=>review.value?.payload?.execution?.result??{});
@@ -33,7 +33,7 @@ async function begin(){
  const current=guard.next();loading.value=true;error.value='';source.value=null;review.value=null;preparedInput.value=null;uncertain.value=false;completionSent=false;requestId=crypto.randomUUID();
  try{const data=await props.request(`/catalog/${props.tenant}/apps/${props.resource.id}/dashboard-builder`);if(!current())return;if(data.resource!==resourceRef.value||typeof data.name!=='string'||!(/^[a-f0-9]{64}$/.test(data.version??''))||!Array.isArray(data.fields)||!Number.isInteger(data.dashboard_count)||typeof data.aggregations!=='object'||data.aggregations===null||data.fields.some((field:Item)=>!Number.isInteger(field.id)||field.id<1||typeof field.label!=='string'||typeof field.table_name!=='string'||typeof field.numeric!=='boolean'||typeof field.date!=='boolean'||typeof field.groupable!=='boolean'))throw new Error('Os campos recebidos não correspondem a esta aplicação. Reabra o assistente.');source.value=data;if(!data.fields.some((field:Field)=>String(field.id)===metricId.value))metricId.value='';if(!data.fields.some((field:Field)=>String(field.id)===groupId.value))groupId.value='';}
  catch(e){if(current())error.value=(e as Error).message;}
- finally{if(current()){loading.value=false;await nextTick();nameInput.value?.focus();}}
+ finally{if(current()){loading.value=false;await nextTick();if(source.value?.creation_available===false){availabilityTitle.value?.focus({preventScroll:true});availabilityTitle.value?.scrollIntoView?.({block:'start'});}else nameInput.value?.focus();}}
 }
 async function prepare(){
  if(busy.value||(!preparedInput.value&&!valid.value))return;const current=guard.current();busy.value=true;error.value='';
@@ -70,6 +70,7 @@ onUnmounted(()=>{guard.invalidate();if(timer)clearInterval(timer);});
  <section class="dashboard-creation-form" aria-label="Novo dashboard" data-tour="dashboard-builder">
   <header><LayoutDashboard :size="21"/><div><h3>Novo dashboard</h3><p>{{tenantName}} · Um resumo com indicador, gráfico e tabela.</p></div></header>
   <div v-if="loading" class="dashboard-progress" role="status"><LoaderCircle class="spin" :size="21"/>Conferindo aplicação e campos disponíveis…</div>
+  <div v-else-if="!review&&source&&source.creation_available===false" class="dashboard-progress attention" role="status"><ShieldCheck :size="23"/><div><strong ref="availabilityTitle" tabindex="-1">Assistente temporariamente indisponível</strong><p>{{source.creation_unavailable_reason}}</p><p>Você pode continuar a autoria no projeto e conferir os painéis existentes. Abrir o projeto não inicia uma tarefa de IA.</p><div class="dashboard-footer"><button class="primary-button" @click="emit('setup')">Continuar no projeto</button><button class="secondary-button" @click="close">Voltar</button></div></div></div>
   <div v-else-if="!review&&source&&source.state==='published'" class="dashboard-progress attention"><div><strong>Crie o novo painel em uma cópia</strong><p>Esta aplicação está publicada. Duplique para sua mesa para preparar o painel e conferir a prévia. A publicação da cópia terá sua própria revisão.</p><div class="dashboard-footer"><button class="primary-button" @click="emit('duplicate')"><Copy :size="16"/>Duplicar para minha mesa</button><button class="secondary-button" @click="close">Voltar</button></div></div></div>
   <div v-else-if="!review&&source&&(!fields.length||!groupFields.length||source.state!=='draft'||source.desk_id!==null||source.dashboard_count>=100)" class="dashboard-progress attention"><div><strong>{{source.dashboard_count>=100?'Esta aplicação atingiu o limite do assistente':'Prepare os dados desta aplicação'}}</strong><p>O assistente precisa de campos identificados e uma aplicação privada com menos de 100 dashboards. Abra um projeto para investigar as fontes, os campos e a atualização dos dados com a IA.</p><div class="dashboard-footer"><button class="primary-button" @click="emit('setup')">Preparar dados no projeto</button><button class="secondary-button" @click="close">Voltar</button></div></div></div>
   <form v-else-if="!review&&source" @submit.prevent="prepare">

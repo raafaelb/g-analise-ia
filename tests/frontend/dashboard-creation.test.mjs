@@ -116,3 +116,11 @@ test('a definite preparation refusal keeps the choices editable and does not pre
  let refused=false;const view=mount({onRequest:(path,method,data,response)=>{if(path.endsWith('/actions')&&!refused){refused=true;throw Object.assign(new Error('O serviço de consulta recusou acesso.'),{status:422});}return response;}});
  try{await settled();await prepare(view);assert.match(text(view.root),/serviço de consulta recusou acesso/);assert.equal(find(view.root,item=>item.kind==='fieldset').props.disabled,false);assert.equal(Boolean(view.button('Conferir esta solicitação')),false);assert.doesNotMatch(text(view.root),/A proposta está guardada/);assert.equal(find(view.root,item=>String(item.props.id??'').endsWith('-name')).props.value,'Resumo comercial');view.field('name','Resumo revisado');await click(view,'Conferir prévia e criação');assert.ok(view.button('Autorizar criação do dashboard'));const sent=view.calls.filter(call=>call.path.endsWith('/actions'));assert.equal(sent.length,2);assert.notEqual(sent[0].data.request_id,sent[1].data.request_id);assert.equal(sent[1].data.name,'Resumo revisado');assert.equal(sent[1].data.metric_id,sent[0].data.metric_id);assert.equal(view.calls.some(call=>call.path.endsWith('/decide')),false);assert.deepEqual(view.errors,[]);}finally{view.close();}
 });
+
+
+test('a suspended data query offers project authorship without a form, clone or creation request',async()=>{
+ for(const state of ['draft','published']){
+  const view=mount({state,onRequest:(path,method,data,response)=>path.endsWith('/dashboard-builder')?{...response,creation_available:false,creation_unavailable_reason:'A consulta direta está temporariamente indisponível. Use Conferir dados.'}:response});
+  try{await settled();assert.match(text(view.root),/Assistente temporariamente indisponível/);assert.equal(text(globalThis.document.activeElement),'Assistente temporariamente indisponível');assert.match(text(view.root),/Conferir dados/);assert.equal(Boolean(find(view.root,item=>item.kind==='form')),false);assert.equal(Boolean(view.button('Duplicar para minha mesa')),false);assert.equal(Boolean(view.button('Conferir prévia e criação')),false);await click(view,'Continuar no projeto');assert.deepEqual(view.events,['setup']);assert.equal(view.calls.length,1);assert.deepEqual(view.errors,[]);}finally{view.close();}
+ }
+});

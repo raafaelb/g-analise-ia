@@ -16,6 +16,8 @@ use Symfony\Component\Process\Process;
 
 class LumoClient
 {
+    public const APP_QUERY_AVAILABLE = false;
+
     private function sessionHome(int $userId): string
     {
         $path = storage_path('app/private/runtime-sessions/'.$userId.'/'.Str::uuid());
@@ -113,6 +115,9 @@ class LumoClient
         }
         if ($project && $project->user_id !== $connection->user_id) {
             throw new RuntimeException('Contexto de usuário inválido.');
+        }
+        if (($arguments[0] ?? '') === 'app' && ($arguments[1] ?? '') === 'query' && ! self::APP_QUERY_AVAILABLE) {
+            throw BiNativeFailure::appQuerySuspended();
         }
         if ($project?->tenant_id) {
             app(TenantPolicy::class)->assertCommandAllowed((string) $project->tenant_id, $arguments, $connection);

@@ -34,7 +34,7 @@ class BiDashboardCreation
             $fields = $this->fields($connection, $context, 'app:'.$id, $shape);
             $this->assertSession($connection, $generation);
 
-            return ['resource' => 'app:'.$id, 'name' => $shape->nome, 'version' => $this->blueprint->digest($shape), 'state' => $summary['state'], 'desk_id' => $summary['desk_id'], 'dashboard_count' => count($shape->dashboards), 'fields' => $fields, 'aggregations' => BiDashboardBlueprint::AGGREGATIONS];
+            return ['resource' => 'app:'.$id, 'name' => $shape->nome, 'version' => $this->blueprint->digest($shape), 'state' => $summary['state'], 'desk_id' => $summary['desk_id'], 'dashboard_count' => count($shape->dashboards), 'fields' => $fields, 'aggregations' => BiDashboardBlueprint::AGGREGATIONS, 'creation_available' => LumoClient::APP_QUERY_AVAILABLE, 'creation_unavailable_reason' => LumoClient::APP_QUERY_AVAILABLE ? null : BiNativeFailure::appQuerySuspended()->getMessage()];
         });
     }
 

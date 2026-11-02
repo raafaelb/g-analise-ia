@@ -11,6 +11,11 @@ class BiNativeFailure extends RuntimeException
         parent::__construct($message, $exitCode);
     }
 
+    public static function appQuerySuspended(): self
+    {
+        return new self('app_query_suspended', 'A consulta direta de valores está temporariamente indisponível para preservar suas permissões de dados. Use Conferir dados ou a prévia do dashboard. Sua conexão BI continua válida.');
+    }
+
     public static function detect(array $arguments, int $exitCode, string $output, string $stderr): ?self
     {
         $failure = mb_substr($stderr, 0, 12_000)."\n".mb_substr($output, 0, 4_000);
