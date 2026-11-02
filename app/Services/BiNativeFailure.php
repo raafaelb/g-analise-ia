@@ -17,6 +17,9 @@ class BiNativeFailure extends RuntimeException
         if ($exitCode === 6 && ($arguments[0] ?? '') === 'list' && ($arguments[1] ?? '') === 'investigation' && trim($failure) === 'Error: list investigation: A Sentinela não está disponível para este ambiente.') {
             return new self('module_unavailable', 'Investigações não estão disponíveis neste ambiente. Consulte a habilitação do módulo Sentinela com o administrador do G-Analise BI.', ['module' => 'sentinela'], 6);
         }
+        if ($exitCode === 10 && ($arguments[0] ?? '') === 'app' && ($arguments[1] ?? '') === 'query' && preg_match('/^app:([1-9][0-9]*)$/D', $arguments[2] ?? '', $reference) && preg_match('/\AError: query '.preg_quote($arguments[2], '/').': User ([1-9][0-9]{0,14}) has no access to app '.$reference[1].'\z/u', trim($failure), $actor)) {
+            return new self('app_query_access_denied', 'O serviço de consulta do G-Analise BI recusou acesso a esta aplicação. Confira com o administrador do BI as permissões e a identidade usada pela integração de consulta.', ['resource' => $arguments[2], 'native_actor_id' => (int) $actor[1]], 10);
+        }
         if ($exitCode !== 9) {
             return null;
         }

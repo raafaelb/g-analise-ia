@@ -9,6 +9,7 @@ use App\Models\Connection;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
+use App\Services\BiNativeFailure;
 use App\Services\LumoClient;
 use App\Services\RefreshCoverage;
 use App\Services\WorkspaceFiles;
@@ -84,6 +85,9 @@ class BiDashboardCreationTest extends TestCase
                 return ['exit_code' => ($state->invalid ?? false) ? 8 : 0, 'data' => ['valid' => ! ($state->invalid ?? false), 'errorCount' => ($state->invalid ?? false) ? 1 : 0]];
             }
             if ($arguments[0] === 'app' && $arguments[1] === 'query') {
+                if ($state->query_denied ?? false) {
+                    throw BiNativeFailure::detect($arguments, 10, '', 'Error: query app:11: User 42 has no access to app 11') ?? new RuntimeException('Recusa de consulta não reconhecida.');
+                }
                 if ($state->query_failure ?? false) {
                     throw new RuntimeException('Falha sintética do provedor.', 10);
                 }
@@ -335,6 +339,22 @@ class BiDashboardCreationTest extends TestCase
         $this->getJson('/api/catalog/100/apps/11/dashboard-builder')->assertUnprocessable();
         $this->assertArrayNotHasKey('dashboard_creation_resolution', $approval->fresh()->payload);
         $this->assertSame(1, $state->pushes);
+    }
+
+    public function test_native_query_denial_is_actionable_and_never_creates_a_review_or_writes(): void
+    {
+        [$user, $connection, $state] = $this->context();
+        $input = $this->input($user);
+        $state->query_denied = true;
+
+        $response = $this->postJson('/api/catalog/100/apps/11/dashboard-builder/actions', $input)->assertUnprocessable()->assertJsonValidationErrors('dashboard');
+
+        $this->assertStringContainsString('identidade usada pela integração', $response->json('errors.dashboard.0'));
+        $this->assertStringNotContainsString('quando a consulta estiver disponível', $response->json('errors.dashboard.0'));
+        $this->assertSame(0, $state->pushes);
+        $this->assertSame('connected', $connection->fresh()->status);
+        $this->assertDatabaseCount('approvals', 0);
+        $this->getJson('/api/catalog/100/apps/11/dashboard-builder')->assertOk();
     }
 
     public function test_provider_query_failure_keeps_the_proposal_without_creating_a_review_or_dashboard(): void

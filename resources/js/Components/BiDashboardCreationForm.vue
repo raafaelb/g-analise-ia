@@ -39,7 +39,7 @@ async function prepare(){
  if(busy.value||(!preparedInput.value&&!valid.value))return;const current=guard.current();busy.value=true;error.value='';
  preparedInput.value??={request_id:requestId,version:source.value!.version,name:name.value.trim(),metric_id:Number(metricId.value),group_id:Number(groupId.value),aggregation:aggregation.value,grain:selectedGroup.value?.date?grain.value:'AGP',format:aggregation.value==='COUNT'?'integer':format.value,metric_title:metricTitle.value.trim()||null};
  try{const response=await props.request(`/catalog/${props.tenant}/apps/${props.resource.id}/dashboard-builder/actions`,'POST',preparedInput.value);if(!current())return;if(response.approval?.payload?.action?.action!=='create_dashboard'||response.approval?.payload?.action?.resource!==resourceRef.value||response.approval?.payload?.action?.name!==preparedInput.value?.name||typeof response.approval?.fingerprint!=='string')throw new Error('Não foi possível confirmar esta revisão. Consulte a mesma solicitação antes de continuar.');review.value=response.approval;emit('updated');await nextTick();reviewHeading.value?.focus();}
- catch(e){if(current())error.value=(e as Error).message;}
+ catch(e){if(current()){error.value=(e as Error).message;if((e as Error&{status?:number}).status===422){preparedInput.value=null;requestId=crypto.randomUUID();}}}
  finally{if(current())busy.value=false;}
 }
 function notifyCompletion(){if(!confirmed.value||completionSent)return;completionSent=true;emit('updated');emit('notice',result.value.message??'Dashboard privado criado e conferido.');}

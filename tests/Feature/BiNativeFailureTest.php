@@ -34,6 +34,43 @@ class BiNativeFailureTest extends TestCase
         $this->assertStringNotContainsString('permissões', $failure->getMessage());
     }
 
+    public function test_application_query_access_denial_is_not_presented_as_a_transient_server_failure(): void
+    {
+        $failure = BiNativeFailure::detect(['app', 'query', 'app:10', '--fields', '501:SUM'], 10, '', 'Error: query app:10: User 42 has no access to app 10');
+
+        $this->assertInstanceOf(BiNativeFailure::class, $failure);
+        $this->assertSame('app_query_access_denied', $failure->reason);
+        $this->assertSame(['resource' => 'app:10', 'native_actor_id' => 42], $failure->details);
+        $this->assertSame(10, $failure->getCode());
+        $this->assertStringContainsString('identidade usada pela integração', $failure->getMessage());
+        $this->assertStringNotContainsString('42', $failure->getMessage());
+        $this->assertStringNotContainsString('expirou', $failure->getMessage());
+    }
+
+    public function test_native_query_denial_preserves_the_connected_session_and_its_credentials(): void
+    {
+        $root = storage_path('framework/testing/native-query-denied-'.Str::uuid());
+        File::ensureDirectoryExists($root, 0700, true);
+        $binary = $root.'/native';
+        File::put($binary, "#!/bin/sh\nprintf '%s\\n' 'Error: query app:10: User 42 has no access to app 10' >&2\nexit 10\n");
+        chmod($binary, 0700);
+        config(['horus.lumo.binary' => $binary]);
+        $user = User::factory()->create();
+        $credentials = ['auth' => ['access_token' => 'synthetic-access', 'refresh_token' => 'synthetic-refresh']];
+        $connection = Connection::create(['user_id' => $user->id, 'provider' => 'horus', 'status' => 'connected', 'credentials' => $credentials, 'metadata' => ['session_generation' => 'session-a']]);
+        try {
+            app(LumoClient::class)->run($connection, ['app', 'query', 'app:10', '--fields', '501:SUM']);
+            $this->fail('A recusa da consulta deve ser informada.');
+        } catch (BiNativeFailure $failure) {
+            $this->assertSame('app_query_access_denied', $failure->reason);
+            $this->assertSame('connected', $connection->fresh()->status);
+            $this->assertSame($credentials, $connection->fresh()->credentials);
+            $this->assertSame('session-a', $connection->fresh()->metadata['session_generation']);
+        } finally {
+            File::deleteDirectory($root);
+        }
+    }
+
     public function test_a_first_execution_status_returns_a_scoped_safe_reason(): void
     {
         $failure = BiNativeFailure::detect(['flow', 'status', 'flow:10'], 9, '', self::NO_EXECUTION."\n");
@@ -71,6 +108,13 @@ class BiNativeFailureTest extends TestCase
             'unavailable module from another category' => [['list', 'app'], 6, self::MODULE_UNAVAILABLE],
             'investigation permission denial' => [['list', 'investigation'], 6, 'Error: list investigation: Sem permissão para acessar este recurso.'],
             'untrusted extra module output' => [['list', 'investigation'], 6, self::MODULE_UNAVAILABLE."\nTOKEN_EXPIRED"],
+            'query denial with another exit' => [['app', 'query', 'app:10'], 9, 'Error: query app:10: User 42 has no access to app 10'],
+            'query denial for another command' => [['app', 'export', 'app:10'], 10, 'Error: query app:10: User 42 has no access to app 10'],
+            'query denial mismatched resource' => [['app', 'query', 'app:11'], 10, 'Error: query app:10: User 42 has no access to app 10'],
+            'query denial mismatched target' => [['app', 'query', 'app:10'], 10, 'Error: query app:10: User 42 has no access to app 11'],
+            'query denial missing actor' => [['app', 'query', 'app:10'], 10, 'Error: query app:10: User 0 has no access to app 10'],
+            'query denial with additional diagnostics' => [['app', 'query', 'app:10'], 10, "Error: query app:10: User 42 has no access to app 10\nPrivate diagnostic must stay unclassified"],
+            'different query server failure' => [['app', 'query', 'app:10'], 10, 'Error: query app:10: Service unavailable'],
             'authentication' => [['writeback', 'import', 'writeback:10'], 6, self::CAPACITY],
             'another command' => [['credential', 'query', 'credential:10'], 9, self::CAPACITY],
             'empty creation' => [['new', 'writeback', '--name', 'Teste'], 9, self::CAPACITY],

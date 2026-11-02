@@ -71,6 +71,9 @@ class BiDashboardCreation
                         $total = $this->lumo->run($connection, ['app', 'query', $data['resource'], '--fields', $selection['metric_ref'], '--limit', '1'], $context, 60)['data'] ?? null;
                         $groups = $this->lumo->run($connection, ['app', 'query', $data['resource'], '--fields', $selection['group_ref'].','.$selection['metric_ref'], '--order-by', ($selection['chart_type'] === 'line' ? $data['group_id'].':ASC' : $data['metric_id'].':DESC'), '--limit', '26'], $context, 60)['data'] ?? null;
                     } catch (RuntimeException $e) {
+                        if ($e instanceof BiNativeFailure) {
+                            throw $e;
+                        }
                         if ($e->getCode() === 10) {
                             throw ValidationException::withMessages(['dashboard' => 'O G-Analise BI apresentou uma falha ao consultar os valores desta aplicação. Nenhum dashboard foi criado. Suas escolhas foram preservadas; você pode conferir esta solicitação quando a consulta estiver disponível. A aplicação não será publicada para contornar essa falha.']);
                         }
