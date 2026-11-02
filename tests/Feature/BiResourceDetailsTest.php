@@ -47,9 +47,30 @@ class BiResourceDetailsTest extends TestCase
         }
         $mock = Mockery::mock(LumoClient::class);
         $mock->shouldReceive('initialize')->andReturnNull();
-        $mock->shouldReceive('run')->andReturnUsing(function ($connection, $args) use ($bodies, $denied, $unreadable, $summaries) {
+        $mock->shouldReceive('run')->andReturnUsing(function ($connection, $args) use ($bodies, $denied, $unreadable, $summaries, $folders, $user) {
+            if ($args[0] === 'status') {
+                return ['data' => ['tenantId' => 321, 'clean' => array_map(function (string $reference) use ($folders): string {
+                    [$kind, $id] = explode(':', $reference);
+
+                    return $reference.'  ('.$folders[$kind].'/resource-'.$id.'.yaml)';
+                }, array_values(array_diff(array_keys($bodies), $unreadable)))]];
+            }
             if ($args[0] === 'info') {
                 return ['data' => ['payload' => ['header' => ['tenantId' => 321], 'body' => $summaries[$args[1]] ?? $bodies[$args[1]]]]];
+            }
+            if ($args[0] === 'pull') {
+                $references = array_values(array_filter(array_slice($args, 1), fn (string $argument): bool => ! str_starts_with($argument, '--')));
+                foreach ($references === [] ? array_keys($bodies) : $references as $reference) {
+                    if (! isset($bodies[$reference]) || in_array($reference, $unreadable, true)) {
+                        continue;
+                    }
+                    [$kind, $id] = explode(':', $reference);
+                    $directory = $this->root.'/'.$user->id.'/catalog-321-initial/'.$folders[$kind];
+                    File::ensureDirectoryExists($directory, 0700, true);
+                    File::put($directory.'/resource-'.$id.'.yaml', Yaml::dump(['id' => (int) $id, 'tenantId' => 321, 'kind' => $kind])."---\n".Yaml::dump($bodies[$reference], 10));
+                }
+
+                return ['data' => []];
             }
             if ($args[0] !== 'list') {
                 return ['data' => []];

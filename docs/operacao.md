@@ -34,6 +34,8 @@ A migração `2026_11_01_191249_add_attachment_ids_to_agent_runs_table` acrescen
 
 Os workers têm `restart: unless-stopped`. Alterações no código exigem reiniciar os workers; a fila é preservada. Em produção, use a nova imagem em todos os serviços. Timeout da fila é maior que o turno; ações remotas não têm repetição automática após resultado incerto. Não monte Docker socket no worker.
 
+A leitura completa do catálogo confere o `status --filter clean` da versão homologada do Lumo, com tenant e caminhos relativos dos documentos sincronizados. Formato desconhecido ou identidade divergente impede confirmar detalhes; não substitua a resposta por arquivos antigos nem remova essa conferência para reduzir latência. Arquivos fora de escopo continuam preservados. Cobertura diária e dependências de exclusão usam a mesma leitura confirmada. Essa revisão não exige migração de banco; recarregue os workers após atualizar o código e confira a saúde.
+
 ## Sandbox do Codex e limites do host
 
 A imagem inclui `codex-resources` da mesma distribuição oficial fixada do Codex, incluindo seu auxiliar `bwrap`; não instala um pacote adicional nem baixa um auxiliar de outra origem. O build e `scripts/codex-smoke.php` verificam que o auxiliar executa. O smoke faz initialize/thread/start sem solicitar inferência e não verifica o isolamento completo de um usuário. Falhas do auxiliar ou do protocolo encerram o comando com código 1, para interromper o CI.

@@ -98,7 +98,7 @@ class RefreshCoverage
         $detail = $catalog->detail($user, $tenant, 'app', $appId, includeRelations: false);
         [$connection,$item] = $catalog->access($user, $tenant);
         $context = $catalog->context($connection, $item);
-        $documents = $catalog->workingMetadata($context);
+        $documents = $catalog->confirmedMetadata($connection, $context);
         $maps = [];
         foreach (['table', 'flow', 'schedule'] as $kind) {
             $maps[$kind] = [];

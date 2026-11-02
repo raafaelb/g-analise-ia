@@ -12,6 +12,7 @@ use App\Models\ManagedBiResource;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\Agent\ActionBroker;
+use App\Services\BiCatalog;
 use App\Services\LumoClient;
 use App\Services\WorkspaceFiles;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -71,6 +72,13 @@ class BiFlowDeletionsTest extends TestCase
         $lumo->shouldReceive('run')->andReturnUsing(function (Connection $connection, array $args, ?Project $project = null) use ($state): array {
             $this->assertSame('100', (string) $project?->tenant_id);
             $state->commands[] = $args;
+            if ($args[0] === 'status') {
+                return ['data' => ['tenantId' => 100, 'clean' => array_values(array_map(function (string $reference): string {
+                    [$kind, $id] = explode(':', $reference);
+
+                    return $reference.'  ('.['flow' => 'flows', 'table' => 'tables', 'app' => 'apps', 'schedule' => 'schedules'][$kind].'/resource--'.$id.'.yaml)';
+                }, array_keys(array_diff_key($state->bodies, array_fill_keys(array_filter([$state->missing_metadata]), true)))))]];
+            }
             if ($args[0] === 'list') {
                 if ($args[1] === $state->denied_list) {
                     throw new RuntimeException('Área sem acesso no ensaio.', 6);
@@ -423,5 +431,27 @@ class BiFlowDeletionsTest extends TestCase
         $this->assertDatabaseCount('approvals', 1);
         $this->assertSame(1, $state->sent);
         $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'flow:2', 'status' => 'deletion_pending']);
+    }
+
+    public static function retainedDependencies(): array
+    {
+        return ['application' => ['app:9'], 'table' => ['table:500'], 'schedule' => ['schedule:8']];
+    }
+
+    #[DataProvider('retainedDependencies')]
+    public function test_old_dependency_files_cannot_authorize_deletion_after_they_leave_the_clean_list(string $reference): void
+    {
+        [$user, $connection, , $state] = $this->context();
+        $context = app(BiCatalog::class)->context($connection, ['id' => '100', 'name' => 'Homologação']);
+        $retained = $this->write($context, $reference, $state->bodies[$reference]);
+        $hash = hash_file('sha256', $retained);
+        $state->missing_metadata = $reference;
+        $this->native($state);
+
+        $this->actingAs($user)->postJson('/api/catalog/100/flows/2/actions', $this->input())->assertUnprocessable()->assertJsonValidationErrors('operation');
+
+        $this->assertSame(0, $state->sent);
+        $this->assertSame($hash, hash_file('sha256', $retained));
+        $this->assertDatabaseCount('approvals', 0);
     }
 }

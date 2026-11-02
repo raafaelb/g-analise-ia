@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\BiCatalog;
 use App\Services\LumoClient;
 use App\Services\RefreshCoverage;
+use App\Services\ScheduleChanges;
 use App\Services\WorkspaceFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -71,6 +72,13 @@ class RefreshCoverageInspectionTest extends TestCase
         $mock->shouldReceive('initialize')->andReturnNull();
         $mock->shouldReceive('run')->andReturnUsing(function (Connection $connection, array $args, Project $context) use ($state): array {
             $state->commands[] = $args;
+            if ($args[0] === 'status') {
+                return ['data' => ['tenantId' => 321, 'clean' => array_map(function (string $reference): string {
+                    [$kind, $id] = explode(':', $reference);
+
+                    return $reference.'  ('.['app' => 'apps', 'table' => 'tables', 'flow' => 'flows', 'schedule' => 'schedules'][$kind].'/resource-'.$id.'.yaml)';
+                }, array_values(array_diff(array_keys($state->documents), $state->skip)))]];
+            }
             if ($args[0] === 'pull') {
                 if ($state->failPull) {
                     throw new RuntimeException('SYNTHETIC-PRIVATE-REFRESH-ERROR');
@@ -283,5 +291,46 @@ class RefreshCoverageInspectionTest extends TestCase
         $this->assertSame(1, count(array_filter($state->commands, fn ($args) => $args === ['diff', 'schedule:100', '--include-remote'])));
         $this->assertSame(1, count(array_filter($state->commands, fn ($args) => $args === ['info', 'schedule:100'])));
         $this->assertSame(1, BiLoadExecution::count());
+    }
+
+    public function test_retained_old_schedule_metadata_cannot_confirm_coverage_after_it_leaves_the_clean_list(): void
+    {
+        [$user, , $state] = $this->fixture(preload: true);
+        $state->skip = ['schedule:100'];
+
+        $this->actingAs($user)->getJson('/api/catalog/321/apps/10/refresh-coverage')->assertUnprocessable()->assertJsonPath('errors.coverage.0', 'Uma ou mais agendas não forneceram sua configuração para esta consulta. Confira o acesso às agendas antes de criar outra ou confirmar a atualização diária.');
+    }
+
+    public function test_retained_old_table_metadata_remains_unresolved_after_it_leaves_the_clean_list(): void
+    {
+        [$user, , $state] = $this->fixture(preload: true);
+        $state->skip = ['table:1'];
+
+        $this->actingAs($user)->getJson('/api/catalog/321/apps/10/refresh-coverage')->assertOk()->assertJsonPath('configured', false)->assertJsonPath('verified', false)->assertJsonPath('unresolved_tables.0.table_id', '1');
+    }
+
+    public function test_schedule_inspection_allows_confirmed_schedules_when_unrelated_app_details_are_unavailable(): void
+    {
+        [$user, $project, $state] = $this->fixture();
+        $state->documents['app:11'] = ['nome' => 'Outra aplicação', 'tables' => [], 'dashboards' => []];
+        $state->skip = ['app:11'];
+        $this->writeDocuments($project, ['schedule:100' => $state->documents['schedule:100']]);
+
+        app(ScheduleChanges::class)->inspect($user, $project, 'schedule:100', false);
+
+        $this->assertContains(['status', '--filter', 'clean'], $state->commands);
+        $this->assertDatabaseCount('approvals', 1);
+        $this->assertDatabaseCount('jobs', 0);
+    }
+
+    public function test_schedule_inspection_refuses_a_retained_file_when_the_schedule_is_no_longer_confirmed(): void
+    {
+        [$user, $project, $state] = $this->fixture(preload: true);
+        $state->skip = ['schedule:100'];
+        $this->writeDocuments($project, ['schedule:100' => $state->documents['schedule:100']]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Metadados de agendas existentes indisponíveis; a nova carga não foi ativada.');
+        app(ScheduleChanges::class)->inspect($user, $project, 'schedule:100', false);
     }
 }

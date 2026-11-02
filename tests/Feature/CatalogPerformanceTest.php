@@ -49,6 +49,9 @@ class CatalogPerformanceTest extends TestCase
         $mock->shouldReceive('initialize')->andReturnNull();
         $mock->shouldReceive('run')->andReturnUsing(function ($connection, array $arguments) use ($header, $listed): array {
             $this->commands[] = $arguments;
+            if ($arguments[0] === 'status') {
+                return ['data' => ['tenantId' => 321, 'clean' => []]];
+            }
             if ($arguments[0] === 'info') {
                 return ['data' => ['payload' => ['header' => $header, 'body' => ['nome' => 'Aplicação conferida', 'deskId' => 7, 'tables' => [], 'dashboards' => [], 'password' => 'SYNTHETIC-PRIVATE-VALUE']]]];
             }

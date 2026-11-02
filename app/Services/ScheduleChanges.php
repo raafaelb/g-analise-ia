@@ -19,11 +19,11 @@ class ScheduleChanges
             $candidate['ativo'] = true;
         }
         $snapshot = $catalog->snapshot($user, (string) $project->tenant_id, true);
-        if (($snapshot['capabilities']['schedule']['status'] ?? null) !== 'available' || $snapshot['warnings'] !== []) {
+        if (($snapshot['capabilities']['schedule']['status'] ?? null) !== 'available' || ($snapshot['metadata_fresh'] ?? false) !== true) {
             throw new RuntimeException('Não foi possível conferir todas as agendas existentes. Atualize os acessos antes de ativar novas cargas.');
         }
         [$connection,$tenant] = $catalog->access($user, (string) $project->tenant_id);
-        $metadata = $catalog->workingMetadata($catalog->context($connection, $tenant));
+        $metadata = $catalog->confirmedMetadata($connection, $catalog->context($connection, $tenant));
         $schedules = [];
         foreach ($snapshot['resources']['schedule'] as $row) {
             $body = $metadata['schedule:'.$row['id']] ?? null;

@@ -47,6 +47,9 @@ class CatalogTest extends TestCase
         $mock = Mockery::mock(LumoClient::class);
         $mock->shouldReceive('initialize')->andReturnNull();
         $mock->shouldReceive('run')->andReturnUsing(function ($c, $args, $p = null, $timeout = 45) use ($apps, $bodies) {
+            if ($args[0] === 'status') {
+                return ['data' => ['tenantId' => (int) $p->tenant_id, 'clean' => []]];
+            }
             if ($args[0] === 'info') {
                 return ['exit_code' => 0, 'data' => ['payload' => ['header' => ['tenantId' => (int) $p->tenant_id], 'body' => $bodies[$args[1]] ?? ['nome' => 'App autorizado', 'dashboards' => []]]]];
             }
@@ -104,10 +107,27 @@ class CatalogTest extends TestCase
     {
         $user = User::factory()->create();
         $this->connect($user);
-        $this->fakeLumo([['id' => 1, 'nome' => 'Comercial', 'deskId' => 7]]);
         $path = $this->root.'/'.$user->id.'/catalog-321-initial/apps';
         File::ensureDirectoryExists($path, 0700, true);
-        File::put($path.'/comercial--1.yaml', "id: 1\nkind: app\nlumo: v2\ntenantId: 321\n---\nnome: Comercial\ndeskId: 7\ntags: [vendas, metas]\ndashboards:\n  - id: 10\n    nome: Receita\n    widgets: []\n");
+        $mock = $this->mock(LumoClient::class);
+        $mock->shouldReceive('initialize')->andReturnNull();
+        $mock->shouldReceive('run')->andReturnUsing(function ($connection, array $arguments) use ($path): array {
+            if ($arguments[0] === 'status') {
+                return ['data' => ['tenantId' => 321, 'clean' => ['app:1  (apps/comercial--1.yaml)']]];
+            }
+            if ($arguments[0] === 'pull') {
+                $this->assertSame(['pull', '--discard-local'], $arguments);
+                File::put($path.'/comercial--1.yaml', "id: 1\nkind: app\nlumo: v2\ntenantId: 321\n---\nnome: Comercial\ndeskId: 7\ntags: [vendas, metas]\ndashboards:\n  - id: 10\n    nome: Receita\n    widgets: []\n");
+
+                return ['data' => []];
+            }
+            if ($arguments[1] === 'variables') {
+                return ['data' => ['count' => 0, 'variables' => []]];
+            }
+            $rows = $arguments[1] === 'app' ? [['id' => 1, 'nome' => 'Comercial', 'deskId' => 7]] : [];
+
+            return ['data' => ['matched' => count($rows), 'results' => $rows]];
+        });
         $this->actingAs($user)->getJson('/api/catalog/321')->assertOk()->assertJsonPath('resources.app.0.dashboard_count', 1)->assertJsonPath('resources.app.0.dashboards.0.name', 'Receita')->assertJsonPath('tags.0', 'metas');
     }
 
@@ -280,6 +300,9 @@ class CatalogTest extends TestCase
             $this->assertSame('catalog-321-initial', $context->id);
             $this->assertSame($user->id, $context->user_id);
             $this->assertFalse($context->exists);
+            if ($args[0] === 'status') {
+                return ['data' => ['tenantId' => 321, 'clean' => ['app:1  (apps/app--1.yaml)']]];
+            }
             if ($args[0] === 'pull') {
                 $this->assertSame(['pull', '--discard-local'], $args);
                 File::put($file, "id: 1\nkind: app\ntenantId: 321\n---\nnome: Versão publicada\n_state: {deskId: 7}\ndashboards: []\n");

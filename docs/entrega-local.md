@@ -4,7 +4,7 @@ Instalação de desenvolvimento: http://127.0.0.1:8088. Estado consolidado em 01
 
 | Entrega | Implementado e verificado | Etapa restante |
 |---|---|---|
-| Catálogo por tenant | Oito tenants da conta principal e um na conta restrita; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados e variáveis sem valores | Homologar autoria dos módulos indisponíveis e restrições entre mesas; segunda identidade com tenant restrito e revogação/restauração de Criar mesas já conferidas |
+| Catálogo por tenant | Oito tenants da conta principal e um na conta restrita; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados confirmados pelo arquivo sincronizado e variáveis sem valores | Homologar autoria dos módulos indisponíveis e restrições entre mesas; segunda identidade com tenant restrito e revogação/restauração de Criar mesas já conferidas |
 | ChatGPT | Login oficial OSS local, plano individual, modelos autorizados, inferência remota, Codex e ferramentas reais | Enquadramento/configuração oficial para hospedagem central; repetir no domínio público |
 | Criação completa | Clone, manutenção, consultas, criação nova, prévia PNG/interativa, histórico de prévias no projeto, revisão assíncrona, ações manuais de duplicação/exclusão e carga de teste | Ampliar a homologação real da substituição de versões; publicação como nova já autorizada e confirmada no BI |
 | Anexos | Extração privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; seleção ordenada por pedido, preservada nas retomadas e conferida sem inferência; interpretação real anterior de CSV, PDF, XLSX e imagens; preparo visual de PDF sem texto conferido sem nova inferência | Homologar interpretação real do PDF digitalizado com autorização; OCR não implementado; validar amostras do piloto |
@@ -149,3 +149,10 @@ A publicação da fonte de homologação aguarda autorização específica. A re
 O seletor **Arquivos** permite escolher e ordenar até 12 referências do projeto para cada pedido, inclusive arquivos além dos primeiros 12. A mensagem mostra a escolha enviada. A seleção fica gravada na tarefa e nas suas retomadas; uploads e mudanças posteriores valem para pedidos futuros. O usuário pode enviar sem anexos novos, sabendo que isso não apaga informações anteriores da conversa. O limite compartilhado de três imagens/páginas continua explícito.
 
 O envio, a preparação do contexto, a recuperação após recarga e a separação entre dois projetos foram conferidos com CSVs fictícios em instalação temporária sem BI, IA ou consumidores de fila. A interface foi corrigida para manter busca e confirmação acessíveis também em telas baixas. Tour e ajuda acompanham a revisão `2026-11-01.6`. A regressão passou com 1.242 testes em SQLite, 1.245 em PostgreSQL, 202 de frontend, Pint e TypeScript/build; evidências e limites estão na [matriz de gestão](gestao-completa.md). Não foi iniciada nova inferência externa.
+
+
+## Confirmação dos metadados atuais — 01/11/2026
+
+O catálogo completo e as conferências de agendas, cobertura diária e dependências de exclusão passaram a usar os documentos identificados como sincronizados pelo status oficial do Lumo. Arquivos retidos fora desse conjunto, inclusive outro arquivo com o mesmo ID, não substituem detalhes atuais. Os arquivos permanecem preservados. Foram acrescentados 27 casos de regressão, com validação completa em SQLite/PostgreSQL, 202 testes de frontend e Pint; a ajuda e o tour acompanham a revisão `2026-11-01.7`.
+
+A medição real preservou IDs, quantidades e capacidades dos 13 grupos. A atualização completa ainda leva dezenas de segundos: as alternativas de leitura direcionada não melhoraram o tempo e foram retiradas. A investigação, os tempos e as próximas etapas estão na [matriz de gestão](gestao-completa.md). Essa rodada foi somente de leitura no BI e não iniciou inferência ou implantação.

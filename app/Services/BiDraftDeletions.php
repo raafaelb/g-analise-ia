@@ -32,7 +32,7 @@ class BiDraftDeletions
         }
         $generation = $connection->metadata['session_generation'] ?? null;
         $snapshot = $this->catalog->snapshot($user, (string) $project->tenant_id, true);
-        $metadata = $this->catalog->workingMetadata($context);
+        $metadata = $this->catalog->confirmedMetadata($connection, $context);
         foreach (['table', 'app', 'schedule'] as $kind) {
             if (($snapshot['metadata_fresh'] ?? false) !== true || ($snapshot['capabilities'][$kind]['status'] ?? '') !== 'available') {
                 throw new RuntimeException('Não foi possível conferir todas as tabelas, aplicações e agendas autorizadas. A exclusão não será preparada com vínculos incompletos.');

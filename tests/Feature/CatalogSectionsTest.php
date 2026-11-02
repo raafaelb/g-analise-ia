@@ -42,6 +42,8 @@ class CatalogSectionsTest extends TestCase
 
     private bool $allowFullPull = false;
 
+    private mixed $nativeStatus = false;
+
     private bool $failInitialize = false;
 
     private string $headerTenant = '321';
@@ -90,7 +92,15 @@ class CatalogSectionsTest extends TestCase
                     }
                 }
 
-                return ['data' => ['matched' => count($rows), 'results' => $rows]];
+                return ['data' => ['matched' => count($rows), 'results' => array_slice($rows, (int) $arguments[array_search('--offset', $arguments, true) + 1], (int) $arguments[array_search('--limit', $arguments, true) + 1])]];
+            }
+            if ($arguments[0] === 'status') {
+                return ['data' => $this->nativeStatus !== false ? $this->nativeStatus : ['tenantId' => 321, 'clean' => $this->skipPull ? [] : array_map(function (string $reference): string {
+                    [$kind, $id] = explode(':', $reference);
+                    $folders = ['app' => 'apps', 'bi-desk' => 'bi-desks', 'dw-desk' => 'dw-desks', 'table' => 'tables', 'flow' => 'flows', 'writeback' => 'writebacks', 'credential' => 'credentials'];
+
+                    return $reference.'  ('.($folders[$kind] ?? $kind.'s').'/recurso--'.$id.'.yaml)';
+                }, array_keys($this->bodies))]];
             }
             if ($arguments[0] === 'info') {
                 if (! array_key_exists($arguments[1], $this->agentInfo)) {
@@ -484,5 +494,143 @@ class CatalogSectionsTest extends TestCase
         $this->actingAs($user)->getJson('/api/catalog/321/sections/app')->assertOk()->assertJsonPath('resources.app.0.name', 'Painel financeiro');
 
         $this->assertSame($before, count($this->commands));
+    }
+
+    public function test_full_refresh_reads_each_category_and_rebuilds_metadata_once_without_exposing_unlisted_resources(): void
+    {
+        $this->allowFullPull = true;
+        [$user, $connection] = $this->connectSection(['app:40' => $this->appBody(), 'bi-desk:7' => ['nome' => 'Financeiro'], 'dw-desk:10' => ['nome' => 'Dados'], 'table:20' => ['nome' => 'Receitas', 'deskId' => 10], 'flow:30' => ['nome' => 'Carga', 'deskId' => 10], 'credential:8' => ['nome' => 'Conexão sem acesso']]);
+        $context = app(BiCatalog::class)->context($connection, ['id' => '321', 'name' => 'Ambiente sintético']);
+        $this->write($context, 'app:99', $this->appBody('Aplicação removida da lista'));
+        $this->write($context, 'credential:8', ['nome' => 'Metadados da conexão antiga']);
+        $this->denied['credential'] = 6;
+        $this->variables = ['FONTE' => 'synthetic-private-catalog-variable'];
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321?refresh=1');
+
+        $response->assertOk()->assertJsonPath('metadata_fresh', true)->assertJsonPath('resources.app.0.dashboards.0.name', 'Receita')->assertJsonCount(1, 'resources.app')->assertJsonPath('resources.dw-desk.0.contents.0.count', 1)->assertJsonPath('resources.dw-desk.0.contents.1.count', 1)->assertJsonPath('capabilities.credential.status', 'access_denied')->assertJsonPath('capabilities.credential.count', null)->assertJsonPath('resources.credential', [])->assertDontSee('Aplicação removida da lista')->assertDontSee('Metadados da conexão antiga')->assertDontSee('synthetic-private-catalog-variable');
+        $this->assertSame(['app', 'bi-desk', 'dw-desk', 'table', 'flow', 'schedule', 'agent', 'writeback', 'deck', 'presentation', 'investigation', 'credential', 'variables'], $this->kindsRead());
+        $pulls = array_values(array_filter($this->commands, fn (array $arguments): bool => $arguments[0] === 'pull'));
+        $this->assertSame([['pull', '--discard-local']], $pulls);
+        $this->assertDatabaseCount('projects', 0);
+        $this->assertDatabaseCount('approvals', 0);
+    }
+
+    public function test_full_refresh_keeps_remote_rows_but_marks_missing_metadata_instead_of_reusing_old_details(): void
+    {
+        $this->allowFullPull = true;
+        [$user, $connection] = $this->connectSection(['app:40' => $this->appBody('Nome remoto atual')]);
+        $context = app(BiCatalog::class)->context($connection, ['id' => '321', 'name' => 'Ambiente sintético']);
+        $this->write($context, 'app:40', $this->appBody('Detalhes desatualizados'));
+        $this->failPull = true;
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321?refresh=1');
+
+        $response->assertOk()->assertJsonPath('resources.app.0.name', 'Nome remoto atual')->assertJsonPath('resources.app.0.dashboard_count', null)->assertJsonPath('metadata_fresh', false)->assertJsonPath('capabilities.app.count', 1)->assertDontSee('Detalhes desatualizados');
+        $this->assertNotEmpty($response->json('warnings'));
+    }
+
+    public static function invalidFullCatalogIdentifiers(): array
+    {
+        return ['option-like text' => ['--invalid'], 'negative number' => [-1], 'boolean' => [true], 'array' => [[40]]];
+    }
+
+    #[DataProvider('invalidFullCatalogIdentifiers')]
+    public function test_full_refresh_marks_malformed_native_identifiers_unavailable_without_passing_them_to_commands(mixed $identifier): void
+    {
+        $this->allowFullPull = true;
+        [$user] = $this->connectSection();
+        $this->nativeRows['app'] = [['id' => $identifier, 'nome' => 'Recurso não confirmado']];
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321?refresh=1');
+
+        $response->assertOk()->assertJsonPath('resources.app', [])->assertJsonPath('capabilities.app.status', 'unavailable')->assertJsonPath('capabilities.app.count', null)->assertDontSee('Recurso não confirmado');
+        $this->assertSame([], array_values(array_filter($this->commands, fn (array $arguments): bool => in_array($identifier, $arguments, true))));
+    }
+
+    public function test_full_refresh_distinguishes_skipped_details_from_a_failed_synchronization(): void
+    {
+        $this->allowFullPull = true;
+        [$user, $connection] = $this->connectSection(['app:40' => $this->appBody('Nome autorizado')]);
+        $context = app(BiCatalog::class)->context($connection, ['id' => '321', 'name' => 'Ambiente sintético']);
+        $retained = $this->write($context, 'app:40', $this->appBody('Detalhes anteriores'));
+        $retainedHash = hash_file('sha256', $retained);
+        $this->skipPull = true;
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321?refresh=1');
+
+        $response->assertOk()->assertJsonPath('metadata_fresh', true)->assertJsonPath('resources.app.0.name', 'Nome autorizado')->assertJsonPath('resources.app.0.dashboard_count', null)->assertJsonPath('resources.app.0.metadata_available', false)->assertDontSee('Detalhes anteriores');
+        $this->assertNotEmpty($response->json('warnings'));
+        $this->assertSame($retainedHash, hash_file('sha256', $retained));
+    }
+
+    public function test_large_full_catalogs_keep_all_pages_after_the_metadata_refresh(): void
+    {
+        $this->allowFullPull = true;
+        $bodies = [];
+        foreach (range(1, 501) as $id) {
+            $bodies['app:'.$id] = ['nome' => 'Painel '.$id];
+        }
+        [$user] = $this->connectSection($bodies);
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321?refresh=1');
+
+        $response->assertOk()->assertJsonCount(501, 'resources.app')->assertJsonPath('capabilities.app.count', 501)->assertJsonPath('resources.app.0.id', '1')->assertJsonPath('resources.app.500.id', '501')->assertJsonPath('metadata_fresh', true);
+        $pulls = array_values(array_filter($this->commands, fn (array $arguments): bool => $arguments[0] === 'pull'));
+        $this->assertSame([['pull', '--discard-local']], $pulls);
+        $this->assertSame(['app', 'app', 'bi-desk', 'dw-desk', 'table', 'flow', 'schedule', 'agent', 'writeback', 'deck', 'presentation', 'investigation', 'credential', 'variables'], $this->kindsRead());
+    }
+
+    public static function invalidSnapshotStatuses(): array
+    {
+        return ['text' => ['invalid'], 'missing clean list' => [['tenantId' => 321]], 'foreign tenant' => [['tenantId' => 999, 'clean' => ['app:40']]], 'unexpected item' => [['tenantId' => 321, 'clean' => [['ref' => 'app:40']]]], 'keyed list' => [['tenantId' => 321, 'clean' => ['item' => 'app:40']]], 'traversal' => [['tenantId' => 321, 'clean' => ['app:40  (apps/../outside.yaml)']]], 'wrong folder' => [['tenantId' => 321, 'clean' => ['app:40  (credentials/private.yaml)']]], 'absolute path' => [['tenantId' => 321, 'clean' => ['app:40  (/tmp/private.yaml)']]], 'duplicate identity' => [['tenantId' => 321, 'clean' => ['app:40  (apps/recurso--40.yaml)', 'app:40  (apps/recurso--40.yaml)']]]];
+    }
+
+    #[DataProvider('invalidSnapshotStatuses')]
+    public function test_full_refresh_keeps_details_unknown_when_the_native_status_cannot_be_verified(mixed $status): void
+    {
+        $this->allowFullPull = true;
+        [$user] = $this->connectSection(['app:40' => [...$this->appBody('Nome autorizado'), 'descricao' => 'SYNTHETIC-UNVERIFIED-DOCUMENT']]);
+        $this->nativeStatus = $status;
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321?refresh=1');
+
+        $response->assertOk()->assertJsonPath('metadata_fresh', false)->assertJsonPath('resources.app.0.name', 'Nome autorizado')->assertJsonPath('resources.app.0.metadata_available', false)->assertJsonPath('resources.app.0.dashboard_count', null)->assertDontSee('SYNTHETIC-UNVERIFIED-DOCUMENT');
+        $this->assertNotEmpty($response->json('warnings'));
+    }
+
+    public function test_only_the_exact_clean_file_is_used_when_old_files_share_its_resource_identity(): void
+    {
+        $this->allowFullPull = true;
+        [$user, $connection] = $this->connectSection(['app:40' => $this->appBody('Nome atual')]);
+        $context = app(BiCatalog::class)->context($connection, ['id' => '321', 'name' => 'Ambiente sintético']);
+        $retained = $this->write($context, 'app:40', $this->appBody('Arquivo antigo com mesmo ID'), filename: 'zz-antigo');
+        $hash = hash_file('sha256', $retained);
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/321?refresh=1');
+
+        $response->assertOk()->assertJsonPath('metadata_fresh', true)->assertJsonPath('resources.app.0.name', 'Nome atual')->assertJsonPath('resources.app.0.dashboard_count', 1)->assertDontSee('Arquivo antigo com mesmo ID');
+        $this->assertSame($hash, hash_file('sha256', $retained));
+    }
+
+    public function test_a_symbolic_link_cannot_confirm_a_catalog_document(): void
+    {
+        $this->allowFullPull = true;
+        [$user, $connection] = $this->connectSection(['app:40' => $this->appBody('Nome autorizado')]);
+        $context = app(BiCatalog::class)->context($connection, ['id' => '321', 'name' => 'Ambiente sintético']);
+        $target = $this->write($context, 'app:40', [...$this->appBody('Outro documento'), 'descricao' => 'SYNTHETIC-LINKED-DOCUMENT'], filename: 'referencia');
+        symlink($target, dirname($target).'/alias.yaml');
+        $this->nativeStatus = ['tenantId' => 321, 'clean' => ['app:40  (apps/alias.yaml)']];
+
+        $this->actingAs($user)->getJson('/api/catalog/321?refresh=1')->assertOk()->assertJsonPath('metadata_fresh', false)->assertJsonPath('resources.app.0.metadata_available', false)->assertDontSee('SYNTHETIC-LINKED-DOCUMENT');
+    }
+
+    public function test_the_native_null_clean_list_is_a_valid_empty_snapshot(): void
+    {
+        $this->allowFullPull = true;
+        [$user] = $this->connectSection();
+        $this->nativeStatus = ['tenantId' => 321, 'clean' => null];
+
+        $this->actingAs($user)->getJson('/api/catalog/321?refresh=1')->assertOk()->assertJsonPath('metadata_fresh', true)->assertJsonPath('resources.app', [])->assertJsonPath('warnings', []);
     }
 }

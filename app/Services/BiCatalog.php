@@ -107,7 +107,7 @@ class BiCatalog
                 $metadataFresh = false;
                 try {
                     $this->refreshSnapshotFiles($connection, $project);
-                    $metadata = $this->workingMetadata($project);
+                    $metadata = $this->confirmedMetadata($connection, $project);
                     $metadataFresh = true;
                 } catch (RuntimeException $e) {
                     if ($e instanceof BiBusy || $connection->fresh()->status !== 'connected') {
@@ -132,6 +132,9 @@ class BiCatalog
                         $resources[$kind] = [];
                         $capabilities[$kind] = $this->failedCapability($e);
                     }
+                }
+                if ($metadataFresh && collect($resources)->flatten(1)->contains(fn (array $resource): bool => ! $resource['metadata_available'])) {
+                    $warnings[] = 'Alguns detalhes, vínculos, nomes de dashboards ou etiquetas não puderam ser atualizados. As informações disponíveis podem ser conferidas ao abrir o recurso.';
                 }
                 $resources = app(BiResourceRelations::class)->deskCounters($resources, $capabilities);
                 $tags = collect($resources)->flatten(1)->flatMap(fn ($row) => $row['tags'] ?? [])->unique()->sort()->values()->all();
@@ -352,8 +355,8 @@ class BiCatalog
                 throw new RuntimeException('A listagem de '.$kind.' não retornou um formato reconhecido.');
             }
             foreach ($page as $row) {
-                if (! is_array($row) || empty($row['id'])) {
-                    throw new RuntimeException('A listagem retornou um recurso sem identificador.');
+                if (! is_array($row) || (! is_int($row['id'] ?? null) && ! is_string($row['id'] ?? null)) || ! ctype_digit((string) $row['id']) || (int) $row['id'] <= 0) {
+                    throw new RuntimeException('A listagem retornou um recurso com identificador inválido.');
                 }$rows[] = $row;
             }
             $offset += count($page);
@@ -382,6 +385,60 @@ class BiCatalog
         $this->assertSnapshotContext($connection, $context);
         // This workspace holds disposable catalog snapshots, never project authorship.
         $this->lumo->run($connection, ['pull', ...($resource === null ? [] : [$resource]), '--discard-local'], $context, $resource === null ? 150 : 90);
+    }
+
+    /** @return array<string, array> */
+    public function confirmedMetadata(Connection $connection, Project $context): array
+    {
+        $this->assertSnapshotContext($connection, $context);
+        $status = $this->lumo->run($connection, ['status', '--filter', 'clean'], $context, 60)['data'];
+        if (! is_array($status) || (! is_int($status['tenantId'] ?? null) && ! is_string($status['tenantId'] ?? null)) || (string) $status['tenantId'] !== (string) $context->tenant_id || ! array_key_exists('clean', $status) || ($status['clean'] !== null && (! is_array($status['clean']) || ! array_is_list($status['clean'])))) {
+            throw new RuntimeException('O estado dos metadados do catálogo não pôde ser conferido. Tente atualizar novamente.');
+        }
+        $root = app(WorkspaceFiles::class)->path($context);
+        $metadata = [];
+        $seen = [];
+        foreach ($status['clean'] ?? [] as $item) {
+            if (! is_string($item)) {
+                throw new RuntimeException('O estado dos metadados do catálogo retornou um formato desconhecido.');
+            }
+            if (! preg_match('/^([a-z-]+):([1-9][0-9]*)\s+\(([^\r\n]+)\)$/D', $item, $match) || ! array_key_exists($match[1], self::FOLDERS)) {
+                continue;
+            }
+            $reference = $match[1].':'.$match[2];
+            $relative = $match[3];
+            $parts = explode('/', $relative);
+            if (isset($seen[$reference]) || strlen($relative) > 512 || str_contains($relative, "\0") || str_contains($relative, '\\') || $parts[0] !== self::FOLDERS[$match[1]] || ! in_array(pathinfo($relative, PATHINFO_EXTENSION), ['yaml', 'yml'], true)) {
+                throw new RuntimeException('O catálogo retornou uma referência de metadados inválida ou ambígua.');
+            }
+            $seen[$reference] = true;
+            $path = $root;
+            foreach ($parts as $part) {
+                if ($part === '' || str_starts_with($part, '.')) {
+                    throw new RuntimeException('O catálogo retornou um caminho de metadados inválido.');
+                }
+                $path .= '/'.$part;
+                if (is_link($path)) {
+                    throw new RuntimeException('Links simbólicos não podem confirmar os metadados do catálogo.');
+                }
+            }
+            if (! is_file($path)) {
+                continue;
+            }
+            try {
+                $document = $this->workingDocument($context, new \SplFileInfo($path));
+                if ($document !== null && $document[0] === $reference) {
+                    $body = Yaml::parse($document[1]);
+                    if (is_array($body)) {
+                        $metadata[$reference] = $body;
+                    }
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return $metadata;
     }
 
     /** @return array{string, string}|null */
