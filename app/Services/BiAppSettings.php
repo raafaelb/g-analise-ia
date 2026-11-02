@@ -21,7 +21,7 @@ use Throwable;
 
 class BiAppSettings
 {
-    public const ACTIONS = ['update_app_details'];
+    public const ACTIONS = ['update_app_details', 'update_app_dashboards'];
 
     public function __construct(private BiCatalog $catalog, private LumoClient $lumo, private TenantPolicy $policy) {}
 
@@ -40,10 +40,40 @@ class BiAppSettings
         });
     }
 
+    public function describeDashboards(User $user, string $tenant, string $id): array
+    {
+        [$connection, $environment] = $this->access($user, $tenant, $id);
+        $generation = $connection->metadata['session_generation'] ?? null;
+
+        return $this->withContext($connection, $environment, function (Project $context) use ($connection, $id, $generation): array {
+            $row = $this->listed($connection, $context, $id);
+            [, $body, , $shape] = $this->document($connection, $context, 'app:'.$id);
+            $summary = $this->catalog->summary('app', $row, $body);
+            $dashboards = $this->dashboardRows($shape, 'app:'.$id, (string) $context->tenant_id);
+            $this->assertGeneration($connection, $generation);
+
+            return ['resource' => 'app:'.$id, 'name' => $body['nome'], 'version' => $this->digest($shape), 'state' => $summary['state'], 'desk_id' => $summary['desk_id'], 'dashboards' => $dashboards];
+        });
+    }
+
+    public function prepareDashboards(User $user, string $tenant, string $id, array $input): array
+    {
+        [$connection, $environment] = $this->access($user, $tenant, $id);
+        $data = $this->normalizeDashboards('app:'.$id, $input);
+
+        return $this->prepareUpdate($user, $tenant, $connection, $environment, $data);
+    }
+
     public function prepare(User $user, string $tenant, string $id, array $input): array
     {
         [$connection, $environment] = $this->access($user, $tenant, $id);
         $data = $this->normalize('app:'.$id, $input);
+
+        return $this->prepareUpdate($user, $tenant, $connection, $environment, $data);
+    }
+
+    private function prepareUpdate(User $user, string $tenant, Connection $connection, array $environment, array $data): array
+    {
         $this->policy->assertCommandAllowed($tenant, ['push', $data['resource']], $connection);
         $requestHash = $this->digest([$tenant, $data]);
         try {
@@ -58,8 +88,8 @@ class BiAppSettings
                 $revision = $this->withContext($connection, $environment, fn (Project $context): array => $this->revision($connection, $context, $data));
                 $approval = DB::transaction(function () use ($user, $tenant, $connection, $data, $revision, $requestHash): Approval {
                     $this->assertGeneration($connection, $revision['connection_generation']);
-                    $approval = Approval::create(['user_id' => $user->id, 'project_id' => null, 'agent_run_id' => null, 'type' => 'manual', 'title' => 'Editar nome e descrição da aplicação', 'description' => 'Confira os valores atuais e propostos antes de salvar na aplicação existente.', 'payload' => ['origin' => 'manual', 'action' => $data, 'revision' => $revision, 'request_id' => $data['request_id'], 'request_hash' => $requestHash], 'fingerprint' => $this->fingerprint($user->id, $tenant, $data, $revision), 'expires_at' => now()->addMinutes(12)]);
-                    Audit::record($user->id, 'bi.app_details.review_created', 'Nome e descrição da aplicação preparados para revisão.', null, ['approval_id' => $approval->id, 'tenant_id' => $tenant, 'resource' => $data['resource'], 'changed_fields' => count($revision['changes'])]);
+                    $approval = Approval::create(['user_id' => $user->id, 'project_id' => null, 'agent_run_id' => null, 'type' => 'manual', 'title' => $data['action'] === 'update_app_dashboards' ? 'Organizar dashboards da aplicação' : 'Editar nome e descrição da aplicação', 'description' => 'Confira os valores atuais e propostos antes de salvar na aplicação existente.', 'payload' => ['origin' => 'manual', 'action' => $data, 'revision' => $revision, 'request_id' => $data['request_id'], 'request_hash' => $requestHash], 'fingerprint' => $this->fingerprint($user->id, $tenant, $data, $revision), 'expires_at' => now()->addMinutes(12)]);
+                    Audit::record($user->id, 'bi.app_details.review_created', 'Alteração da aplicação preparada para revisão.', null, ['approval_id' => $approval->id, 'tenant_id' => $tenant, 'resource' => $data['resource'], 'changed_fields' => count($revision['changes'])]);
 
                     return $approval;
                 });
@@ -103,7 +133,7 @@ class BiAppSettings
                         $this->lumo->run($connection, ['push', $data['resource']], $context, 90);
                         $result = $this->withContext($connection, $environment, fn (Project $verification): array => $this->verify($connection, $verification, $data, $revision));
                         $this->assertGeneration($connection, $revision['connection_generation']);
-                        Audit::record($user->id, 'bi.app_details.configured', 'Nome e descrição salvos e conferidos na aplicação existente.', null, ['approval_id' => $approval->id, 'tenant_id' => $tenant, 'resource' => $data['resource']]);
+                        Audit::record($user->id, 'bi.app_details.configured', 'Alteração salva e conferida na aplicação existente.', null, ['approval_id' => $approval->id, 'tenant_id' => $tenant, 'resource' => $data['resource']]);
 
                         return $result;
                     } catch (Throwable $e) {
@@ -199,6 +229,43 @@ class BiAppSettings
         return ['action' => self::ACTIONS[0], 'resource' => $resource, 'source_version' => $validated['version'], 'app_changes' => $changes, 'request_id' => strtolower($validated['request_id'])];
     }
 
+    private function normalizeDashboards(string $resource, array $input): array
+    {
+        if (array_diff(array_keys($input), ['request_id', 'version', 'dashboards']) !== []) {
+            throw ValidationException::withMessages(['application' => 'Esta edição aceita somente nomes e ordem dos dashboards existentes.']);
+        }
+        $validated = Validator::make($input, ['request_id' => ['required', 'uuid'], 'version' => ['required', 'string', 'regex:/^[a-f0-9]{64}$/D'], 'dashboards' => ['required', 'array', 'list', 'min:1', 'max:100'], 'dashboards.*' => ['required', 'array:id,name'], 'dashboards.*.id' => ['required', 'integer', 'min:1', 'distinct'], 'dashboards.*.name' => ['required', 'string', 'max:100', 'not_regex:/[\x00-\x1F\x7F]/']])->validate();
+        $rows = array_map(fn (array $row): array => ['id' => (int) $row['id'], 'name' => trim($row['name'])], $validated['dashboards']);
+        if (collect($rows)->contains(fn (array $row): bool => $row['name'] === '')) {
+            throw ValidationException::withMessages(['application' => 'Informe um nome para cada dashboard.']);
+        }
+
+        return ['action' => 'update_app_dashboards', 'resource' => $resource, 'source_version' => $validated['version'], 'dashboard_changes' => $rows, 'request_id' => strtolower($validated['request_id'])];
+    }
+
+    /** Only canonical inline dashboards with a confirmed identity can be organized. */
+    private function dashboardRows(stdClass $shape, string $resource, string $tenant): array
+    {
+        if (! is_array($shape->dashboards ?? null) || ! array_is_list($shape->dashboards) || count($shape->dashboards) > 100) {
+            throw new RuntimeException('A lista completa de dashboards não pôde ser confirmada. Os painéis serão preservados.');
+        }
+        $rows = [];
+        foreach ($shape->dashboards as $dashboard) {
+            $header = $dashboard->header ?? null;
+            $body = $dashboard->body ?? null;
+            if (! $header instanceof stdClass || ! $body instanceof stdClass || ($header->kind ?? null) !== 'app-dashboard' || ($header->lumo ?? null) !== 'v2' || ! is_int($header->id ?? null) || $header->id < 1 || ! is_int($header->tenantId ?? null) || (string) $header->tenantId !== $tenant || ! is_int($header->appId ?? null) || (string) $header->appId !== substr($resource, 4) || ! is_string($body->nome ?? null) || ! is_int($body->ordem ?? null) || ! is_array($body->widgets ?? null) || ! array_is_list($body->widgets)) {
+                throw new RuntimeException('A identidade ou a configuração de um dashboard não foi confirmada nesta aplicação.');
+            }
+            $rows[] = ['id' => $header->id, 'name' => $body->nome, 'order' => $body->ordem, 'widget_count' => count($body->widgets)];
+        }
+        if (count(array_unique(array_column($rows, 'id'))) !== count($rows)) {
+            throw new RuntimeException('A lista recebida contém identidades repetidas de dashboards.');
+        }
+        usort($rows, fn (array $a, array $b): int => $a['order'] <=> $b['order']);
+
+        return $rows;
+    }
+
     private function revision(Connection $connection, Project $context, array $data, bool $validate = true): array
     {
         $generation = $connection->metadata['session_generation'] ?? null;
@@ -209,15 +276,41 @@ class BiAppSettings
         if (! $summary['desk_known'] || ! in_array($summary['state'], ['draft', 'published'], true)) {
             throw new RuntimeException('Não foi possível confirmar se a aplicação está privada ou publicada. Confira o acesso antes de editar.');
         }
+        $dashboardEdit = $data['action'] === 'update_app_dashboards';
+        $dashboardReview = null;
+        if ($dashboardEdit) {
+            abort_unless($summary['state'] === 'draft' && $summary['desk_id'] === null, 409, 'Esta aplicação está publicada. Duplique para sua mesa antes de organizar seus dashboards.');
+            $before = $this->dashboardRows($shape, $data['resource'], (string) $context->tenant_id);
+            $ids = array_column($before, 'id');
+            $proposedIds = array_column($data['dashboard_changes'], 'id');
+            sort($ids);
+            sort($proposedIds);
+            abort_unless($ids === $proposedIds, 409, 'Mantenha todos os dashboards existentes, uma única vez. Esta edição não adiciona nem exclui painéis.');
+            $dashboardReview = ['before' => $before, 'after' => $data['dashboard_changes']];
+        }
         $updated = $this->apply($shape, $data);
         $changes = [];
-        foreach ($data['app_changes'] as $field => $value) {
+        foreach ($data['app_changes'] ?? [] as $field => $value) {
             if (($body[$field] ?? null) !== $value) {
                 $changes[] = ['target' => 'Aplicação', 'field' => $field === 'nome' ? 'Nome' : 'Descrição', 'before' => $body[$field] ?? null, 'after' => $value];
             }
         }
+        if ($dashboardEdit) {
+            $beforeById = array_column($dashboardReview['before'], null, 'id');
+            $currentOrder = array_column($dashboardReview['before'], 'id');
+            foreach ($data['dashboard_changes'] as $index => $row) {
+                $original = $beforeById[$row['id']];
+                if ($original['name'] !== $row['name']) {
+                    $changes[] = ['target' => $original['name'], 'field' => 'Nome do dashboard', 'before' => $original['name'], 'after' => $row['name']];
+                }
+                $position = array_search($row['id'], $currentOrder, true);
+                if ($position !== $index) {
+                    $changes[] = ['target' => $row['name'], 'field' => 'Posição', 'before' => $position + 1, 'after' => $index + 1];
+                }
+            }
+        }
         if ($changes === []) {
-            throw ValidationException::withMessages(['application' => 'Altere o nome ou a descrição antes de conferir.']);
+            throw ValidationException::withMessages(['application' => $dashboardEdit ? 'Altere um nome ou a ordem dos dashboards antes de conferir.' : 'Altere o nome ou a descrição antes de conferir.']);
         }
         if ($validate) {
             try {
@@ -229,7 +322,7 @@ class BiAppSettings
         }
         $this->assertGeneration($connection, $generation);
 
-        return ['tenant_id' => (string) $context->tenant_id, 'resource' => $data['resource'], 'connection_generation' => $generation, 'source_digest' => $this->digest($shape), 'expected_digest' => $this->digest($updated), 'app_details' => ['name' => $body['nome'], 'state' => $summary['state'], 'desk_id' => $summary['desk_id']], 'changes' => $changes, 'impact' => $summary['state'] === 'published' ? 'O nome e a descrição serão alterados na aplicação já publicada, visível aos usuários da mesma mesa. Os dashboards, filtros, fontes e agendas serão preservados. Esta operação não publica outra versão nem altera os acessos.' : 'O nome e a descrição serão alterados neste rascunho. Os dashboards, filtros, fontes e agendas serão preservados. A aplicação continua privada; publicação tem revisão própria.'];
+        return array_filter(['tenant_id' => (string) $context->tenant_id, 'resource' => $data['resource'], 'connection_generation' => $generation, 'source_digest' => $this->digest($shape), 'expected_digest' => $this->digest($updated), 'app_details' => ['name' => $body['nome'], 'state' => $summary['state'], 'desk_id' => $summary['desk_id']], 'dashboard_edit' => $dashboardReview, 'changes' => $changes, 'impact' => $dashboardEdit ? 'Somente os nomes e a ordem dos dashboards serão alterados neste rascunho privado. Todos os painéis, gráficos, filtros, fontes e agendas serão preservados. Esta operação não publica a aplicação.' : ($summary['state'] === 'published' ? 'O nome e a descrição serão alterados na aplicação já publicada, visível aos usuários da mesma mesa. Os dashboards, filtros, fontes e agendas serão preservados. Esta operação não publica outra versão nem altera os acessos.' : 'O nome e a descrição serão alterados neste rascunho. Os dashboards, filtros, fontes e agendas serão preservados. A aplicação continua privada; publicação tem revisão própria.')], fn (mixed $value, string $key): bool => $key !== 'dashboard_edit' || $value !== null, ARRAY_FILTER_USE_BOTH);
     }
 
     private function verify(Connection $connection, Project $context, array $data, array $revision): array
@@ -238,11 +331,28 @@ class BiAppSettings
         [, $body, , $shape] = $this->document($connection, $context, $data['resource']);
         $summary = $this->catalog->summary('app', $row, $body);
         $difference = $this->lumo->run($connection, ['diff', $data['resource'], '--include-remote'], $context, 60)['data'] ?? null;
-        if (! hash_equals($revision['expected_digest'], $this->digest($shape)) || $summary['state'] !== $revision['app_details']['state'] || $summary['desk_id'] !== $revision['app_details']['desk_id'] || ! is_array($difference) || ($difference['workingMissing'] ?? null) !== false || ($difference['workingVsState']['equal'] ?? null) !== true || ($difference['workingVsServer']['equal'] ?? null) !== true) {
+        $comparison = $shape;
+        $orderVerified = true;
+        if ($data['action'] === 'update_app_dashboards') {
+            $desired = array_column($data['dashboard_changes'], 'id');
+            $rows = $this->dashboardRows($shape, $data['resource'], (string) $context->tenant_id);
+            $received = array_map(fn (stdClass $dashboard): int => $dashboard->header->id, $shape->dashboards);
+            $orderVerified = $received === $desired && array_column($rows, 'id') === $desired;
+            // The native read projection can zero ordem; its ordered ID sequence must still match.
+            $comparison = clone $shape;
+            $comparison->dashboards = [];
+            foreach ($shape->dashboards as $index => $original) {
+                $dashboard = clone $original;
+                $dashboard->body = clone $dashboard->body;
+                $dashboard->body->ordem = $index;
+                $comparison->dashboards[] = $dashboard;
+            }
+        }
+        if (! $orderVerified || ! hash_equals($revision['expected_digest'], $this->digest($comparison)) || $summary['state'] !== $revision['app_details']['state'] || $summary['desk_id'] !== $revision['app_details']['desk_id'] || ! is_array($difference) || ($difference['workingMissing'] ?? null) !== false || ($difference['workingVsState']['equal'] ?? null) !== true || ($difference['workingVsServer']['equal'] ?? null) !== true) {
             throw new RuntimeException('A configuração revisada não foi confirmada integralmente. Confira a aplicação atual antes de outra alteração.');
         }
 
-        return ['resource' => $data['resource'], 'confirmed_name' => $body['nome'], 'confirmed_description' => $body['descricao'] ?? null, 'changed_fields' => count($revision['changes']), 'configuration_verified' => true, 'message' => 'Nome e descrição salvos e conferidos no G-Analise BI.'];
+        return ['resource' => $data['resource'], 'confirmed_name' => $body['nome'], 'confirmed_description' => $body['descricao'] ?? null, 'changed_fields' => count($revision['changes']), 'configuration_verified' => true, 'dashboards_verified' => $data['action'] === 'update_app_dashboards', 'message' => $data['action'] === 'update_app_dashboards' ? 'Nomes e ordem dos dashboards salvos e conferidos no G-Analise BI.' : 'Nome e descrição salvos e conferidos no G-Analise BI.'];
     }
 
     private function review(Approval $approval, User $user): array
@@ -306,8 +416,22 @@ class BiAppSettings
     private function apply(stdClass $source, array $data): stdClass
     {
         $updated = clone $source;
-        foreach ($data['app_changes'] as $field => $value) {
+        foreach ($data['app_changes'] ?? [] as $field => $value) {
             $updated->{$field} = $value;
+        }
+        if ($data['action'] === 'update_app_dashboards') {
+            $byId = [];
+            foreach ($source->dashboards as $dashboard) {
+                $byId[$dashboard->header->id] = $dashboard;
+            }
+            $updated->dashboards = [];
+            foreach ($data['dashboard_changes'] as $index => $row) {
+                $dashboard = clone $byId[$row['id']];
+                $dashboard->body = clone $dashboard->body;
+                $dashboard->body->nome = $row['name'];
+                $dashboard->body->ordem = $index;
+                $updated->dashboards[] = $dashboard;
+            }
         }
 
         return $updated;

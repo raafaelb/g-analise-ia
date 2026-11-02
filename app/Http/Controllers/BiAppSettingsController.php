@@ -17,6 +17,16 @@ class BiAppSettingsController extends Controller
         return $this->respond(fn (): array => $settings->describe($request->user(), $tenant, $id));
     }
 
+    public function dashboards(Request $request, string $tenant, string $id, BiAppSettings $settings): JsonResponse
+    {
+        return $this->respond(fn (): array => $settings->describeDashboards($request->user(), $tenant, $id));
+    }
+
+    public function prepareDashboards(Request $request, string $tenant, string $id, BiAppSettings $settings): JsonResponse
+    {
+        return $this->respond(fn (): array => $settings->prepareDashboards($request->user(), $tenant, $id, $request->all()));
+    }
+
     public function prepare(Request $request, string $tenant, string $id, BiAppSettings $settings): JsonResponse
     {
         return $this->respond(fn (): array => $settings->prepare($request->user(), $tenant, $id, $request->all()));

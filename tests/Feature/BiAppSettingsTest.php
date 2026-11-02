@@ -112,6 +112,18 @@ class BiAppSettingsTest extends TestCase
                 if ($state->unexpected_change ?? false) {
                     $state->body['dashboards'][0]['nome'] = 'Alterado por outro processo';
                 }
+                if ($state->zero_read_order ?? false) {
+                    foreach ($state->body['dashboards'] as &$dashboard) {
+                        $dashboard['body']['ordem'] = 0;
+                    }
+                    unset($dashboard);
+                }
+                if ($state->wrong_tab_order ?? false) {
+                    $state->body['dashboards'] = array_reverse($state->body['dashboards']);
+                }
+                if ($state->unexpected_widget_change ?? false) {
+                    $state->body['dashboards'][0]['body']['widgets'][0]['type'] = 'Table';
+                }
                 if ($state->lost_response ?? false) {
                     throw new RuntimeException('Resposta interrompida depois do envio.');
                 }
@@ -608,5 +620,243 @@ class BiAppSettingsTest extends TestCase
         $this->assertSame([], $state->pushed_shape->reports);
         $this->assertSame([], $state->pushed_shape->config->show_last_loadedat_tables);
         $this->assertInstanceOf(\stdClass::class, $state->pushed_shape->config->empty_options);
+    }
+
+    private function dashboardContext(?int $desk = null): array
+    {
+        [$user, $connection, $state] = $this->context(desk: $desk);
+        $state->body['dashboards'] = [
+            ['header' => ['kind' => 'app-dashboard', 'lumo' => 'v2', 'id' => 21, 'tenantId' => 100, 'appId' => 11], 'body' => ['nome' => 'Resumo', 'ordem' => 0, 'filters' => [['id' => 77]], 'widgets' => [['id' => 7, 'type' => 'Svelte', 'code' => 'SYNTHETIC-WIDGET-CONTENT']], 'future_setting' => (object) []]],
+            ['header' => ['kind' => 'app-dashboard', 'lumo' => 'v2', 'id' => 22, 'tenantId' => 100, 'appId' => 11], 'body' => ['nome' => 'Detalhes', 'ordem' => 1, 'filters' => [], 'widgets' => [['id' => 8, 'type' => 'Kpi', 'chart' => ['dataSource' => '123:SUM']]], 'future_setting' => ['keep' => true]]],
+        ];
+        $this->native($state);
+
+        return [$user, $connection, $state];
+    }
+
+    private function dashboardInput(User $user): array
+    {
+        $version = $this->actingAs($user)->getJson('/api/catalog/100/apps/11/dashboards')->assertOk()->json('version');
+
+        return ['request_id' => (string) Str::uuid(), 'version' => $version, 'dashboards' => [['id' => 22, 'name' => 'Detalhes financeiros'], ['id' => 21, 'name' => 'Resumo']]];
+    }
+
+    private function prepareDashboards(User $user, array $input): Approval
+    {
+        $response = $this->actingAs($user)->postJson('/api/catalog/100/apps/11/dashboards/actions', $input)->assertOk();
+
+        return Approval::findOrFail($response->json('approval.id'));
+    }
+
+    public function test_dashboard_organization_reads_only_navigation_metadata_in_current_display_order(): void
+    {
+        [$user, , $state] = $this->dashboardContext();
+        $state->body['dashboards'] = array_reverse($state->body['dashboards']);
+
+        $response = $this->actingAs($user)->getJson('/api/catalog/100/apps/11/dashboards')->assertOk();
+
+        $response->assertJsonPath('dashboards', [['id' => 21, 'name' => 'Resumo', 'order' => 0, 'widget_count' => 1], ['id' => 22, 'name' => 'Detalhes', 'order' => 1, 'widget_count' => 1]]);
+        $this->assertStringNotContainsString('SYNTHETIC-WIDGET-CONTENT', $response->getContent());
+        $this->assertSame(0, $state->pushes);
+    }
+
+    public function test_authorized_dashboard_organization_preserves_every_other_setting_and_identifier(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->dashboardContext();
+        $original = $state->body;
+        $approval = $this->prepareDashboards($user, $this->dashboardInput($user));
+        $this->assertSame(0, $state->pushes);
+        $this->assertSame($original, $state->body);
+        $this->assertSame('Organizar dashboards da aplicação', $approval->title);
+        $this->assertSame('Resumo', $approval->payload['revision']['dashboard_edit']['before'][0]['name']);
+        $this->assertSame('Detalhes financeiros', $approval->payload['revision']['dashboard_edit']['after'][0]['name']);
+
+        $result = $this->execute($user, $approval);
+
+        $this->assertSame('completed', $result->status);
+        $this->assertTrue($result->payload['execution']['result']['dashboards_verified']);
+        $this->assertTrue($result->payload['execution']['result']['configuration_verified']);
+        $this->assertSame(1, $state->pushes);
+        $expected = $original;
+        $expected['dashboards'] = array_reverse($expected['dashboards']);
+        $expected['dashboards'][0]['body']['nome'] = 'Detalhes financeiros';
+        $expected['dashboards'][0]['body']['ordem'] = 0;
+        $expected['dashboards'][1]['body']['ordem'] = 1;
+        $this->assertSame(json_encode($expected), json_encode($state->body));
+        Queue::assertNotPushed(RunAgentTurn::class);
+        $this->assertSame([], File::directories($this->root.'/'.$user->id));
+    }
+
+    public function test_published_dashboard_organization_explains_duplication_and_never_writes(): void
+    {
+        [$user, , $state] = $this->dashboardContext(desk: 45);
+        $input = $this->dashboardInput($user);
+
+        $this->postJson('/api/catalog/100/apps/11/dashboards/actions', $input)->assertConflict()->assertJsonPath('message', 'Esta aplicação está publicada. Duplique para sua mesa antes de organizar seus dashboards.');
+
+        $this->assertSame(0, $state->pushes);
+        $this->assertDatabaseCount('approvals', 0);
+    }
+
+    public static function invalidDashboardInputs(): array
+    {
+        return [
+            'remove a tab' => ['dashboards', [['id' => 21, 'name' => 'Resumo']], 409],
+            'adds another tab' => ['dashboards', [['id' => 21, 'name' => 'Resumo'], ['id' => 23, 'name' => 'Outro']], 409],
+            'duplicate identity' => ['dashboards', [['id' => 21, 'name' => 'Resumo'], ['id' => 21, 'name' => 'Outro']], 422],
+            'empty name' => ['dashboards', [['id' => 21, 'name' => '   '], ['id' => 22, 'name' => 'Outro']], 422],
+            'hidden widget modification' => ['dashboards', [['id' => 21, 'name' => 'Resumo', 'widgets' => []], ['id' => 22, 'name' => 'Outro']], 422],
+            'empty list' => ['dashboards', [], 422],
+            'name too long' => ['dashboards', [['id' => 21, 'name' => str_repeat('a', 101)], ['id' => 22, 'name' => 'Outro']], 422],
+            'control character' => ['dashboards', [['id' => 21, 'name' => "Resumo\nlinha"], ['id' => 22, 'name' => 'Outro']], 422],
+            'foreign app changes' => ['name', 'Outro app', 422],
+            'source version' => ['version', str_repeat('f', 64), 409],
+        ];
+    }
+
+    #[DataProvider('invalidDashboardInputs')]
+    public function test_invalid_dashboard_proposals_do_not_create_reviews_or_change_native_content(string $key, mixed $value, int $status): void
+    {
+        [$user, , $state] = $this->dashboardContext();
+        $input = $this->dashboardInput($user);
+        $original = $state->body;
+
+        $this->postJson('/api/catalog/100/apps/11/dashboards/actions', [...$input, $key => $value])->assertStatus($status);
+
+        $this->assertSame(0, $state->pushes);
+        $this->assertSame($original, $state->body);
+        $this->assertDatabaseCount('approvals', 0);
+    }
+
+    public function test_dashboard_organization_requires_a_change_and_reuses_only_the_same_proposal(): void
+    {
+        [$user] = $this->dashboardContext();
+        $input = $this->dashboardInput($user);
+        $this->postJson('/api/catalog/100/apps/11/dashboards/actions', [...$input, 'dashboards' => [['id' => 21, 'name' => 'Resumo'], ['id' => 22, 'name' => 'Detalhes']]])->assertUnprocessable()->assertJsonValidationErrors('application');
+        $first = $this->prepareDashboards($user, $input);
+        $second = $this->prepareDashboards($user, $input);
+        $this->assertSame($first->id, $second->id);
+
+        $this->postJson('/api/catalog/100/apps/11/dashboards/actions', [...$input, 'dashboards' => [['id' => 22, 'name' => 'Mudança posterior'], ['id' => 21, 'name' => 'Resumo']]])->assertConflict();
+
+        $this->assertDatabaseCount('approvals', 1);
+    }
+
+    public function test_dashboard_drift_and_a_new_publication_after_review_prevent_writes(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->dashboardContext();
+        $approval = $this->prepareDashboards($user, $this->dashboardInput($user));
+        $state->body['_state'] = ['deskId' => 45, 'state' => 'published'];
+
+        $result = $this->execute($user, $approval);
+
+        $this->assertSame('failed', $result->status);
+        $this->assertSame(0, $state->pushes);
+        $this->assertSame('Resumo', $state->body['dashboards'][0]['body']['nome']);
+    }
+
+    public function test_lost_dashboard_edit_response_is_confirmed_without_resending_the_edit(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->dashboardContext();
+        $approval = $this->prepareDashboards($user, $this->dashboardInput($user));
+        $state->lost_response = true;
+        $result = $this->execute($user, $approval);
+        $this->assertSame('failed', $result->status);
+        $this->assertSame(1, $state->pushes);
+        $connection = Connection::where('user_id', $user->id)->firstOrFail();
+        $connection->update(['metadata' => [...$connection->metadata, 'session_generation' => 'renewed']]);
+
+        $this->postJson('/api/bi-actions/'.$approval->id.'/app-settings-verification')->assertOk()->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.execution.result.dashboards_verified', true);
+
+        $this->assertSame(1, $state->pushes);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_an_unexpected_widget_change_prevents_a_verified_dashboard_receipt(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->dashboardContext();
+        $approval = $this->prepareDashboards($user, $this->dashboardInput($user));
+        $state->unexpected_widget_change = true;
+
+        $result = $this->execute($user, $approval);
+
+        $this->assertSame('failed', $result->status);
+        $this->assertArrayNotHasKey('result', $result->payload['execution']);
+        $this->postJson('/api/bi-actions/'.$approval->id.'/app-settings-verification')->assertUnprocessable();
+        $this->assertSame(1, $state->pushes);
+    }
+
+    public function test_dashboard_organization_respects_authentication_roles_and_tenant_scope(): void
+    {
+        $this->getJson('/api/catalog/100/apps/11/dashboards')->assertUnauthorized();
+        $this->postJson('/api/catalog/100/apps/11/dashboards/actions', [])->assertUnauthorized();
+        [$user, , $state] = $this->dashboardContext();
+        $user->forceFill(['role' => 'viewer'])->save();
+        $this->actingAs($user->fresh())->getJson('/api/catalog/100/apps/11/dashboards')->assertForbidden();
+        $this->postJson('/api/catalog/100/apps/11/dashboards/actions', [])->assertForbidden();
+        $user->forceFill(['role' => 'editor'])->save();
+
+        $this->actingAs($user->fresh())->getJson('/api/catalog/200/apps/11/dashboards')->assertForbidden();
+        $this->postJson('/api/catalog/200/apps/11/dashboards/actions', [])->assertForbidden();
+
+        $this->assertSame([], $state->commands);
+        $this->assertDatabaseCount('approvals', 0);
+    }
+
+    public function test_incomplete_dashboard_identity_is_rejected_before_showing_an_editable_list(): void
+    {
+        [$user, , $state] = $this->dashboardContext();
+        $state->body['dashboards'][0]['header']['appId'] = 12;
+
+        $this->actingAs($user)->getJson('/api/catalog/100/apps/11/dashboards')->assertUnprocessable();
+
+        $this->assertSame(0, $state->pushes);
+    }
+
+    public function test_a_published_desk_with_a_contradictory_draft_label_cannot_be_organized(): void
+    {
+        [$user, , $state] = $this->dashboardContext(desk: 45);
+        $state->body['_state']['state'] = 'draft';
+        $input = $this->dashboardInput($user);
+
+        $this->postJson('/api/catalog/100/apps/11/dashboards/actions', $input)->assertConflict();
+
+        $this->assertSame(0, $state->pushes);
+        $this->assertDatabaseCount('approvals', 0);
+    }
+
+    public function test_native_zero_position_projection_is_verified_only_with_the_exact_ordered_id_sequence(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->dashboardContext();
+        $approval = $this->prepareDashboards($user, $this->dashboardInput($user));
+        $state->zero_read_order = true;
+
+        $result = $this->execute($user, $approval);
+
+        $this->assertSame('completed', $result->status);
+        $this->assertTrue($result->payload['execution']['result']['dashboards_verified']);
+        $this->assertSame([22, 21], array_column(array_column($state->body['dashboards'], 'header'), 'id'));
+        $this->assertSame(1, $state->pushes);
+    }
+
+    public function test_ignored_tab_reordering_cannot_be_presented_as_a_verified_save(): void
+    {
+        Queue::fake();
+        [$user, , $state] = $this->dashboardContext();
+        $approval = $this->prepareDashboards($user, $this->dashboardInput($user));
+        $state->zero_read_order = true;
+        $state->wrong_tab_order = true;
+
+        $result = $this->execute($user, $approval);
+
+        $this->assertSame('failed', $result->status);
+        $this->assertArrayNotHasKey('result', $result->payload['execution']);
+        $this->postJson('/api/bi-actions/'.$approval->id.'/app-settings-verification')->assertUnprocessable();
+        $this->assertSame(1, $state->pushes);
     }
 }

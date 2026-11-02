@@ -28,7 +28,7 @@ function all(item,predicate){return[...(predicate(item)?[item]:[]),...item.child
 function find(item,predicate){return all(item,predicate)[0];}
 function text(item){return item.text+item.children.map(text).join('');}
 function node(kind,text=''){
- const item={kind,tagName:kind.toUpperCase(),text,props:{},children:[],parent:null,isConnected:true,addEventListener(){},removeEventListener(){},getClientRects(){return[{}];},getRootNode(){return globalThis.document;},focus(){globalThis.document.activeElement=this;}};
+ const item={kind,tagName:kind.toUpperCase(),text,props:{},children:[],parent:null,isConnected:true,addEventListener(){},removeEventListener(){},getClientRects(){return[{}];},getRootNode(){return globalThis.document;},querySelector(selector){return find(this,item=>item!==this&&item.kind===selector)??null;},focus(){globalThis.document.activeElement=this;}};
  Object.defineProperty(item,'value',{get(){return item.props.value??'';},set(value){item.props.value=value;}});
  return item;
 }
@@ -37,24 +37,24 @@ const reviewId='00000000-0000-4000-8000-000000000011';
 function approval(status='pending'){
  return {id:reviewId,type:'manual',project_id:null,status,expires_at:'2099-01-01T00:00:00Z',fingerprint:'f'.repeat(64),payload:{origin:'manual',action:{action:'update_app_details',resource:'app:11',app_changes:{nome:'Nova visão'}},revision:{tenant_id:'100',resource:'app:11',app_details:{name:'Visão atual',state:'draft',desk_id:null},changes:[{target:'Aplicação',field:'Nome',before:'Visão atual',after:'Nova visão'},{target:'Aplicação',field:'Descrição',before:'Descrição antiga',after:'Descrição nova'}],impact:'Os dashboards e as fontes serão preservados.'},...(status==='pending'?{}:{app_settings_attempt:{resource:'app:11',started_at:'2026-11-01T12:00:00Z'}})}};
 }
-function receipt(item,verified=true){return{...item,status:'completed',payload:{...item.payload,execution:{result:{resource:item.payload.action.resource,confirmed_name:'Nova visão',changed_fields:1,configuration_verified:verified}}}};}
-function mount({component=Form,onRequest=null,outcome='completed',verified=true,publication='draft',initialApproval=null,sourceName='Visão atual',sourceDescription='Descrição antiga'}={}){
+function receipt(item,verified=true){return{...item,status:'completed',payload:{...item.payload,execution:{result:{resource:item.payload.action.resource,confirmed_name:'Nova visão',changed_fields:1,configuration_verified:verified,dashboards_verified:verified&&item.payload.action.action==='update_app_dashboards'}}}};}
+function mount({component=Form,onRequest=null,outcome='completed',verified=true,publication='draft',initialApproval=null,sourceName='Visão atual',sourceDescription='Descrição antiga',mode='details'}={}){
  const previous=Object.fromEntries(['document','Document','ShadowRoot','HTMLElement'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  Object.defineProperty(globalThis,'document',{configurable:true,writable:true,value:{activeElement:null,hidden:true}});
  for(const key of ['Document','ShadowRoot','HTMLElement'])Object.defineProperty(globalThis,key,{configurable:true,writable:true,value:class{}});
  const root=node('root'),calls=[],events=[],errors=[];let current=initialApproval??approval();
- const props=ref(component===Recovery?{approval:current}:{tenant:'100',tenantName:'Homologação',resource:{id:'11',ref:'app:11',kind:'app',name:'Visão atual'}});
+ const props=ref(component===Recovery?{approval:current}:{mode,tenant:'100',tenantName:'Homologação',resource:{id:'11',ref:'app:11',kind:'app',name:'Visão atual'}});
  const request=async(path,method,data)=>{
   calls.push({path,method,data:data===undefined?undefined:JSON.parse(JSON.stringify(data))});
   let result;
-  if(path.endsWith('/settings')){const id=path.split('/')[4];result={resource:'app:'+id,name:id==='11'?sourceName:'Outro ambiente',description:sourceDescription,version:'a'.repeat(64),state:publication,desk_id:publication==='published'?'45':null};}
-  else if(path.endsWith('/settings/actions')){current=approval();current.payload.action.app_changes={...(data.name?{nome:data.name}:{}),...('description'in data?{descricao:data.description}:{})};result={approval:current};}
+  if(path.endsWith('/settings')||path.endsWith('/dashboards')){const id=path.split('/')[4];result={resource:'app:'+id,name:id==='11'?sourceName:'Outro ambiente',description:sourceDescription,version:'a'.repeat(64),dashboards:[{id:21,name:'Resumo',order:0,widget_count:2},{id:22,name:'Detalhes',order:1,widget_count:3}],state:publication,desk_id:publication==='published'?'45':null};}
+  else if(path.endsWith('/settings/actions')||path.endsWith('/dashboards/actions')){current=approval();current.payload.action.app_changes={...(data.name?{nome:data.name}:{}),...('description'in data?{descricao:data.description}:{})};if(mode==='dashboards'){current.payload.action={action:'update_app_dashboards',resource:'app:11',dashboard_changes:JSON.parse(JSON.stringify(data.dashboards))};current.payload.revision.dashboard_edit={before:[{id:21,name:'Resumo',widget_count:2},{id:22,name:'Detalhes',widget_count:3}],after:JSON.parse(JSON.stringify(data.dashboards))};}result={approval:current};}
   else if(path.endsWith('/decide')){current={...current,status:data.decision};result=current;}
   else if(path.endsWith('/app-settings-verification')){current=receipt(current,verified);result={approval:current};}
   else {current=outcome==='completed'?receipt(current,verified):{...current,status:outcome,payload:{...current.payload,app_settings_attempt:{resource:'app:11',started_at:'2026-11-01T12:00:00Z'},execution:{message:'Conferência pendente.'}}};result={approval:current};}
   const response=structuredClone(result);return onRequest?onRequest(path,method,data,response):response;
  };
- const app=renderer.createApp({setup:()=>()=>h(component,{...props.value,request,onUpdated:()=>events.push('updated'),onNotice:value=>events.push(['notice',value]),onSaved:value=>events.push(['saved',value]),onConfirmed:value=>events.push(['confirmed',value])})});
+ const app=renderer.createApp({setup:()=>()=>h(component,{...props.value,request,onUpdated:()=>events.push('updated'),onNotice:value=>events.push(['notice',value]),onSaved:value=>events.push(['saved',value]),onConfirmed:value=>events.push(['confirmed',value]),onDuplicate:()=>events.push('duplicate')})});
  app.config.errorHandler=error=>errors.push(error.message);app.mount(root);
  return {root,calls,events,errors,props,button:label=>find(root,item=>item.kind==='button'&&text(item).trim()===label),setName:value=>find(root,item=>item.kind==='input').props['onUpdate:modelValue'](value),setDescription:value=>find(root,item=>item.kind==='textarea').props['onUpdate:modelValue'](value),close:()=>{app.unmount();for(const[key,descriptor]of Object.entries(previous)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];}}};
 }
@@ -128,4 +128,36 @@ test('an existing long description is preserved while only the name is edited',a
 });
 test('an existing long name is preserved while only the description is edited',async()=>{
  const view=mount({sourceName:'N'.repeat(120)});try{await settled();view.setDescription('Descrição nova');await settled();find(view.root,item=>item.kind==='form').props.onSubmit({preventDefault(){}});await settled();assert.equal(view.calls.length,2);assert.equal('name'in view.calls.at(-1).data,false);assert.equal(view.calls.at(-1).data.description,'Descrição nova');}finally{view.close();}
+});
+
+
+test('dashboard organization moves and renames all tabs with an immutable reviewed proposal',async()=>{
+ const view=mount({mode:'dashboards'});try{
+  await settled();assert.equal(view.button('Conferir alterações').props.disabled,true);assert.equal(document.activeElement.props.value,'Resumo');
+  find(view.root,item=>item.kind==='button'&&item.props['aria-label']==='Mover Detalhes para cima').props.onClick();await settled();
+  find(view.root,item=>item.kind==='input'&&item.props.value==='Detalhes').props['onUpdate:modelValue']('Detalhes financeiros');await settled();
+  find(view.root,item=>item.kind==='form').props.onSubmit({preventDefault(){}});await settled();
+  assert.equal(view.calls[1].path,'/catalog/100/apps/11/dashboards/actions');
+  assert.deepEqual(view.calls[1].data.dashboards,[{id:22,name:'Detalhes financeiros'},{id:21,name:'Resumo'}]);
+  assert.deepEqual(Object.keys(view.calls[1].data).sort(),['dashboards','request_id','version']);
+  assert.equal(view.calls.some(call=>call.path.endsWith('/decide')),false);
+  await click(view,'Autorizar alteração');assert.ok(view.button('Ver aplicação atualizada'));assert.equal(view.calls.filter(call=>call.path.endsWith('/decide')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+test('published dashboard organization offers duplication instead of an editable form',async()=>{
+ const view=mount({mode:'dashboards',publication:'published'});try{await settled();assert.match(text(view.root),/Duplique para organizar seus dashboards/);assert.equal(Boolean(find(view.root,item=>item.kind==='form')),false);await click(view,'Duplicar para minha mesa');assert.deepEqual(view.events,['duplicate']);assert.equal(view.calls.length,1);}finally{view.close();}
+});
+test('empty dashboard names cannot be prepared and tab controls have accessible boundaries',async()=>{
+ const view=mount({mode:'dashboards'});try{await settled();assert.equal(find(view.root,item=>item.kind==='button'&&item.props['aria-label']==='Mover Resumo para cima').props.disabled,true);assert.equal(find(view.root,item=>item.kind==='button'&&item.props['aria-label']==='Mover Detalhes para baixo').props.disabled,true);find(view.root,item=>item.kind==='input'&&item.props.value==='Resumo').props['onUpdate:modelValue']('   ');await settled();assert.equal(view.button('Conferir alterações').props.disabled,true);assert.equal(view.calls.length,1);}finally{view.close();}
+});
+test('the dashboard review shows old and proposed tab order with escaped names',async()=>{
+ const item=approval();item.payload.action.action='update_app_dashboards';item.payload.revision.dashboard_edit={before:[{id:21,name:'Resumo',widget_count:2},{id:22,name:'Detalhes',widget_count:3}],after:[{id:22,name:'<script>nova aba</script>'},{id:21,name:'Resumo'}]};
+ const html=await render(Review,{approval:item,tenants:[{id:'100',name:'Homologação'}]});assert.match(html,/Nomes e ordem dos dashboards/);assert.match(html,/Abas atuais/);assert.match(html,/Abas propostas/);assert.match(html,/&lt;script&gt;nova aba/);assert.doesNotMatch(html,/<script>nova aba/);
+ const history=await render(Operations,{approvals:[receipt(item)],projects:[],tenants:[],request:async()=>{throw new Error('Sem chamadas.');}});assert.match(history,/Dashboards organizados e conferidos/);
+});
+test('a lost dashboard proposal is recovered without changing the reviewed order',async()=>{
+ let lost=false;const view=mount({mode:'dashboards',onRequest:(path,method,data,response)=>{if(path.endsWith('/dashboards/actions')&&!lost){lost=true;throw new Error('Resposta perdida.');}return response;}});try{await settled();find(view.root,item=>item.kind==='input'&&item.props.value==='Resumo').props['onUpdate:modelValue']('Novo resumo');await settled();find(view.root,item=>item.kind==='form').props.onSubmit({preventDefault(){}});await settled();await click(view,'Conferir esta solicitação');const calls=view.calls.filter(call=>call.path.endsWith('/dashboards/actions'));assert.equal(calls.length,2);assert.deepEqual(calls[0].data,calls[1].data);assert.equal(view.calls.some(call=>call.path.endsWith('/decide')),false);}finally{view.close();}
+});
+test('failed dashboard organization has read-only result recovery in activity',async()=>{
+ const item=approval('failed');item.payload.action.action='update_app_dashboards';const html=await render(Recovery,{approval:item,request:async()=>{throw new Error('Sem chamadas.');}});assert.match(html,/nomes e a ordem dos dashboards/);assert.match(html,/Conferir resultado/);assert.match(html,/não reenvia a edição/);
 });

@@ -66,6 +66,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/catalog/{tenant}/variables/{id}/configuration', [BiVariableController::class, 'describe'])->whereNumber('tenant')->where('id', '[a-f0-9]+')->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/variables/actions', [BiVariableController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::post('/bi-actions/{id}/variable-verification', [BiVariableController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/apps/{id}/dashboards', [BiAppSettingsController::class, 'dashboards'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/apps/{id}/dashboards/actions', [BiAppSettingsController::class, 'prepareDashboards'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/catalog/{tenant}/apps/{id}/settings', [BiAppSettingsController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/actions', [BiAppCreationController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::post('/bi-actions/{id}/app-creation-verification', [BiAppCreationController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');

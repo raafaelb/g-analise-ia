@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-02.4",
+  "version": "2026-11-02.5",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -257,6 +257,13 @@
           "id": "catalog-app-details",
           "title": "Organize o nome da aplicação",
           "description": "Em Aplicações, abra um recurso e use Editar nome e descrição. Compare os valores antes de autorizar. A edição mantém os dashboards e as fontes; em uma aplicação publicada, a identificação muda para os usuários da mesma mesa. Se o resultado ficar incerto, Conferir resultado consulta o BI sem reenviar a edição.",
+          "anchor": "catalog-types",
+          "audience": "authors"
+        },
+        {
+          "id": "catalog-app-dashboards",
+          "title": "Organize as abas dos seus painéis",
+          "description": "Em Aplicações, abra o recurso e use Organizar dashboards para renomear as abas e mudar sua ordem com os botões de seta. Confira a comparação antes de autorizar. Gráficos, filtros e fontes são preservados. Aplicações publicadas oferecem Duplicar para minha mesa; organize a cópia. Se o resultado ficar incerto, Conferir resultado consulta a alteração sem reenviá-la.",
           "anchor": "catalog-types",
           "audience": "authors"
         },
@@ -1152,6 +1159,24 @@
         }
       ],
       "audience": "authors"
+    },
+    {
+      "id": "dashboard-tabs",
+      "title": "Como renomear e mudar a ordem dos dashboards?",
+      "audience": "authors",
+      "summary": "Renomeie e ordene abas de um rascunho, revise as mudanças e preserve o conteúdo.",
+      "body": "**Organize uma aplicação na sua mesa**\n\nNo Catálogo BI, abra uma aplicação e selecione Organizar dashboards. Edite os nomes e use as setas para cima e para baixo para escolher a sequência das abas. A quantidade de gráficos e componentes de cada painel ajuda a identificar o conteúdo.\n\nConferir alterações mostra os nomes e a ordem atuais e propostos. Autorizar alteração salva o rascunho e compara a configuração completa recebida do BI. Esta ação preserva os painéis, seus identificadores, gráficos, filtros, fontes e agendas; não adiciona nem exclui dashboards.\n\n**Quando a aplicação está publicada**\n\nO BI protege a estrutura de aplicações publicadas. Use Duplicar para minha mesa, confirme a cópia e organize seus dashboards. A publicação da cópia é uma decisão separada, com outra revisão.\n\nSe a aplicação ainda não tem dashboards, use Trabalhar neste recurso para criar o primeiro painel com a IA. Organizar dashboards funciona sobre painéis existentes.\n\n**Se a alteração precisar de conferência**\n\nConferir resultado consulta o BI e não reenvia a edição. Uma versão alterada, troca de sessão ou perda de acesso pode exigir reabrir a configuração. O histórico fica em Atividade.\n\nSe estiver editando a mesma aplicação em um projeto, use Atualizar do BI antes de continuar. Edições locais ainda não sincronizadas são preservadas e precisam ser revisadas; o catálogo não substitui os arquivos do projeto.",
+      "pages": [
+        "catalog",
+        "project",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir Catálogo BI"
+        }
+      ]
     }
   ]
 }
