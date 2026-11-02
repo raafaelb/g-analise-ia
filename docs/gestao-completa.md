@@ -1020,3 +1020,29 @@ Os recibos novos identificam a conferência do conteúdo e lembram que dados tê
 Testes isolados cobrem alterações em dashboards, widgets, tabelas, expressões, filtros e campos adicionais, recuperação por leitura, auditoria legítima, formato nativo em publicação nova/substituição e cabeçalhos de outro contexto. A homologação nativa dessa nova comparação ao publicar a aplicação permanece pendente da autorização específica; a publicação e a conferência do ETL desta rodada já foram concluídas.
 
 A regressão final passou com **1.385 testes em SQLite** (três casos exclusivos de PostgreSQL ignorados), **1.388 em PostgreSQL** e **250 de frontend**. Pint, TypeScript e build local passaram. A ajuda foi conferida em 1.920 × 871 e 390 × 844, sem transbordamento horizontal; o conteúdo possui rolagem própria e o link para Atividade funcionou. As duas âncoras existentes de ajuda/histórico estavam presentes. Os nove registros anteriores de progresso dos tours permaneceram idênticos. A saúde local confirmou banco, cache, agendador e três filas de workers, com filas vazias.
+
+
+## Aplicação publicada e permissões nativas entre duas identidades — 02/11/2026
+
+Após a autorização específica do usuário, uma revisão atual publicou uma única vez a aplicação **41566**, com um dashboard e cinco widgets, na mesa de aplicações **5267**, no tenant de teste **1290**. O plano manteve o conteúdo e o destino autorizados; validação, comparação oficial e checkpoint foram reconferidos antes do envio. O recibo confirmou **content_verified: true** e uma segunda leitura independente comparou novamente o conteúdo integral recebido. A revisão antiga expirada não foi reutilizada. A publicação não alterou a fonte sintética, sua tabela ou a agenda diária.
+
+A segunda identidade BI foi conectada ao perfil local temporário exclusivamente para o ensaio. Com seu perfil administrativo original, ambas as identidades consultaram seis registros, total **R$ 2.100**, Sul **R$ 600** e Norte **R$ 1.500**. O teste retirou temporariamente o grupo Administradores da conta de homologação e liberou somente a suíte DataViz, a função Ver de Aplicações e o uso do Lumo CLI, sem funções de criação, edição, exclusão ou publicação e sem suítes DW/ETL.
+
+| Situação da conta de consulta | Resultado observado |
+| --- | --- |
+| Sem mesa de aplicações liberada | Lista sem a aplicação; detalhes e prévia recusados pelo BI. |
+| Mesa liberada, tabela sem liberação | Aplicação e metadados visíveis; prévia numérica retornou zeros e uma linha de preenchimento, sem aviso explícito de permissão. Não corresponde aos seis registros conhecidos da fonte. |
+| Mesa e tabela liberadas, sem filtro de linha | Seis registros, total R$ 2.100, Sul R$ 600 e Norte R$ 1.500. |
+| Mesa e tabela liberadas, filtro REGIAO = Sul | Somente IDs 1, 2 e 3, total R$ 600 e três registros; nenhuma região Norte no resultado. |
+| Mesa revogada, mantendo a liberação filtrada da tabela | A aplicação deixou de ser listada e detalhes/prévia foram recusados. |
+| Perfil administrativo original restaurado | Ambas as identidades voltaram aos seis registros e total R$ 2.100; conteúdo publicado novamente conferido. |
+
+Em todas as fases restritas, a consulta direta da tabela e das mesas de dados no DW foi recusada. As negativas usaram o código de acesso do BI, e a conexão permaneceu conectada. O ensaio comprova essas operações de leitura do Lumo e do catálogo; não declara testadas todas as ações de escrita, exportações, MCP, dispositivos ou rotas nativas com o perfil restrito. Não houve tentativa de escrita com esse perfil nem nova inferência.
+
+O retorno de zeros sem um sinal de permissão exige uma explicação, sem diagnosticar falta de acesso a partir de um valor zero legítimo. **Conferir dados** agora mostra uma orientação sobre filtros e acesso às tabelas. A ajuda **Por que vejo a aplicação, mas faltam dados?** e o passo existente do catálogo usam a versão **2026-11-02.3**. Nenhum tour visto é reiniciado. Essa orientação não substitui uma mensagem nativa de permissão nem concede acesso.
+
+Ao terminar, foram retirados o filtro de região e as liberações diretas criadas no ensaio. O grupo Administradores foi restaurado e os 32 grupos de funções e as quatro suítes coincidiram integralmente com o checkpoint observável da interface. A tabela voltou a não ter liberação direta, filtros, colunas escondidas ou expiração; a configuração de exportação permaneceu no padrão anterior. A mesa de dados e o controle global de mesas não foram alterados. Essa conferência descreve o estado observável e o acesso efetivo, sem afirmar uma restauração byte a byte da base interna do provedor.
+
+O perfil local temporário foi inativado e desconectado, com credenciais removidas e zero sessões. Os comprovantes completos permanecem privados, fora do Git. A conta principal, os dados fictícios publicados e a agenda diária foram preservados; não houve escrita em Novo Hamburgo, implantação ou nova inferência. Uma consulta posterior da cobertura observou também uma carga concluída na madrugada, com seis registros, sem presumir a origem do disparo a partir desse histórico.
+
+A validação da ajuda passou com **14 testes e 119 asserções**, além de TypeScript e build local. A orientação foi inspecionada em **1.920 × 818** e **390 × 844 px**: as larguras útil/de rolagem coincidiram em **904 px** no computador e **288 px** no celular. A ajuda foi conferida também em **1.920 × 871** e no tamanho móvel, com rolagem própria, busca do novo artigo e atalho para Conexões funcionais. A âncora estável do catálogo estava presente e nenhum tour abriu automaticamente. Os **14 registros de progresso** existentes antes desta conferência visual mantiveram a mesma assinatura depois dela. O tamanho normal do navegador foi restaurado. Não houve mudança de lógica de autorização ou dependências nesta orientação.

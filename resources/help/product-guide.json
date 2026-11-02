@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-02.2",
+  "version": "2026-11-02.3",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -214,7 +214,7 @@
         {
           "id": "catalog-search",
           "title": "Localize e confira",
-          "description": "Use a busca e os filtros e abra um recurso para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso ou um módulo estiver indisponível no ambiente. São condições diferentes. Mensagens extensas ficam em Ver detalhes técnicos, sem mudar o resultado informado pelo BI. Detalhes sem confirmação ficam desconhecidos, mesmo que já tenham sido consultados antes.",
+          "description": "Use a busca e os filtros e abra um recurso para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso ou um módulo estiver indisponível no ambiente. São condições diferentes. Mensagens extensas ficam em Ver detalhes técnicos, sem mudar o resultado informado pelo BI. Detalhes sem confirmação ficam desconhecidos, mesmo que já tenham sido consultados antes. Em Conferir dados, os valores seguem os filtros e o acesso às tabelas. Ver a aplicação não garante acesso às suas tabelas; zeros ou informações incompletas exigem conferir esses acessos.",
           "anchor": "catalog-search",
           "audience": "all"
         },
@@ -642,6 +642,24 @@
         "catalog"
       ],
       "actions": [],
+      "audience": "all"
+    },
+    {
+      "id": "bi-data-permissions",
+      "title": "Por que vejo a aplicação, mas faltam dados?",
+      "summary": "Confira o acesso à mesa, às tabelas e os filtros de dados com o administrador do BI.",
+      "body": "O acesso à aplicação e o acesso aos dados são conferências diferentes. A mesa de aplicações organiza quem pode encontrar os painéis. As tabelas também podem exigir uma liberação própria e conter filtros de linha, colunas escondidas ou prazo de acesso. O perfil do G-Analise IA não amplia essas permissões do BI.\n\nEm **Catálogo BI → Aplicações → Conferir dados**, os resultados seguem o acesso da conta BI conectada. Na homologação com uma conta de consulta, liberar apenas a mesa tornou a aplicação visível, mas a prévia numérica retornou zeros e uma linha de preenchimento, sem um aviso explícito de falta de acesso à tabela. Liberar a tabela permitiu consultar os dados; um filtro de região restringiu os resultados à região autorizada. Isso não significa que todo valor zero seja uma falta de permissão.\n\nSe os dados parecerem incompletos, confira os filtros da dashboard, a atualização dos dados e a conta mostrada em **Conexões**. Peça ao administrador do BI para verificar o acesso à mesa e às tabelas utilizadas, incluindo filtros de linha, colunas e vigência. **Atualizar acessos** renova as informações da conexão; não concede permissões.\n\nA consulta direta de uma tabela no DW e a consulta dentro de uma dashboard são operações diferentes, com permissões próprias. Uma pessoa pode consultar os dados autorizados de uma aplicação e continuar sem acesso de construção no DW/ETL. Não use uma conta administradora para contornar a restrição de outra pessoa.\n\nUma recusa de acesso não significa que a sessão expirou. O portal mantém essa diferença nas mensagens. Atualizar o catálogo ou consultar novamente não publica recursos nem altera as permissões.",
+      "pages": [
+        "catalog",
+        "project",
+        "connections"
+      ],
+      "actions": [
+        {
+          "page": "connections",
+          "label": "Conferir minha conexão BI"
+        }
+      ],
       "audience": "all"
     },
     {
