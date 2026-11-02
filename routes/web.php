@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BiAppSettingsController;
 use App\Http\Controllers\BiCredentialController;
 use App\Http\Controllers\BiDeskController;
 use App\Http\Controllers\BiFlowWizardController;
@@ -59,6 +60,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/catalog/{tenant}/credentials/{id}/configuration', [BiCredentialController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/credentials/actions', [BiCredentialController::class, 'prepare'])->whereNumber('tenant')->middleware('throttle:bi-actions');
         Route::post('/catalog/{tenant}/credentials/{id}/inspect/{action}', [BiCredentialController::class, 'inspect'])->whereNumber(['tenant', 'id'])->whereIn('action', ['test', 'schema', 'relationships'])->middleware('throttle:bi-inspect');
+        Route::get('/catalog/{tenant}/apps/{id}/settings', [BiAppSettingsController::class, 'describe'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-inspect');
+        Route::post('/catalog/{tenant}/apps/{id}/settings/actions', [BiAppSettingsController::class, 'prepare'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
+        Route::post('/bi-actions/{id}/app-settings-verification', [BiAppSettingsController::class, 'verify'])->whereUuid('id')->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/apps/{id}/actions', [CatalogController::class, 'prepareAction'])->whereNumber(['tenant', 'id'])->middleware('throttle:bi-actions');
         Route::get('/catalog/{tenant}/flow-wizard/options', [BiFlowWizardController::class, 'options'])->whereNumber('tenant')->middleware('throttle:bi-inspect');
         Route::post('/catalog/{tenant}/flow-wizard/fields', [BiFlowWizardController::class, 'fields'])->whereNumber('tenant')->middleware('throttle:bi-inspect');

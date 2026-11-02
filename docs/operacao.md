@@ -38,6 +38,8 @@ A leitura completa do catálogo confere o `status --filter clean` da versão hom
 
 Após alterações no BI, os serviços invalidam o snapshot completo e os caches de categoria da mesma conexão, geração de sessão e tenant. A abertura de um resultado salvo, uma publicação confirmada ou uma exclusão confirmada renova a categoria correspondente; o botão **Atualizar catálogo** continua solicitando todas as áreas. Quantidades de outras áreas podem voltar a **Consultar**. Essa invalidação remove somente chaves de cache e não apaga YAML de autoria. A revisão também não exige migração de banco; use o mesmo procedimento de atualização graciosa dos workers e conferência de saúde.
 
+A edição manual de nome/descrição de aplicações também usa revisões e execução pela fila `actions`. Depois de atualizar o código, recarregue os workers de forma graciosa e confira a saúde; não há migração ou dependência nova nessa revisão. A consulta de resultado em Atividade é somente leitura e não deve ser substituída por um novo envio. Os workspaces temporários de edição/conferência são separados dos projetos existentes e removidos ao terminar; os arquivos de autoria dos projetos não são sobrescritos.
+
 ## Sandbox do Codex e limites do host
 
 A imagem inclui `codex-resources` da mesma distribuição oficial fixada do Codex, incluindo seu auxiliar `bwrap`; não instala um pacote adicional nem baixa um auxiliar de outra origem. O build e `scripts/codex-smoke.php` verificam que o auxiliar executa. O smoke faz initialize/thread/start sem solicitar inferência e não verifica o isolamento completo de um usuário. Falhas do auxiliar ou do protocolo encerram o comando com código 1, para interromper o CI.

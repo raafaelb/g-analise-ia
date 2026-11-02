@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-01.8",
+  "version": "2026-11-01.9",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -247,6 +247,13 @@
           "audience": "authors"
         },
         {
+          "id": "catalog-app-details",
+          "title": "Organize o nome da aplicação",
+          "description": "Em Aplicações, abra um recurso e use Editar nome e descrição. Compare os valores antes de autorizar. A edição mantém os dashboards e as fontes; em uma aplicação publicada, a identificação muda para os usuários da mesma mesa. Se o resultado ficar incerto, Conferir resultado consulta o BI sem reenviar a edição.",
+          "anchor": "catalog-types",
+          "audience": "authors"
+        },
+        {
           "id": "catalog-edit",
           "title": "Ações claras no próprio catálogo",
           "description": "Crie mesas e conexões quando autorizado e confira as estruturas das fontes. Aplicações e ETLs em rascunho criados pelo portal permitem Excluir rascunho criado aqui: revise o que será removido e preservado. Excluir uma aplicação remove seus dashboards e preserva as tabelas; excluir um ETL também pode remover seus destinos e dados de teste. Se o resultado ficar sem confirmação, use Conferir exclusão na conversa ou em Atividade antes de novas escritas. Uma recusa conhecida exige resolver o motivo e preparar outra revisão.",
@@ -369,7 +376,7 @@
         {
           "id": "activity-history",
           "title": "Use o histórico para investigar",
-          "description": "Abra Ver revisão desta operação para conferir proposta e efeito da decisão. Em exclusões sem confirmação, Conferir exclusão consulta o resultado sem reenviar. Uma recusa conhecida exige resolver o motivo e preparar nova revisão. Publicações mostram destino e próximas verificações; contadores das cargas medem processamento, não o total da tabela. Você também resolve as solicitações na conversa. Mensagens extensas ficam em Ver detalhes técnicos, sem alterar o resultado do BI.",
+          "description": "Abra Ver revisão desta operação para conferir proposta e efeito da decisão. Em exclusões sem confirmação, Conferir exclusão consulta o resultado sem reenviar. Uma recusa conhecida exige resolver o motivo e preparar nova revisão. Publicações mostram destino e próximas verificações; contadores das cargas medem processamento, não o total da tabela. Você também resolve as solicitações na conversa. Mensagens extensas ficam em Ver detalhes técnicos, sem alterar o resultado do BI. Em edições de nome e descrição, Conferir resultado consulta o que foi salvo na aplicação sem repetir a alteração.",
           "anchor": "activity-history",
           "audience": "all"
         },
@@ -620,6 +627,27 @@
       ],
       "actions": [],
       "audience": "all"
+    },
+    {
+      "id": "app-details",
+      "title": "Como altero o nome e a descrição de uma aplicação?",
+      "summary": "Edite a identificação pelo catálogo, compare a proposta e confira o resultado no BI.",
+      "body": "No **Catálogo BI**, escolha **Aplicações**, abra o recurso e, em **Gerenciar aplicação**, use **Editar nome e descrição**. O nome identifica a aplicação que reúne os dashboards; esta edição não renomeia as abas dos dashboards.\n\nAltere os campos desejados e use **Conferir alterações**. A revisão mostra os valores atuais e propostos e informa se a aplicação está privada ou publicada. Autorize ou recuse a proposta. Em uma aplicação já publicada, o nome e a descrição ficam visíveis aos usuários da mesma mesa. Os dashboards, filtros, fontes e agendas são preservados; esta operação não publica uma nova versão nem executa uma carga.\n\nSe a configuração mudar enquanto o formulário estiver aberto, reabra a configuração atual antes de revisar outra proposta. Se uma decisão ficar sem resposta, use **Conferir solicitação** antes de decidir novamente. Se o envio da edição ocorrer mas seu resultado não for confirmado, **Conferir resultado** faz uma nova leitura sem reenviar a edição. Essa conferência também aparece em **Atividade → Operações de BI**. Uma consulta que não confirme a proposta exige analisar a aplicação atual, sem anunciar sucesso automaticamente.\n\nDepois da confirmação, **Ver aplicação atualizada** renova a categoria e abre os detalhes conferidos. O nome pessoal de um projeto é independente do nome da aplicação. Para continuar edições em um projeto já vinculado, use **Atualizar do BI**: alterações locais ainda não sincronizadas precisam ser revisadas antes dessa atualização.\n\nA edição usa sua conexão BI e não inicia uma tarefa de IA. É necessário um perfil de autoria no portal e permissão no BI. Uma exclusão pendente impede preparar ou executar esta edição. Quem tem perfil de consulta continua podendo visualizar os recursos autorizados, sem os controles de alteração.",
+      "pages": [
+        "catalog",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir aplicações no catálogo"
+        },
+        {
+          "page": "activity",
+          "label": "Conferir minhas operações"
+        }
+      ],
+      "audience": "authors"
     },
     {
       "id": "table-presentation",

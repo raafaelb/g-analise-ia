@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\ArtifactImages;
 use App\Services\AttachmentContext;
 use App\Services\Audit;
+use App\Services\BiAppSettings;
 use App\Services\BiCatalog;
 use App\Services\BiCloneNames;
 use App\Services\BiCredentials;
@@ -260,6 +261,9 @@ class ActionBroker
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiSchedules::ACTIONS, true)) {
             return app(BiSchedules::class)->executeApproved($approval);
+        }
+        if (in_array($approval->payload['action']['action'] ?? '', BiAppSettings::ACTIONS, true)) {
+            return app(BiAppSettings::class)->executeApproved($approval);
         }
         if (in_array($approval->payload['action']['action'] ?? '', BiTablePresentation::ACTIONS, true)) {
             return app(BiTablePresentation::class)->executeApproved($approval);
