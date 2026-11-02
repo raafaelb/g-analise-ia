@@ -66,7 +66,7 @@ class BiPublications
 
         return [
             'mode' => $mode,
-            'source' => ['resource' => $ref, 'name' => $this->name($source), 'dashboard_count' => count($source['dashboards']), 'sha256' => $this->digest($source)],
+            'source' => ['resource' => $ref, 'name' => $this->name($source), 'dashboard_count' => count($source['dashboards']), 'sha256' => $this->digest($source), 'content_sha256' => $this->contentDigest($source, $ref, (string) $project->tenant_id)],
             'destination' => ['id' => $desk, 'resource' => 'bi-desk:'.$desk, 'name' => (string) ($destination['nome'] ?? $destination['name'] ?? 'Mesa #'.$desk)],
             'target' => $target,
             'connection_generation' => $connection->metadata['session_generation'] ?? null,
@@ -92,13 +92,17 @@ class BiPublications
         if ($this->desk($body) !== ($plan['destination']['id'] ?? null) || $this->name($body) !== ($plan['source']['name'] ?? null) || ! is_array($body['dashboards'] ?? null) || count($body['dashboards']) !== ($plan['source']['dashboard_count'] ?? null)) {
             throw new RuntimeException('O destino ou o conteúdo resumido retornado pelo BI não corresponde à revisão autorizada.');
         }
+        $contentVerified = array_key_exists('content_sha256', $plan['source']);
+        if ($contentVerified && (! is_string($plan['source']['content_sha256']) || ! preg_match('/^[a-f0-9]{64}$/D', $plan['source']['content_sha256']) || ! hash_equals($plan['source']['content_sha256'], $this->contentDigest($body, $ref, (string) $project->tenant_id)))) {
+            throw new RuntimeException('O conteúdo da aplicação publicada não corresponde à revisão autorizada. Confira gráficos, expressões, filtros e fontes sem reenviar a publicação.');
+        }
         $this->assertSession($connection, $project);
         $this->assertGeneration($connection, $generation);
         if ($requireOriginalSession && ($connection->metadata['session_generation'] ?? null) !== ($plan['connection_generation'] ?? null)) {
             throw new RuntimeException('A sessão mudou durante a confirmação da publicação.');
         }
 
-        return ['verified' => true, 'mode' => $plan['mode'], 'resource' => $ref, 'name' => $this->name($body), 'dashboard_count' => count($body['dashboards']), 'destination' => $plan['destination'], 'checked_at' => now()->toIso8601String()];
+        return ['verified' => true, 'content_verified' => $contentVerified, 'mode' => $plan['mode'], 'resource' => $ref, 'name' => $this->name($body), 'dashboard_count' => count($body['dashboards']), 'destination' => $plan['destination'], 'message' => $contentVerified ? 'Conteúdo revisado conferido no BI. A atualização dos dados é verificada separadamente.' : 'Destino e quantidade de dashboards conferidos. Esta revisão anterior não inclui a conferência integral do conteúdo.', 'checked_at' => now()->toIso8601String()];
     }
 
     /** @return array{project: Project, approval: Approval} */
@@ -269,6 +273,31 @@ class BiPublications
         }
 
         return $name;
+    }
+
+    private function contentDigest(array $body, string $resource, string $tenant): string
+    {
+        foreach (['_state', 'deskId', 'desk_id', 'version', 'criado_em', 'criado_por', 'publicado_em', 'publicado_por', 'cloned_from'] as $field) {
+            unset($body[$field]);
+        }
+        foreach ($body['dashboards'] as $index => $dashboard) {
+            if (! is_array($dashboard)) {
+                throw new RuntimeException('A configuração completa de um dashboard não foi recebida.');
+            }
+            if (array_key_exists('header', $dashboard) || array_key_exists('body', $dashboard)) {
+                $header = $dashboard['header'] ?? null;
+                if (! is_array($header) || ! is_array($dashboard['body'] ?? null) || ($header['kind'] ?? null) !== 'app-dashboard' || ($header['lumo'] ?? null) !== 'v2' || ! is_int($header['id'] ?? null) || $header['id'] < 1 || ! is_int($header['tenantId'] ?? null) || (string) $header['tenantId'] !== $tenant || ($header['appId'] ?? null) !== (int) substr($resource, 4)) {
+                    throw new RuntimeException('O dashboard retornou fora do contexto da aplicação revisada.');
+                }
+                unset($dashboard['header']['appId']);
+                foreach (['version', 'criado_em', 'criado_por', 'publicado_em', 'publicado_por'] as $field) {
+                    unset($dashboard['body'][$field]);
+                }
+                $body['dashboards'][$index] = $dashboard;
+            }
+        }
+
+        return $this->digest($body);
     }
 
     private function digest(array $body): string

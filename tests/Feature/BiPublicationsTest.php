@@ -83,6 +83,9 @@ class BiPublicationsTest extends TestCase
                 if ($state->apply) {
                     $target = in_array('--new', $args, true) ? 2 : 1;
                     $state->bodies[$target] = [...$state->bodies[2], '_state' => ['deskId' => 10]];
+                    if (isset($state->after_publish)) {
+                        $state->bodies[$target] = ($state->after_publish)($state->bodies[$target]);
+                    }
                     if ($target === 1) {
                         unset($state->bodies[2]);
                     }
@@ -167,6 +170,194 @@ class BiPublicationsTest extends TestCase
         $this->assertSame('failed', $approval->fresh()->status);
         $this->assertStringContainsString('mudou após a revisão', $approval->fresh()->payload['execution']['message']);
         $this->assertSame(0, $state->publishes);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function publishedContentChanges(): array
+    {
+        return [
+            'dashboard content changed' => ['dashboards.0.nome'],
+            'widget content changed' => ['dashboards.0.widgets.0.config.title'],
+            'table changed' => ['tables.0.tableId'],
+            'expression changed' => ['expressions.0.formula'],
+            'filter changed' => ['filtros.0.value'],
+            'future content field changed' => ['private_reference'],
+        ];
+    }
+
+    #[DataProvider('publishedContentChanges')]
+    public function test_published_content_different_from_the_review_is_not_confirmed_or_sent_again(string $path): void
+    {
+        Queue::fake();
+        [$user, $project, , $state] = $this->context();
+        $state->bodies[2] = [...$state->bodies[2],
+            'dashboards' => [['id' => 22, 'nome' => 'Resumo', 'widgets' => [['id' => 33, 'config' => ['title' => 'Receita']]]]],
+            'tables' => [['tableId' => 7, 'tipo' => 'dimension']],
+            'expressions' => [['id' => 80, 'formula' => 'SUM(VALOR)']],
+            'filtros' => [['column' => ['column_id' => 9, 'expression' => 'AGP'], 'operator' => '=', 'value' => 'Sul']],
+        ];
+        $state->after_publish = function (array $body) use ($path): array {
+            data_set($body, $path, $path === 'tables.0.tableId' ? 8 : 'Conteúdo diferente');
+
+            return $body;
+        };
+        $this->native($state);
+        $approval = $this->prepare($user);
+
+        $this->execute($user, $approval);
+        (new ExecuteApprovedAction($approval->id))->handle(app(ActionBroker::class));
+
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertStringContainsString('confirmação final ficou pendente', $approval->fresh()->payload['execution']['message']);
+        $this->assertNull($project->fresh()->preview_revision);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
+        $this->assertSame(1, $state->publishes);
+        $this->assertDatabaseCount('agent_runs', 0);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_read_only_reconciliation_rejects_different_content_until_the_reviewed_content_is_returned(): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->throw_after_publish = true;
+        $this->native($state);
+        $approval = $this->prepare($user);
+        $this->execute($user, $approval);
+        $reviewed = $state->bodies[2];
+        $state->bodies[2]['private_reference'] = 'Outra configuração';
+        $endpoint = '/api/approvals/'.$approval->id.'/publication/verify';
+
+        $this->postJson($endpoint)->assertUnprocessable()->assertJsonValidationErrors('publication');
+
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'draft']);
+        $state->bodies[2] = $reviewed;
+        $this->postJson($endpoint)->assertOk()->assertJsonPath('approval.status', 'completed')->assertJsonPath('approval.payload.execution.result.publication.content_verified', true);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'published']);
+        $this->assertSame(1, $state->publishes);
+        $this->assertDatabaseCount('agent_runs', 0);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_publication_audit_metadata_can_change_without_invalidating_reviewed_content(): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->after_publish = fn (array $body): array => [...$body, 'deskId' => 10, 'version' => 2, 'criado_em' => '2026-11-01T10:00:00-03:00', 'criado_por' => 5, 'publicado_em' => '2026-11-02T03:00:00-03:00', 'publicado_por' => 6];
+        $this->native($state);
+        $approval = $this->prepare($user);
+
+        $this->execute($user, $approval);
+
+        $this->assertSame('completed', $approval->fresh()->status);
+        $this->assertTrue($approval->fresh()->payload['execution']['result']['publication']['content_verified']);
+        $this->assertStringNotContainsString('synthetic-private-source', json_encode($approval->payload['revision']['publication']));
+        $this->assertSame(1, $state->publishes);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_legacy_publication_receipts_do_not_claim_content_verification(): void
+    {
+        [, $project, $connection, $state] = $this->context();
+        $this->native($state);
+        $publications = app(BiPublications::class);
+        $plan = $publications->plan($connection, $project, ['resource' => 'app:2', 'desk' => 10]);
+        unset($plan['source']['content_sha256']);
+        $state->bodies[2]['_state']['deskId'] = 10;
+
+        $result = $publications->verify($connection, $project, $plan);
+
+        $this->assertTrue($result['verified']);
+        $this->assertFalse($result['content_verified']);
+        $this->assertSame(0, $state->publishes);
+    }
+
+    private function wrappedDashboard(): array
+    {
+        return ['header' => ['id' => 22, 'kind' => 'app-dashboard', 'lumo' => 'v2', 'tenantId' => 100, 'appId' => 2], 'body' => ['nome' => 'Resumo', 'ordem' => 0, 'version' => 1, 'widgets' => [['id' => 33, 'type' => 'Kpi', 'x' => 0, 'y' => 0, 'chart' => ['version' => 1, 'options' => ['title' => 'Receita']]]]]];
+    }
+
+    /** @return array<string, array{string, int}> */
+    public static function wrappedPublicationModes(): array
+    {
+        return ['new application' => ['new', 2], 'replace original' => ['replace', 1]];
+    }
+
+    #[DataProvider('wrappedPublicationModes')]
+    public function test_native_dashboard_envelopes_confirm_current_application_binding_and_allow_audit_changes(string $mode, int $appId): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->bodies[2]['dashboards'] = [$this->wrappedDashboard()];
+        $state->after_publish = function (array $body) use ($appId): array {
+            $body['dashboards'][0]['header']['appId'] = $appId;
+            $body['dashboards'][0]['body']['version'] = 2;
+            $body['dashboards'][0]['body']['publicado_em'] = '2026-11-02T03:00:00-03:00';
+            $body['dashboards'][0]['body']['publicado_por'] = 6;
+
+            return $body;
+        };
+        $this->native($state);
+        $approval = $this->prepare($user, $mode);
+
+        $this->execute($user, $approval);
+
+        $this->assertSame('completed', $approval->fresh()->status);
+        $this->assertTrue($approval->fresh()->payload['execution']['result']['publication']['content_verified']);
+        $this->assertSame('app:'.$appId, $approval->fresh()->payload['execution']['result']['published_resource']);
+        $this->assertSame(1, $state->publishes);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    /** @return array<string, array{string, mixed}> */
+    public static function invalidWrappedDashboardChanges(): array
+    {
+        return [
+            'another application' => ['header.appId', 999],
+            'another tenant' => ['header.tenantId', 999],
+            'another resource kind' => ['header.kind', 'app'],
+            'unknown document version' => ['header.lumo', 'v3'],
+            'missing body' => ['body', null],
+            'changed chart version is content' => ['body.widgets.0.chart.version', 2],
+        ];
+    }
+
+    #[DataProvider('invalidWrappedDashboardChanges')]
+    public function test_foreign_or_changed_native_dashboard_content_is_not_confirmed(string $path, mixed $value): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->bodies[2]['dashboards'] = [$this->wrappedDashboard()];
+        $state->after_publish = function (array $body) use ($path, $value): array {
+            data_set($body['dashboards'][0], $path, $value);
+
+            return $body;
+        };
+        $this->native($state);
+        $approval = $this->prepare($user);
+
+        $this->execute($user, $approval);
+
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
+        $this->assertSame(1, $state->publishes);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_returns_422_before_a_review_for_a_dashboard_bound_to_another_application(): void
+    {
+        Queue::fake();
+        [$user, , , $state] = $this->context();
+        $state->bodies[2]['dashboards'] = [$this->wrappedDashboard()];
+        $state->bodies[2]['dashboards'][0]['header']['appId'] = 999;
+        $this->native($state);
+
+        $this->actingAs($user)->postJson('/api/catalog/100/apps/2/actions', ['action' => 'publish_app', 'desk' => 10, 'publish_mode' => 'new', 'request_id' => (string) Str::uuid()])->assertUnprocessable()->assertJsonPath('errors.operation.0', 'O dashboard retornou fora do contexto da aplicação revisada.');
+
+        $this->assertDatabaseCount('approvals', 0);
+        $this->assertSame(0, $state->publishes);
+        Queue::assertNothingPushed();
     }
 
     public function test_a_successful_cli_exit_without_confirmed_publication_is_not_retried_or_marked_published(): void

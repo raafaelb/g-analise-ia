@@ -107,3 +107,12 @@ docker compose --env-file .env.homologacao -f compose.homologacao.yaml down
 ```
 
 O teste cria uma conta sintética somente após conferir o nome exclusivo do banco efêmero. Verifica certificado, assets, prefixo Inertia, CSRF/login, redirecionamento e sessão autenticada. A senha aleatória não é exibida. Não contorna avisos de certificado do navegador nem instala certificados no sistema. Encerrar o Compose descarta o banco/cache de ensaio.
+
+
+## Homologação da fonte e compilação local — 02/11/2026
+
+A fonte sintética de permissões no tenant de teste foi publicada com autorização específica e possui uma única agenda ativa diária às 03h de Brasília. Uma carga completa terminou com sucesso, com identificador conferido e nova leitura dos seis registros. A aplicação de teste segue privada e as restrições entre mesas/filtros por linha não devem ser apresentadas como homologadas. A sessão administrativa expirou; nenhuma permissão nativa foi alterada nesta rodada. O perfil local da segunda identidade terminou novamente inativo e desconectado, sem credenciais. Os identificadores e o alcance da prova constam na análise de gestão completa; os recibos e dados continuam fora do Git.
+
+No HTTP local, usar **`npm run build:local`**, como nos scripts de preparação e no CI. `npm run build` lê a configuração de produção; neste ambiente ela aponta para o ensaio HTTPS em outro endereço e subdiretório. Um build direcionado ao endereço errado deixou módulos de páginas indisponíveis e a tela em branco; a compilação local foi restaurada e a página de login voltou a renderizar sem erros de JavaScript na conferência do navegador. Isso não constitui implantação nem homologação do domínio público. A configuração final de produção precisa corresponder ao endereço que será efetivamente publicado.
+
+Publicações novas de aplicações passam a conferir também o conteúdo revisado e os vínculos dos dashboards, com recibo explícito. Uma divergência permanece pendente e deve ser investigada por leitura; não reenviar automaticamente. O Lumo instalado não oferece `--dry-run` para `app publish`; a preparação usa plano, validação, comparação remota e checkpoint, mantendo a decisão de publicação separada.
