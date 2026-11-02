@@ -14,7 +14,7 @@ use RuntimeException;
 
 class BiWorkspaceSync
 {
-    public function __construct(private BiCatalog $catalog, private LumoClient $lumo) {}
+    public function __construct(private BiCatalog $catalog, private LumoClient $lumo, private BiWorkspaceCheckpoint $checkpoints) {}
 
     /** @return array<string, mixed> */
     public function refreshProject(User $user, string $id): array
@@ -52,15 +52,25 @@ class BiWorkspaceSync
         $this->assertSession($connection, $generation);
         abort_unless(collect($this->catalog->rows($connection, $project, $match[1]))->contains(fn (array $row): bool => (string) $row['id'] === $match[2]), 404, 'Este recurso não está disponível no tenant para sua sessão atual.');
         $this->assertSession($connection, $generation);
+        $document = $this->checkpoints->document($project, $resource);
         $before = $this->difference($connection, $project, $resource);
         $this->assertSession($connection, $generation);
-        if ($before['workingMissing'] === false && $before['workingVsState']['equal'] !== true) {
-            return ['status' => 'local_changes', 'updated' => false, 'verified' => false, 'resource' => $resource, 'message' => 'Há edições locais ainda não sincronizadas. Elas foram preservadas. Revise as diferenças com a IA antes de atualizar a versão do BI.'];
-        }
-        if ($before['workingMissing'] === false && $before['workingVsServer']['equal'] === true) {
+        if ($before['workingMissing'] === false && $before['workingVsState']['equal'] === true && $before['workingVsServer']['equal'] === true) {
+            $this->checkpoints->close($project, $resource);
+
             return ['status' => 'current', 'updated' => false, 'verified' => true, 'resource' => $resource, 'message' => 'Este projeto já está com a versão atual do BI.'];
         }
-        $this->lumo->run($connection, ['pull', $resource], $project, 90);
+        $command = ['pull', $resource];
+        if ($before['workingMissing'] === false) {
+            $checkpoint = $this->checkpoints->protect($connection, $project, $resource, $document, $before['workingVsState']['equal'] === true || $before['workingVsServer']['equal'] === true);
+            if (! $checkpoint) {
+                return ['status' => 'local_changes', 'updated' => false, 'verified' => false, 'resource' => $resource, 'message' => 'Há edições locais ainda não sincronizadas. Elas foram preservadas. Revise as diferenças com a IA antes de atualizar a versão do BI.'];
+            }
+            $this->checkpoints->assertReady($connection, $project, $resource, $document, $checkpoint);
+            $command[] = '--discard-local';
+        }
+        $this->lumo->run($connection, $command, $project, 90);
+        $this->checkpoints->close($project, $resource);
         $after = $this->difference($connection, $project, $resource);
         $this->assertSession($connection, $generation);
         $verified = $after['workingMissing'] === false && $after['workingVsState']['equal'] === true && $after['workingVsServer']['equal'] === true;

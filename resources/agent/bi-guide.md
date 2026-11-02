@@ -21,7 +21,7 @@ Crie arquivos a partir do recurso produzido por `new`/`clone_app`. Não substitu
 
 ## Atualizar a versão de autoria
 
-Se o BI foi alterado fora deste projeto ou após substituir uma aplicação, use `horus_action` com `action: refresh_resource` e o recurso autorizado. Essa operação lê a versão atual e atualiza somente arquivos sem edições locais pendentes. Se retornar `local_changes`, preserve o conteúdo e use `diff` para explicar o conflito e propor uma combinação. Não force sobrescrita e não edite `.lumo/`. Após atualizar, leia novamente os arquivos com `workspace_file` para obter o novo hash antes de editar.
+Se o BI foi alterado fora deste projeto ou após substituir uma aplicação, use `horus_action` com `action: refresh_resource` e o recurso autorizado. Essa operação lê a versão atual e atualiza somente arquivos sem edições locais pendentes, preservando um checkpoint conferido antes do recebimento. Uma tentativa interrompida só pode aproveitar esse comprovante com os mesmos arquivos, projeto e acesso; ele é encerrado depois de utilizado. Se retornar `local_changes`, preserve o conteúdo e use `diff` para explicar o conflito e propor uma combinação. Uma versão antiga sem esse comprovante também precisa de revisão. Não force sobrescrita e não edite `.lumo/`. Após atualizar, leia novamente os arquivos com `workspace_file` para obter o novo hash antes de editar. Essa atualização de configuração não executa cargas de dados nem envia alterações ao BI.
 
 ## Referências de medidas e dimensões
 

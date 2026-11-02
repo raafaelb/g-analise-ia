@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-02.9",
+  "version": "2026-11-02.10",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -127,9 +127,9 @@
         {
           "id": "project-config",
           "title": "Confira o projeto",
-          "description": "Configurar permite conferir as instruções e o vínculo do projeto. Trocar o ambiente depois de iniciar um trabalho exige outro projeto.",
+          "description": "Configurar permite conferir as instruções e o vínculo. Após alterar a aplicação pelo catálogo ou pelo BI, use Atualizar do BI antes de continuar no projeto. Edições locais pendentes são preservadas. Trocar o ambiente depois de iniciar um trabalho exige outro projeto.",
           "anchor": "project-config",
-          "audience": "all"
+          "audience": "authors"
         },
         {
           "id": "project-flow-wizard",
@@ -1207,6 +1207,23 @@
         {
           "page": "activity",
           "label": "Abrir Atividade"
+        }
+      ],
+      "audience": "authors"
+    },
+    {
+      "id": "project-bi-refresh",
+      "title": "Como recebo no projeto as alterações feitas no BI?",
+      "summary": "Atualize a configuração do projeto após mudanças no catálogo, preservando suas edições pendentes.",
+      "body": "Abra o projeto vinculado ao recurso e use **Atualizar do BI** depois de alterar a aplicação pelo catálogo ou no G-Analise BI. O portal recebe a configuração atual e confere novamente o resultado. Essa ação usa sua conexão BI, sem iniciar uma conversa com a IA, publicar a aplicação ou executar uma carga de dados.\n\nAntes do recebimento, um registro de segurança preserva a configuração local que foi confirmada sem edições pendentes. A atualização fica limitada ao recurso escolhido. O projeto, suas conversas e os demais arquivos continuam preservados.\n\nSe aparecer **Há edições locais ainda não sincronizadas**, o portal mantém esses arquivos. Peça à IA para comparar as diferenças entre o projeto e a aplicação atual e explicar como combinar as alterações antes de continuar. Uma versão antiga que ficou no projeto após uma falha também pode exigir essa conferência.\n\nUma atualização interrompida pode ser conferida novamente pelo mesmo botão. O recebimento só continua quando o registro anterior, os arquivos e o acesso atual forem confirmados; arquivos alterados ou uma sessão diferente exigem revisão. Uma nova mudança no BI durante a operação fica como pendência, em vez de anunciar que tudo está atualizado.\n\nAguarde as tarefas de IA e conclua ou recuse revisões pendentes antes de atualizar manualmente. O recurso precisa continuar disponível no tenant para sua conta. **Atualizar do BI** recebe a configuração; para atualizar os valores dos indicadores, confira as fontes e as agendas em **Atualização de dados**.",
+      "pages": [
+        "project",
+        "catalog"
+      ],
+      "actions": [
+        {
+          "page": "projects",
+          "label": "Abrir meus projetos"
         }
       ],
       "audience": "authors"
