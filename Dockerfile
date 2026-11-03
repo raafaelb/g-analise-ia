@@ -29,6 +29,14 @@ WORKDIR /var/www/html
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["php","artisan","serve","--host=0.0.0.0","--port=8000","--no-reload"]
 
+FROM runtime AS isolated-agent
+RUN mkdir -p /home/agent /opt/g-analise /run/agent-inference && chown 1000:1000 /home/agent && chmod 0700 /home/agent
+COPY app/Services/Agent/AgentLocalProxy.php app/Services/Agent/CodexProtocol.php docker/agent-entry.php LICENSE /opt/g-analise/
+USER 1000:1000
+WORKDIR /home/agent
+ENTRYPOINT ["/sbin/tini", "-g", "--", "php", "/opt/g-analise/agent-entry.php"]
+CMD []
+
 FROM runtime AS dependencies
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --prefer-dist --no-interaction --optimize-autoloader

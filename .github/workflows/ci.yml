@@ -25,6 +25,18 @@ jobs:
           tags: horus-ia-php:local
           cache-from: type=gha,scope=ganalise-tools-linux-amd64
           cache-to: type=gha,scope=ganalise-tools-linux-amd64,mode=max
+      - name: Compilar executor isolado
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          target: isolated-agent
+          load: true
+          push: false
+          tags: ganalise-isolated-agent:ci
+          cache-from: |
+            type=gha,scope=ganalise-tools-linux-amd64
+            type=gha,scope=ganalise-agent-linux-amd64
+          cache-to: type=gha,scope=ganalise-agent-linux-amd64,mode=max
       - run: docker compose run --rm --no-deps app composer install --no-interaction --prefer-dist
       - run: docker compose run --rm --no-deps app php artisan key:generate
       - run: docker compose run --rm frontend npm ci
@@ -35,6 +47,10 @@ jobs:
       - run: docker compose -f compose.yaml -f compose.tests.yaml run --rm --no-deps app php scripts/test-postgres.php
       - run: docker compose run --rm --no-deps app vendor/bin/pint --test
       - run: docker compose run --rm --no-deps app php scripts/codex-smoke.php
+      - name: Ensaiar executor isolado com gateway Unix e identidades sinteticas
+        run: |
+          docker pull nginxinc/nginx-unprivileged:stable-alpine
+          python3 scripts/test-codex-isolation.py --disposable --agent-image ganalise-isolated-agent:ci --output "${RUNNER_TEMP}/ganalise-isolated-gateway.json"
       - name: Compilar e conferir configuracao da imagem de producao
         run: |
           python3 scripts/prepare-production.py --url https://ci.example.invalid/ia-ganalise
