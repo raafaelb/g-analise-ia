@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return $response;
             }
 
+            Inertia::resolveUrlUsing(app(HandleInertiaRequests::class)->urlResolver());
             $page = Inertia::render('Error', ['status' => $status])->toResponse($request)->setStatusCode($status);
             $page->headers->set('Cache-Control', 'no-store, private');
             if ($response->headers->has('Retry-After')) {

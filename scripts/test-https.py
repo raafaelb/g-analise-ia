@@ -30,6 +30,25 @@ for asset in assets:
     with opener.open(asset) as f:assert f.status==200
 raw=re.search(r'<script data-page="app" type="application/json">(.*?)</script>',body,re.S)[1];page=json.loads(raw)
 assert page['url']=='/ia-ganalise/login',page['url']
+error_pages={}
+for name,path,method,payload,headers,expected_status in [
+    ('missing','/missing-recovery-path?view=ready','GET',None,{'Accept':'text/html'},404),
+    ('expired','/login','POST',b'{}',{'Accept':'text/html','Content-Type':'application/json','X-Inertia':'true','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':'synthetic-invalid','Origin':'https://localhost:8443'},419),
+]:
+    try:
+        failure=urllib.request.urlopen(urllib.request.Request(base+path,method=method,data=payload,headers=headers),context=ctx,timeout=10)
+    except urllib.error.HTTPError as failure_response:
+        failure=failure_response
+    with failure:
+        failure_body=failure.read().decode()
+        assert failure.status==expected_status and failure.headers.get('Location') is None,name
+        if 'application/json' in failure.headers.get('Content-Type',''):
+            failure_page=json.loads(failure_body)
+        else:
+            failure_page=json.loads(re.search(r'<script data-page="app" type="application/json">(.*?)</script>',failure_body,re.S)[1])
+    assert failure_page['component']=='Error' and failure_page['props']['status']==expected_status,name
+    assert failure_page['url']=='/ia-ganalise'+path,name
+    error_pages[name]={'status':expected_status,'public_prefix_preserved':True,'no_redirect':True}
 request=urllib.request.Request(base+'/login',data=urllib.parse.urlencode({'email':'homologacao@example.invalid','password':password,'remember':'0','_token':match[1]}).encode(),headers={'Origin':'https://localhost:8443','Referer':base+'/login'})
 with opener.open(request) as f:
     final=f.geturl();auth_body=f.read().decode();assert final.startswith(base+'/app'),final
@@ -83,4 +102,4 @@ while True:
     if '"path":"/auth/openai/callback"' in container_logs:break
     assert time.monotonic()<deadline,'O acesso ao callback não apareceu no log HTTP esperado.'
     time.sleep(0.1)
-print(json.dumps({'ok':True,'websocket':ws,'foreign_origin_rejected':True,'tls_certificate_verified':True,'assets_checked':len(assets),'inertia_prefix':page['url'],'login_redirect':final,'authenticated_bootstrap':True,'secure_cookie_scoped':True,'isolated_database':True,'auth_return_prefix':True,'synthetic_auth_data_absent_from_logs':True}))
+print(json.dumps({'ok':True,'websocket':ws,'foreign_origin_rejected':True,'tls_certificate_verified':True,'assets_checked':len(assets),'inertia_prefix':page['url'],'login_redirect':final,'authenticated_bootstrap':True,'secure_cookie_scoped':True,'isolated_database':True,'auth_return_prefix':True,'synthetic_auth_data_absent_from_logs':True,'error_pages':error_pages}))

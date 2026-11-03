@@ -62,6 +62,21 @@ class WebErrorResponsesTest extends TestCase
         $this->get('/__limited-recovery')->assertTooManyRequests()->assertHeader('Retry-After', '60')->assertInertia(fn (AssertableInertia $page) => $page->component('Error', false)->where('status', 429));
     }
 
+    public function test_a_missing_route_keeps_the_public_prefix_before_web_middleware_runs(): void
+    {
+        config(['app.debug' => false, 'app.url' => 'https://pilot.example.invalid/ia-ganalise']);
+
+        $this->get('/missing-recovery-path?view=ready')->assertNotFound()->assertInertia(fn (AssertableInertia $page) => $page->component('Error', false)->where('status', 404)->url('/ia-ganalise/missing-recovery-path?view=ready'));
+    }
+
+    public function test_a_csrf_error_before_inertia_middleware_keeps_the_public_prefix(): void
+    {
+        $this->app->instance('env', 'production');
+        config(['app.debug' => false, 'app.url' => 'https://pilot.example.invalid/ia-ganalise']);
+
+        $this->post('/login', ['email' => 'synthetic@example.invalid', 'password' => 'Synthetic password'], ['X-Inertia' => 'true', 'Accept' => 'text/html', 'X-CSRF-TOKEN' => 'synthetic-invalid'])->assertStatus(419)->assertHeaderMissing('Location')->assertJsonPath('component', 'Error')->assertJsonPath('url', '/ia-ganalise/login')->assertDontSee('Synthetic password');
+    }
+
     public function test_debug_mode_preserves_the_original_error_response(): void
     {
         config(['app.debug' => true]);
