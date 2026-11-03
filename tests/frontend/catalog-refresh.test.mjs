@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import {parse,compileScript} from '@vue/compiler-sfc';
 import ts from 'typescript';
 import {createRenderer,h,nextTick,ref} from 'vue';
-let Catalog,activeFixture;
+let Catalog,RealManualAction,activeFixture;
 const kinds=['app','bi-desk','dw-desk','table','flow','schedule','agent','writeback','deck','presentation','investigation','credential','variables'];
 function resource(kind,id,name){if(kind==='variables'){const key='QA_VAR_'+id;return{id:Buffer.from(key).toString('hex'),ref:'{{'+key+'}}',kind,name:key,description:'Valor protegido',state:'available',desk_id:null,desk_known:false,tags:[],dashboards:[],dashboard_count:null,table_count:null,active:null};}return {id:String(id),ref:kind+':'+id,kind,name:name??kind+' de teste '+id,description:'Referência fictícia',state:'draft',desk_id:null,desk_known:true,tags:[],dashboards:[],dashboard_count:null,table_count:null,active:null};}
-function stub(name){return {props:['resource','kind','dashboard'],setup(props,{emit}){return()=>{
+function stub(name){return {inheritAttrs:name!=='BiManualAction',props:['resource','kind','dashboard'],setup(props,{emit,attrs}){return()=>{
  const save=(kind,id)=>{const row=activeFixture.save(kind,id);emit('saved',row.ref);};
  if(name==='BiCredentialForm'||name==='BiCredentialActions')return h('button',{onClick:()=>save('credential',props.resource?.id??42)},'Concluir conexão de teste');
  if(name==='BiAppCreationDialog')return h('button',{onClick:()=>{const row=activeFixture.save('app',42);emit('created',row.ref);}},'Concluir criação de aplicação');
@@ -16,11 +16,23 @@ function stub(name){return {props:['resource','kind','dashboard'],setup(props,{e
  if(name==='BiDeskForm')return h('button',{onClick:()=>save(props.kind,props.resource?.id??42)},'Concluir mesa de teste');
  if(name==='BiScheduleForm')return h('button',{onClick:()=>save('schedule',props.resource?.id??42)},'Concluir agenda de teste');
  if(name==='BiLiveViewer')return h('div',{},'Prévia nativa '+props.dashboard);
+ if(name==='BiManualAction'&&activeFixture.realManual)return h(RealManualAction,{...attrs,...props});
  if(name==='BiManualAction')return h('div',[h('button',{onClick:()=>{const row=activeFixture.dashboard(props.resource.id);emit('dashboardCreated',{resource:row.ref,dashboard_id:91});}},'Concluir criação de dashboard'),h('button',{onClick:()=>{const row=activeFixture.save(props.resource.kind,44);emit('published',row.ref);}},'Concluir publicação de teste'),h('button',{onClick:()=>{activeFixture.remove(props.resource.kind,props.resource.id);emit('deleted');}},'Concluir exclusão de teste')]);
  if(name==='ResourceOverview')return h('button',{onClick:()=>emit('open',resource('credential',1))},'Abrir conexão relacionada de teste');
  return h('div');
  }}};}
 before(async()=>{
+ const manualPath=new URL('../../resources/js/Components/BiManualAction.vue',import.meta.url);
+ const {descriptor:manualDescriptor}=parse(await readFile(manualPath,'utf8'));
+ const manualCompiled=compileScript(manualDescriptor,{id:'manual-clone-refresh-regression',inlineTemplate:true});
+ globalThis.__manualRefreshChildren=Object.fromEntries(Object.values(manualCompiled.imports).filter(item=>item.source.endsWith('.vue')).map(item=>[item.source,stub(item.source.split('/').at(-1).slice(0,-4))]));
+ try{
+  let script=manualCompiled.content.replace(/import ([A-Za-z_$][\w$]*) from (['"])(\.\/[^'"]+\.vue)\2;?/g,(_,name,_quote,source)=>`const ${name}=globalThis.__manualRefreshChildren[${JSON.stringify(source)}];`);
+  script=script.replace(/from (['"])([^'"]+)\1/g,(_,quote,source)=>`from ${quote}${source.startsWith('.')?new URL(source+'.ts',manualPath).href:import.meta.resolve(source)}${quote}`);
+  const code=ts.transpileModule(script,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ESNext}}).outputText;
+  RealManualAction=(await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))).default;
+ }finally{delete globalThis.__manualRefreshChildren;}
+
  const path=new URL('../../resources/js/Components/BiCatalog.vue',import.meta.url);
  const {descriptor}=parse(await readFile(path,'utf8'));
  const compiled=compileScript(descriptor,{id:'catalog-refresh-regression',inlineTemplate:true});
@@ -48,18 +60,27 @@ const renderer=createRenderer({
  remove:item=>{if(item.parent){const index=item.parent.children.indexOf(item);if(index>=0)item.parent.children.splice(index,1);}item.parent=null;},parentNode:item=>item.parent,nextSibling:item=>item.parent?.children[item.parent.children.indexOf(item)+1]??null,
  insertStaticContent:(text,parent,anchor)=>{const item=node('static',text);const index=parent.children.indexOf(anchor);if(index<0)parent.children.push(item);else parent.children.splice(index,0,item);item.parent=parent;return[item,item];},
 });
-function mount({onRequest=null,role='admin',readOnly=false}={}){
+function mount({onRequest=null,role='admin',readOnly=false,realManual=false}={}){
  const previous=Object.fromEntries(['window','document','localStorage','Document','ShadowRoot','HTMLElement'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  Object.defineProperty(globalThis,'window',{configurable:true,writable:true,value:{addEventListener(){},removeEventListener(){},matchMedia(){return{matches:true};}}});
  Object.defineProperty(globalThis,'document',{configurable:true,writable:true,value:{activeElement:null}});
  for(const name of ['Document','ShadowRoot','HTMLElement'])Object.defineProperty(globalThis,name,{configurable:true,writable:true,value:class{}});
  Object.defineProperty(globalThis,'localStorage',{configurable:true,writable:true,value:{getItem:key=>key==='g-analise:tenant:17'?'923':null,setItem(){}}});
  const resources=new Map(kinds.map(kind=>[kind,[resource(kind,1)]]));
- const fixture={dashboard(id){const row={...resources.get('app').find(item=>item.id===String(id)),dashboard_count:2,dashboards:[{id:90,name:'Existente',widget_count:1},{id:91,name:'Novo painel',widget_count:3}]};resources.set('app',resources.get('app').map(item=>item.id===row.id?row:item));return row;},save(kind,id){const row=resource(kind,id,kind+' atualizado '+id);resources.set(kind,[...resources.get(kind).filter(item=>item.id!==row.id),row]);return row;},remove(kind,id){resources.set(kind,resources.get(kind).filter(item=>item.id!==String(id)));}};
+ const fixture={realManual,dashboard(id){const row={...resources.get('app').find(item=>item.id===String(id)),dashboard_count:2,dashboards:[{id:90,name:'Existente',widget_count:1},{id:91,name:'Novo painel',widget_count:3}]};resources.set('app',resources.get('app').map(item=>item.id===row.id?row:item));return row;},save(kind,id){const row=resource(kind,id,kind+' atualizado '+id);resources.set(kind,[...resources.get(kind).filter(item=>item.id!==row.id),row]);return row;},remove(kind,id){resources.set(kind,resources.get(kind).filter(item=>item.id!==String(id)));}};
  activeFixture=fixture;
  const requests=[],errors=[],root=node('root'),connected=ref(true);
  const request=async(...args)=>{
-  requests.push(args);const path=args[0];const tenant=path.split('/')[2].split('?')[0];const type=/\/sections\/([a-z-]+)/.exec(path)?.[1];const match=/\/resources\/([a-z-]+)\/([0-9]+)/.exec(path);
+  requests.push(args);const path=args[0];
+  if(realManual){
+   const approval={id:'00000000-0000-4000-8000-000000000001',status:'pending',expires_at:'2099-01-01T00:00:00Z',fingerprint:'synthetic-clone-version'};
+   const project={id:'00000000-0000-4000-8000-000000000002'};
+   const cloning=/^\/catalog\/923\/(apps|flows)\/1\/actions$/.exec(path);
+   if(cloning){fixture.cloning=cloning[1]==='apps'?'app':'flow';return{approval,project};}
+   if(path==='/approvals/'+approval.id+'/decide')return{...approval,status:'approved'};
+   if(path==='/bi-actions/'+approval.id){const row=fixture.save(fixture.cloning,42);return{project,approval:{...approval,status:'completed',payload:{execution:{result:{managed_resource:row.ref,confirmed_name:row.name}}}}};}
+  }
+  const tenant=path.split('/')[2].split('?')[0];const type=/\/sections\/([a-z-]+)/.exec(path)?.[1];const match=/\/resources\/([a-z-]+)\/([0-9]+)/.exec(path);
   let result;
   const variableMatch=/\/variables\/([a-f0-9]+)$/.exec(path);
   if(variableMatch){const row=resources.get('variables').find(item=>item.id===variableMatch[1]);result={resource:row,tenant:{id:tenant,name:'Ambiente '+tenant,read_only:readOnly},details:{value:'[protegido]'},overview:[],related:[]};}
@@ -136,4 +157,41 @@ test('a created dashboard refreshes its application once and opens the new inter
 });
 test('a newer selection in the same application supersedes a pending created-dashboard navigation',async()=>{
  let reads=0,release;const view=mount({onRequest:(path,response)=>{if(path==='/catalog/923/resources/app/1'){reads++;response={...response,viewer_available:true,metadata_complete:true};if(reads===2)return new Promise(resolve=>release=()=>resolve(response));}return response;}});try{await settled();view.openFirst();await settled();view.button('Concluir criação de dashboard').props.onClick();await settled();assert.equal(typeof release,'function');find(modal(view),item=>item.kind==='button'&&String(item.props.class??'').includes('modal-close')).props.onClick();await settled();view.openFirst();await settled();find(view.root,item=>item.props['aria-label']==='Dashboard da aplicação').props['onUpdate:modelValue']('90');await settled();release();await settled();assert.doesNotMatch(text(modal(view)),/Prévia nativa 91/);assert.equal(find(view.root,item=>item.props['aria-label']==='Dashboard da aplicação').props.value??find(view.root,item=>item.props['aria-label']==='Dashboard da aplicação').value,'90');assert.deepEqual(view.errors,[]);}finally{release?.();view.close();}
+});
+
+
+async function completeManualClone(view,kind){
+ await choose(view,kind==='app'?'Aplicações':'Fontes / ETL');view.openFirst();await settled();
+ await view.button(kind==='app'?'Duplicar aplicação':'Duplicar ETL').props.onClick();await settled();
+ await find(view.root,item=>item.kind==='form').props.onSubmit({preventDefault(){}});await settled();
+ await view.button('Autorizar duplicação').props.onClick();await settled();await settled();
+}
+for(const kind of ['app','flow']){
+ test(`a real completed ${kind} clone refreshes only its category and preserves the receipt in the current modal`,async()=>{
+  const view=mount({realManual:true});
+  try{
+   await settled();await completeManualClone(view,kind);
+   assert.deepEqual(freshRequests(view),['/catalog/923/sections/'+kind+'?refresh=1']);
+   assert.match(text(modal(view)),/Cópia criada na sua mesa/);
+   assert.match(text(modal(view)),/Abrir projeto da cópia/);
+   assert.ok(find(view.root,item=>item.kind==='button'&&item.props.class==='catalog-resource'&&text(item).includes(kind+' atualizado 42')));
+   assert.equal(view.requests.filter(args=>args[1]==='POST'&&args[0].endsWith('/actions')).length,1);
+   assert.equal(view.requests.some(args=>args[0]==='/catalog/923/resources/'+kind+'/42'),false);
+   assert.deepEqual(view.errors,[]);
+  }finally{view.close();}
+ });
+}
+test('a post-clone catalog failure keeps the successful receipt and retries only the read',async()=>{
+ let failed=false;const view=mount({realManual:true,onRequest:(path,response)=>{if(path.includes('refresh=1')&&!failed){failed=true;throw new Error('Falha fictícia da leitura.');}return response;}});
+ try{
+  await settled();await completeManualClone(view,'app');
+  assert.match(text(modal(view)),/Cópia criada na sua mesa/);
+  find(view.root,item=>item.kind==='button'&&item.props['aria-label']==='Fechar recurso').props.onClick();await settled();
+  assert.match(text(view.root),/Falha fictícia da leitura/);
+  view.button('Tentar novamente').props.onClick();await settled();
+  assert.ok(find(view.root,item=>item.kind==='button'&&item.props.class==='catalog-resource'&&text(item).includes('app atualizado 42')));
+  assert.equal(view.requests.filter(args=>args[1]==='POST'&&args[0].endsWith('/actions')).length,1);
+  assert.equal(view.requests.filter(args=>args[0].includes('/decide')).length,1);
+  assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
 });
