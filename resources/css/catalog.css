@@ -20,3 +20,7 @@
 .is-list .catalog-resource>footer,.is-list .catalog-resource>footer>span{min-width:0;overflow-wrap:anywhere}
 
 .catalog-data-guidance{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;margin-bottom:16px;border:1px solid #dce7f7;border-radius:8px;background:#f5f9ff;color:#49698f}.catalog-data-guidance>svg{flex-shrink:0;margin-top:2px}.catalog-data-guidance strong{display:block;font-size:12px;line-height:1.6}.catalog-data-guidance p{font-size:12px;line-height:1.8;margin:5px 0 0;color:#5d7390}
+
+/* Preserve a clear close control and one vertical reading area on small screens. */
+.catalog-detail .resource-back{max-width:calc(100% - 36px);min-height:26px;line-height:1.6;overflow-wrap:anywhere}.catalog-detail .resource-back>svg{flex-shrink:0}
+@media(max-width:760px){.catalog-detail .execution-list{max-height:none;overflow:visible}.catalog-detail .catalog-detail-heading h2{overflow-wrap:anywhere}}

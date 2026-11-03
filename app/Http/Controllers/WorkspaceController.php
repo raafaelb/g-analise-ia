@@ -66,6 +66,9 @@ class WorkspaceController extends Controller
         $connections = Connection::where('user_id', $uid)->get();
         $lumoGeneration = $connections->firstWhere('provider', 'horus')?->metadata['session_generation'] ?? null;
         foreach ($connections as $connection) {
+            if ($connection->provider === 'openai') {
+                $connection->setAttribute('requires_reauthorization', $connection->status !== 'connected' || (($connection->metadata['auth_mode'] ?? null) === 'oss_local' && ! app()->environment('local')));
+            }
             if (str_starts_with($connection->provider, BiMcpIdentity::PREFIX)) {
                 $connection->setAttribute('requires_reauthorization', $connection->status !== 'connected' || $lumoGeneration === null || ($connection->metadata['lumo_generation'] ?? null) !== $lumoGeneration || ($connection->metadata['access_version'] ?? null) !== $request->user()->access_version);
             }

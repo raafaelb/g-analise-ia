@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-03.1",
+  "version": "2026-11-03.2",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -42,14 +42,14 @@
         {
           "id": "home-request",
           "title": "Comece pelo que você precisa",
-          "description": "Conte o objetivo, quem usará o dashboard e os indicadores importantes. Você não precisa fornecer SQL nem conhecer os nomes das tabelas.",
+          "description": "Conte o objetivo, quem usará o dashboard e os indicadores importantes. Você não precisa fornecer SQL nem conhecer os nomes das tabelas. Se faltar uma conexão ou autorização, o aviso indica o próximo passo e o envio fica indisponível.",
           "anchor": "home-request",
           "audience": "authors"
         },
         {
           "id": "home-project",
           "title": "Escolha onde organizar o trabalho",
-          "description": "Abra um projeto existente para continuar uma criação ou manutenção. Um novo projeto reúne suas conversas, arquivos e recurso BI de trabalho.",
+          "description": "Abra um projeto existente para continuar uma criação ou manutenção. Escolher um projeto não exige uma nova autenticação do BI. As conexões e o ambiente são conferidos antes de enviar uma tarefa à IA.",
           "anchor": "home-project",
           "audience": "all"
         },
@@ -141,7 +141,7 @@
         {
           "id": "project-request",
           "title": "Peça o resultado em suas palavras",
-          "description": "Explique o que deseja criar ou melhorar e envie referências quando necessário. Na conversa vazia de um ETL, Conferir este ETL preenche um pedido de análise; revise o texto antes de enviar. A IA deve conferir as fontes reais antes de concluir.",
+          "description": "Explique o que deseja criar ou melhorar e envie referências quando necessário. Se faltar uma conexão, autorização ou ambiente acessível, o aviso acima do campo mostra como resolver antes do envio. Na conversa vazia de um ETL, Conferir este ETL preenche um pedido de análise; revise o texto antes de enviar.",
           "anchor": "project-request",
           "audience": "authors"
         },
@@ -315,7 +315,7 @@
         {
           "id": "connections-chatgpt",
           "title": "Conecte sua inteligência",
-          "description": "Quando habilitado para esta instalação, autorize sua própria conta ChatGPT na página oficial. A inferência ocorre na OpenAI e usa os limites do seu plano. Se a conexão estiver indisponível, confira a pendência indicada no cartão.",
+          "description": "Quando habilitado para esta instalação, autorize sua própria conta ChatGPT na página oficial. A inferência ocorre na OpenAI e usa os limites do seu plano. Uma autorização local precisa ser refeita na configuração adequada ao mudar de servidor; o cartão informa quando reconectar.",
           "anchor": "connections-chatgpt",
           "audience": "all"
         },
@@ -486,7 +486,7 @@
       "id": "getting-started",
       "title": "Como começar no G-Analise IA",
       "summary": "Conecte suas contas, escolha o ambiente e descreva seu objetivo.",
-      "body": "O G-Analise IA é o espaço da Inovadora para criar e manter dashboards por conversa, explorar os recursos do G-Analise BI e acompanhar a atualização dos dados.\n\n1. Entre no portal com sua conta local ou pela Suíte.\n2. Em **Conexões**, autorize sua conta ChatGPT e conecte seu usuário do G-Analise BI.\n3. No **Catálogo BI**, escolha o ambiente e localize um recurso existente, ou abra **Novo projeto** para começar um objetivo.\n4. Descreva o que deseja em linguagem de negócio. A IA deve investigar as fontes disponíveis.\n5. Confira os dados, as prévias e cada proposta de alteração antes de autorizar.\n\nSeu perfil e suas permissões no BI determinam as ações disponíveis.",
+      "body": "O G-Analise IA é o espaço da Inovadora para criar e manter dashboards por conversa, explorar os recursos do G-Analise BI e acompanhar a atualização dos dados.\n\n1. Entre no portal com sua conta local ou pela Suíte.\n2. Em **Conexões**, autorize sua conta ChatGPT e conecte seu usuário do G-Analise BI.\n3. No **Catálogo BI**, escolha o ambiente e localize um recurso existente, ou abra **Novo projeto** para começar um objetivo.\n4. Descreva o que deseja em linguagem de negócio. A IA deve investigar as fontes disponíveis.\n5. Confira os dados, as prévias e cada proposta de alteração antes de autorizar.\n\nSeu perfil e suas permissões no BI determinam as ações disponíveis.\n\nSe a criação estiver indisponível, o aviso junto ao campo de mensagem explica o próximo passo: habilitar a integração, conectar uma conta, autorizar o uso do plano ou configurar um ambiente acessível. Você pode continuar abrindo seus projetos e usando as ações disponíveis no catálogo. Um perfil de consulta não envia tarefas de criação.",
       "pages": [
         "home",
         "connections"
@@ -528,7 +528,7 @@
       "id": "projects",
       "title": "Para que servem os projetos?",
       "summary": "Projetos organizam o objetivo, as conversas, os arquivos e o recurso BI de trabalho.",
-      "body": "Um **projeto** organiza um trabalho, como criar uma visão financeira ou melhorar um dashboard de estoque. Ele reúne o objetivo, instruções, conversas, arquivos e o recurso BI vinculado.\n\nUma **conversa** é o histórico de pedidos e respostas dentro desse projeto. Uma **aplicação BI** pode conter uma ou várias **dashboards**, que são as páginas visuais com indicadores e filtros. O projeto não é a própria dashboard e não cria automaticamente um novo recurso no BI.\n\nPara continuar uma manutenção, abra o projeto correspondente em **Meus projetos**. Para localizar dashboards que já existem na sua conta BI, use **Catálogo BI**. Trabalhos em ambientes diferentes precisam de projetos separados.",
+      "body": "Um **projeto** organiza um trabalho, como criar uma visão financeira ou melhorar um dashboard de estoque. Ele reúne o objetivo, instruções, conversas, arquivos e o recurso BI vinculado.\n\nUma **conversa** é o histórico de pedidos e respostas dentro desse projeto. Uma **aplicação BI** pode conter uma ou várias **dashboards**, que são as páginas visuais com indicadores e filtros. O projeto não é a própria dashboard e não cria automaticamente um novo recurso no BI.\n\nPara continuar uma manutenção, abra o projeto correspondente em **Meus projetos**. Para localizar dashboards que já existem na sua conta BI, use **Catálogo BI**. Trabalhos em ambientes diferentes precisam de projetos separados.\n\nNa página **Criar com IA**, **Escolher um projeto** abre seus projetos mesmo sem a conexão BI. Abrir o histórico não exige refazer essa autenticação. Antes de enviar uma tarefa, o portal confere seu perfil, a autorização ChatGPT, a conexão BI e o ambiente do projeto. Contas com perfil de consulta abrem os projetos disponíveis, mas não recebem os controles de novo projeto ou nova conversa.",
       "pages": [
         "home",
         "projects",
@@ -589,7 +589,7 @@
       "id": "portal-connections",
       "title": "Como conecto minhas contas?",
       "summary": "O login no portal, o ChatGPT e o acesso ao BI são conexões diferentes.",
-      "body": "Em **Conexões**, conecte seu usuário do G-Analise BI e, quando habilitado nesta instalação, autorize sua conta ChatGPT na página oficial. Se a conta BI tiver autenticação adicional, informe o código no formulário do navegador. Não envie senhas pelo chat.\n\nO login pela **Suíte** ou por senha local permite entrar no portal. Ele não substitui a conexão ChatGPT nem cria permissões extras no BI. A conta BI precisa ter autorização de uso do Lumo CLI. Se essa permissão faltar, procure o responsável pelo ambiente.\n\nA configuração de ChatGPT depende do modo habilitado pelo administrador. O fluxo local foi homologado; hospedagem central depende da configuração oficial adequada. Se a opção estiver indisponível, a mensagem da página explica a pendência.\n\nCada pessoa deve usar seu próprio acesso ao portal e conectar suas próprias contas. A implantação em outro servidor não copia automaticamente as conexões feitas no ambiente local. Quando o ChatGPT estiver indisponível, você ainda pode explorar o catálogo e usar as ações de BI oferecidas para seu perfil; operações dependentes de IA ou MCP precisam das respectivas conexões habilitadas.",
+      "body": "Em **Conexões**, conecte seu usuário do G-Analise BI e, quando habilitado nesta instalação, autorize sua conta ChatGPT na página oficial. Se a conta BI tiver autenticação adicional, informe o código no formulário do navegador. Não envie senhas pelo chat.\n\nO login pela **Suíte** ou por senha local permite entrar no portal. Ele não substitui a conexão ChatGPT nem cria permissões extras no BI. A conta BI precisa ter autorização de uso do Lumo CLI. Se essa permissão faltar, procure o responsável pelo ambiente.\n\nA configuração de ChatGPT depende do modo habilitado pelo administrador. O fluxo local foi homologado; hospedagem central depende da configuração oficial adequada. Se a opção estiver indisponível, a mensagem da página explica a pendência.\n\nCada pessoa deve usar seu próprio acesso ao portal e conectar suas próprias contas. A implantação em outro servidor não copia automaticamente as conexões feitas no ambiente local. Quando o ChatGPT estiver indisponível, você ainda pode explorar o catálogo e usar as ações de BI oferecidas para seu perfil; operações dependentes de IA ou MCP precisam das respectivas conexões habilitadas.\n\nUma autorização ChatGPT obtida no modo local não habilita tarefas ao ser restaurada em produção. Nesse caso, o cartão indica **Reconectar** e o teste de IA fica indisponível até a autorização adequada. Desabilitar novos logins na instalação não revoga por si só uma autorização já válida. O portal não usa uma chave de API como alternativa automática.",
       "pages": [
         "connections",
         "home"

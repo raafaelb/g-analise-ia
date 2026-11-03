@@ -92,3 +92,5 @@
 .connections-view .connection-card{min-width:0}
 .connections-view .connected-account strong{overflow-wrap:anywhere}
 @media(max-width:1000px){.connections-view .connection-grid{grid-template-columns:minmax(0,1fr)}}
+
+html:has(.modal-backdrop),body:has(.modal-backdrop){overflow:hidden}.modal{overscroll-behavior:contain}
