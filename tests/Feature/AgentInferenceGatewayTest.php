@@ -65,7 +65,7 @@ class AgentInferenceGatewayTest extends TestCase
         $response = app(AgentInferenceGateway::class)->respond($grant->authorization(), $payload);
 
         TestResponse::fromBaseResponse($response)->assertOk()->assertHeader('Content-Type', 'text/event-stream')->assertHeaderContains('Cache-Control', 'no-store')->assertHeader('X-Accel-Buffering', 'no')->assertHeaderMissing('Set-Cookie')->assertStreamedContent($this->events());
-        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.openai.com/v1/responses' && $request->hasHeader('Authorization', 'Bearer SYNTHETIC-SERVER-OAUTH') && ! $request->hasHeader('Authorization', 'Bearer '.$grant->authorization()) && $request->data() === $payload);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.openai.com/v1/responses' && $request->hasHeader('originator', 'G-Analise IA') && $request->hasHeader('Authorization', 'Bearer SYNTHETIC-SERVER-OAUTH') && ! $request->hasHeader('Authorization', 'Bearer '.$grant->authorization()) && $request->data() === $payload);
         Http::assertSentCount(1);
     }
 

@@ -37,11 +37,12 @@ class AgentInferenceGateway
             return $this->error(401);
         }
         $this->grants->active($grant);
+        $client = CodexProtocol::initialize()['clientInfo'];
         try {
             $upstream = Http::withoutRedirecting()
                 ->withToken($accessToken)
                 ->accept('text/event-stream')
-                ->withHeaders(['originator' => 'g_analise_ia', 'User-Agent' => 'g_analise_ia/1.0'])
+                ->withHeaders(['originator' => $client['name'], 'User-Agent' => $client['name'].'/'.$client['version']])
                 ->connectTimeout(10)
                 ->timeout((int) config('horus.codex.timeout', 900))
                 ->withOptions(['stream' => true, 'read_timeout' => 15])
