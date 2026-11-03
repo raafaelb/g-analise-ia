@@ -93,7 +93,7 @@ class BiPublications
             throw new RuntimeException('O destino ou o conteúdo resumido retornado pelo BI não corresponde à revisão autorizada.');
         }
         $contentVerified = array_key_exists('content_sha256', $plan['source']);
-        if ($contentVerified && (! is_string($plan['source']['content_sha256']) || ! preg_match('/^[a-f0-9]{64}$/D', $plan['source']['content_sha256']) || ! hash_equals($plan['source']['content_sha256'], $this->contentDigest($body, $ref, (string) $project->tenant_id)))) {
+        if ($contentVerified && (! is_string($plan['source']['content_sha256']) || ! preg_match('/^[a-f0-9]{64}$/D', $plan['source']['content_sha256']) || ! $this->matchesContentDigest($body, $ref, (string) $project->tenant_id, $plan['source']['content_sha256']))) {
             throw new RuntimeException('O conteúdo da aplicação publicada não corresponde à revisão autorizada. Confira gráficos, expressões, filtros e fontes sem reenviar a publicação.');
         }
         $this->assertSession($connection, $project);
@@ -273,6 +273,26 @@ class BiPublications
         }
 
         return $name;
+    }
+
+    /** Native publication omits an empty reports field or returns null/[]; preserve existing review hashes. */
+    private function matchesContentDigest(array $body, string $resource, string $tenant, string $expected): bool
+    {
+        if (hash_equals($expected, $this->contentDigest($body, $resource, $tenant))) {
+            return true;
+        }
+        if (array_key_exists('reports', $body) && ! in_array($body['reports'], [null, []], true)) {
+            return false;
+        }
+        foreach ([null, []] as $empty) {
+            $body['reports'] = $empty;
+            if (hash_equals($expected, $this->contentDigest($body, $resource, $tenant))) {
+                return true;
+            }
+        }
+        unset($body['reports']);
+
+        return hash_equals($expected, $this->contentDigest($body, $resource, $tenant));
     }
 
     private function contentDigest(array $body, string $resource, string $tenant): string

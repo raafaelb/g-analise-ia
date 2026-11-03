@@ -257,6 +257,146 @@ class BiPublicationsTest extends TestCase
         Queue::assertNotPushed(RunAgentTurn::class);
     }
 
+    /** @return array<string, array{string, bool, mixed, bool, mixed}> */
+    public static function emptyReportRepresentations(): array
+    {
+        $cases = [];
+        $representations = ['omitted' => [false, null], 'null' => [true, null], 'empty list' => [true, []]];
+        foreach (['new', 'replace'] as $mode) {
+            foreach ($representations as $source => [$sourcePresent, $before]) {
+                foreach ($representations as $target => [$targetPresent, $after]) {
+                    if ($source !== $target) {
+                        $cases[$mode.': '.$source.' becomes '.$target] = [$mode, $sourcePresent, $before, $targetPresent, $after];
+                    }
+                }
+            }
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('emptyReportRepresentations')]
+    public function test_native_empty_report_normalization_confirms_the_review_without_republishing(string $mode, bool $sourcePresent, mixed $before, bool $targetPresent, mixed $after): void
+    {
+        Queue::fake();
+        [$user, $project, , $state] = $this->context();
+        if ($sourcePresent) {
+            $state->bodies[2]['reports'] = $before;
+        }
+        $state->bodies[2]['dashboards'] = [$this->wrappedDashboard()];
+        $target = $mode === 'replace' ? 1 : 2;
+        $state->after_publish = function (array $body) use ($targetPresent, $after, $target): array {
+            unset($body['reports']);
+            if ($targetPresent) {
+                $body['reports'] = $after;
+            }
+            $body['dashboards'][0]['header']['appId'] = $target;
+
+            return $body;
+        };
+        $this->native($state);
+        $approval = $this->prepare($user, $mode);
+        $fingerprint = $approval->fingerprint;
+
+        $this->execute($user, $approval);
+        (new ExecuteApprovedAction($approval->id))->handle(app(ActionBroker::class));
+
+        $current = $approval->fresh();
+        $this->assertSame('completed', $current->status);
+        $this->assertTrue($current->payload['execution']['result']['publication']['content_verified']);
+        $this->assertSame($fingerprint, $current->fingerprint);
+        $this->assertSame('app:'.$target, $project->fresh()->source_ref);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'published']);
+        $this->assertSame(1, $state->publishes);
+        $this->assertDatabaseCount('agent_runs', 0);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    /** @return array<string, array{bool, mixed, mixed}> */
+    public static function changedReportContent(): array
+    {
+        return [
+            'null gained a report' => [true, null, [['id' => 1, 'nome' => 'Novo relatório']]],
+            'empty list gained a report' => [true, [], [['id' => 1, 'nome' => 'Novo relatório']]],
+            'report was dropped to null' => [true, [['id' => 1, 'nome' => 'Relatório revisado']], null],
+            'report was dropped to an empty list' => [true, [['id' => 1, 'nome' => 'Relatório revisado']], []],
+            'report configuration changed' => [true, [['id' => 1, 'nome' => 'Relatório revisado']], [['id' => 1, 'nome' => 'Outra configuração']]],
+            'omitted field gained a report' => [false, null, [['id' => 1, 'nome' => 'Novo relatório']]],
+            'invalid false is not an empty list' => [true, false, []],
+        ];
+    }
+
+    #[DataProvider('changedReportContent')]
+    public function test_report_changes_are_not_hidden_by_empty_normalization(bool $present, mixed $before, mixed $after): void
+    {
+        Queue::fake();
+        [$user, $project, , $state] = $this->context();
+        if ($present) {
+            $state->bodies[2]['reports'] = $before;
+        }
+        $state->after_publish = fn (array $body): array => [...$body, 'reports' => $after];
+        $this->native($state);
+        $approval = $this->prepare($user);
+
+        $this->execute($user, $approval);
+        (new ExecuteApprovedAction($approval->id))->handle(app(ActionBroker::class));
+
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertNull($project->fresh()->preview_revision);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
+        $this->assertSame(1, $state->publishes);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_an_empty_report_normalization_does_not_hide_a_changed_widget(): void
+    {
+        Queue::fake();
+        [$user, $project, , $state] = $this->context();
+        $state->bodies[2]['reports'] = null;
+        $state->bodies[2]['dashboards'] = [$this->wrappedDashboard()];
+        $state->after_publish = function (array $body): array {
+            $body['reports'] = [];
+            $body['dashboards'][0]['body']['widgets'][0]['chart']['options']['title'] = 'Conteúdo não autorizado';
+
+            return $body;
+        };
+        $this->native($state);
+        $approval = $this->prepare($user);
+
+        $this->execute($user, $approval);
+
+        $this->assertSame('failed', $approval->fresh()->status);
+        $this->assertNull($project->fresh()->preview_revision);
+        $this->assertDatabaseHas('managed_bi_resources', ['resource' => 'app:2', 'status' => 'publication_pending']);
+        $this->assertSame(1, $state->publishes);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
+    public function test_an_existing_authorized_review_reconciles_normalized_empty_reports_using_reads_only(): void
+    {
+        Queue::fake();
+        [$user, $project, , $state] = $this->context();
+        $state->after_publish = fn (array $body): array => [...$body, 'reports' => []];
+        $state->throw_after_publish = true;
+        $this->native($state);
+        $approval = $this->prepare($user, 'replace');
+        $fingerprint = $approval->fingerprint;
+        $this->execute($user, $approval);
+        $this->assertSame('failed', $approval->fresh()->status);
+
+        $this->postJson('/api/approvals/'.$approval->id.'/publication/verify')
+            ->assertOk()
+            ->assertJsonPath('approval.status', 'completed')
+            ->assertJsonPath('approval.payload.execution.result.publication.content_verified', true);
+
+        $this->assertSame($fingerprint, $approval->fresh()->fingerprint);
+        $this->assertSame('app:1', $project->fresh()->source_ref);
+        $this->assertSame('app:1', ManagedBiResource::first()->receipt['publication']['resource']);
+        $this->assertSame(1, $state->publishes);
+        $this->assertDatabaseCount('agent_runs', 0);
+        Queue::assertNotPushed(RunAgentTurn::class);
+    }
+
     public function test_legacy_publication_receipts_do_not_claim_content_verification(): void
     {
         [, $project, $connection, $state] = $this->context();
