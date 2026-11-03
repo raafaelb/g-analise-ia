@@ -14,21 +14,24 @@ use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
-    ->withRouting(web: __DIR__.'/../routes/web.php', commands: __DIR__.'/../routes/console.php', channels: __DIR__.'/../routes/channels.php', health: '/up')
+    ->withRouting(web: __DIR__.'/../routes/web.php', commands: __DIR__.'/../routes/console.php', channels: __DIR__.'/../routes/channels.php', health: '/up', then: function (): void {
+        require __DIR__.'/../routes/inference.php';
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->replace(TrustProxies::class, TrustDeploymentProxies::class);
         $middleware->web(append: [CanonicalLocalOrigin::class, HandleInertiaRequests::class, SecurityHeaders::class, EnsureUserAccess::class]);
         $middleware->redirectGuestsTo(fn () => url('/login'));
         $mcpQuery = fn (Request $request): bool => $request->is('api/catalog/*/apps/*/mcp');
         $variableWrite = fn (Request $request): bool => $request->is('api/catalog/*/variables/actions');
-        $middleware->convertEmptyStringsToNull(except: [$mcpQuery, $variableWrite]);
-        $middleware->trimStrings(except: ['values.password', 'values.JsonKey', 'values.odbcconnection', 'columns.*.key', $mcpQuery, $variableWrite]);
+        $agentInference = fn (Request $request): bool => $request->is('internal/inference/*');
+        $middleware->convertEmptyStringsToNull(except: [$mcpQuery, $variableWrite, $agentInference]);
+        $middleware->trimStrings(except: ['values.password', 'values.JsonKey', 'values.odbcconnection', 'columns.*.key', $mcpQuery, $variableWrite, $agentInference]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is('api/*') || $request->expectsJson());
+        $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is('api/*', 'internal/inference/*') || $request->expectsJson());
         $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
             $status = $response->getStatusCode();
-            if ($request->is('api/*') || $request->expectsJson() || ! in_array($status, [403, 404, 419, 429, 500, 503], true)) {
+            if ($request->is('api/*', 'internal/inference/*') || $request->expectsJson() || ! in_array($status, [403, 404, 419, 429, 500, 503], true)) {
                 return $response;
             }
             if (config('app.debug') && $status >= 500) {

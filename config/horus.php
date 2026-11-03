@@ -21,5 +21,13 @@ return [
     'lumo' => ['binary' => env('LUMO_BINARY', '/usr/local/bin/lumo'), 'server' => env('LUMO_API_URL', 'https://api.horusbi.com.br/cli/v2'), 'web_url' => env('LUMO_WEB_URL', 'https://dataviz.horusbi.com.br'), 'login_enabled' => (bool) env('LUMO_LOGIN_ENABLED', false)],
     'mcp' => ['enabled' => (bool) env('BI_MCP_ENABLED', false), 'resource' => env('BI_MCP_RESOURCE', rtrim(env('LUMO_WEB_URL', 'https://dataviz.horusbi.com.br'), '/').'/mcp'), 'redirect_uri' => env('BI_MCP_REDIRECT_URI', rtrim(env('APP_URL', 'http://localhost:8088'), '/').'/auth/bi-mcp/callback'), 'client_id' => env('BI_MCP_CLIENT_ID')],
     'viewer' => ['enabled' => (bool) env('BI_VIEWER_ENABLED', false), 'allowed_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env('BI_VIEWER_ALLOWED_ORIGINS', env('LUMO_WEB_URL', 'https://dataviz.horusbi.com.br'))))))],
-    'codex' => ['binary' => env('CODEX_BINARY', '/usr/local/bin/codex'), 'model' => env('CODEX_DEFAULT_MODEL'), 'timeout' => (int) env('CODEX_TURN_TIMEOUT', 900)],
+    'codex' => [
+        'binary' => env('CODEX_BINARY', '/usr/local/bin/codex'),
+        'model' => env('CODEX_DEFAULT_MODEL'),
+        'timeout' => (int) env('CODEX_TURN_TIMEOUT', 900),
+        'gateway_enabled' => (bool) env('AGENT_INFERENCE_ENABLED', false),
+        'gateway_secret' => env('AGENT_INFERENCE_SECRET'),
+        'gateway_max_requests' => (int) env('CODEX_GATEWAY_MAX_REQUESTS', 64),
+        'gateway_max_bytes' => (int) env('CODEX_GATEWAY_MAX_BYTES', 50331648),
+    ],
 ];

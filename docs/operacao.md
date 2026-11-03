@@ -44,6 +44,12 @@ docker compose --env-file .env.production -f compose.production.yaml exec app ph
 
 Depois, cadastre os demais acessos pela página **Usuários**, sem compartilhar uma conta BI entre pessoas. A primeira instalação utiliza banco vazio: o pacote de código não migra as contas e conexões pessoais usadas na homologação local. Para transferência de dados existente, use o procedimento de backup/restauração e preserve a APP_KEY.
 
+## Critério para liberar o piloto com IA
+
+O piloto solicitado depende da IA. A saúde dos serviços, o CI aprovado e uma instalação Docker com a OpenAI desligada comprovam somente parte da infraestrutura; não comprovam a entrega funcional. Antes de liberar usuários, concluir a habilitação oficial do ChatGPT para o portal central e validar no domínio definitivo login individual, consentimento para uso do plano, resposta real, ferramentas BI, renovação e isolamento entre processos. O envio do formulário de interesse foi informado pelo responsável em 03/11/2026; ainda aguardamos uma configuração aprovada aplicável ao cenário.
+
+A [documentação de autenticação do Codex App Server](https://learn.chatgpt.com/docs/app-server#auth-endpoints) explicita que a autenticação nativa do App Server não é permitida para serviços hospedados. O suporte técnico a código de dispositivo não elimina essa restrição. Não tratar a alteração de flags ou do domínio como homologação do acesso hospedado.
+
 ## Instalação central
 
 Use `.env.production.example` como modelo de `.env.production`. Defina APP_KEY, senha PostgreSQL, segredo e chave Reverb; preserve APP_KEY em cofre. Confira APP_URL/ASSET_URL, PUBLIC_HOST, PUBLIC_PATH e SESSION_PATH. Para o domínio previsto: HTTPS, `/ia-ganalise`, cookie seguro e `LOCAL_PREVIEW=false`.
@@ -198,3 +204,12 @@ O CI envia um texto inteiramente fictício com exatamente 10 MiB pelo HTTPS loca
 O parâmetro **`--realtime`** acrescenta dez assinaturas reais de canais privados pelo HTTPS/Reverb. Cada conta autoriza seu canal e recebe 403 para o canal de outra; o servidor WebSocket também precisa recusar uma assinatura reaproveitada em outro canal ou socket. Eventos `WorkspaceChanged` inteiramente fictícios são emitidos pelo aplicativo do ensaio e conferidos por identidade. As autorizações não podem aparecer nos logs de TLS/web/PHP/Reverb. O resultado não equivale a consultas BI ou inferências concorrentes.
 
 O parâmetro **`--parallel`** do teste de filas exige pelo menos duas réplicas de `worker` e de `actions`. Tarefas fictícias precisam se sobrepor em processos distintos, enquanto documentos e ajuda continuam disponíveis. As réplicas são aumentadas somente no Compose descartável acima; o padrão de produção continua conservador e pode ser ajustado pelo operador conforme memória, filas e homologação do ambiente. Esses números de réplica não limitam o cadastro ou o número de usuários do produto.
+
+
+## Intermediador de inferência em desenvolvimento
+
+A rota `/internal/inference/v1/responses` é uma base para o executor isolado e permanece desligada por padrão (`AGENT_INFERENCE_ENABLED=false`). Não habilitar essa função no serviço público. Quando houver um serviço privado homologado, seu proxy deverá acrescentar `X-G-Analise-Inference` com o segredo `AGENT_INFERENCE_SECRET` (32 a 256 caracteres); o executor recebe somente uma autorização temporária da tarefa no bearer. O segredo do gateway e o token OAuth do usuário não devem entrar no ambiente do executor. Não existe rota HTTP para emitir autorizações temporárias.
+
+O limite interno padrão é 48 MiB (`CODEX_GATEWAY_MAX_BYTES`), para acomodar imagens autorizadas sem ampliar os uploads públicos. O serviço privado também precisará de configuração própria de PHP/Nginx e memória compatível: o limite de aplicação não substitui `post_max_size` nem `client_max_body_size`. As definições atuais de produção continuam inalteradas nesse aspecto e ainda não provisionam o transporte privado. O orçamento de 64 chamadas por tarefa (`CODEX_GATEWAY_MAX_REQUESTS`) é um limite operacional, não uma leitura do saldo do plano ChatGPT.
+
+Os testes automatizados desta base usam respostas e credenciais fictícias. Eles não homologam o login hospedado, não demonstram autorização da OpenAI e não tornam a instalação apta para um piloto com IA sem a integração e os ensaios completos descritos acima.
