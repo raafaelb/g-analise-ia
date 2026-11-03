@@ -1,5 +1,6 @@
 """Regressão: a APP_KEY não pode substituir a chave pública do Reverb."""
 import base64
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -20,6 +21,8 @@ class HttpsConfigurationTest(unittest.TestCase):
             subprocess.run(script, check=True, capture_output=True)
             text = (root / ".env.homologacao").read_text()
             values = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+            self.assertEqual(str(os.getuid()), values["LOCAL_UID"])
+            self.assertEqual(str(os.getgid()), values["LOCAL_GID"])
             self.assertEqual("homologacao-local", values["REVERB_APP_KEY"])
             self.assertNotEqual(values["APP_KEY"], values["REVERB_APP_KEY"])
             self.assertEqual(32, len(base64.b64decode(values["APP_KEY"].removeprefix("base64:"))))

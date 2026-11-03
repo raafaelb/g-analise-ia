@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-03.2",
+  "version": "2026-11-03.3",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -423,7 +423,7 @@
         {
           "id": "account-intro",
           "title": "Cuide do seu acesso",
-          "description": "Esta página reúne a segurança da sua conta no portal. O acesso às integrações continua sendo individual.",
+          "description": "Esta página reúne a segurança da sua conta no portal. O acesso às integrações continua sendo individual. Ao pedir ajuda sobre login, informe a mensagem e o horário, sem enviar senha ou link de autorização.",
           "audience": "all"
         },
         {
@@ -880,7 +880,7 @@
       "id": "account-security",
       "title": "Como gerencio minha senha e meu acesso?",
       "summary": "Contas locais e contas da Suíte têm opções de segurança diferentes.",
-      "body": "Abra **Segurança da conta**. As contas locais podem trocar a senha conforme os campos mostrados. Uma senha inicial precisa ser substituída antes de acessar as demais funcionalidades.\n\nA troca de senha local encerra sessões e cancela tarefas e revisões da versão anterior do acesso. Colaboradores que usam a Suíte gerenciam sua autenticação pelas opções disponíveis para essa origem.\n\nO perfil do portal não concede acesso adicional ao BI: cada pessoa continua usando sua própria conexão e suas permissões.\n\nSe outra conta entrar no mesmo navegador, uma aba antiga solicitará uma nova entrada ou atualização antes de enviar pedidos. Isso mantém o contexto do atendimento separado. Não compartilhe a sessão da conta entre pessoas.",
+      "body": "Abra **Segurança da conta**. As contas locais podem trocar a senha conforme os campos mostrados. Uma senha inicial precisa ser substituída antes de acessar as demais funcionalidades.\n\nA troca de senha local encerra sessões e cancela tarefas e revisões da versão anterior do acesso. Colaboradores que usam a Suíte gerenciam sua autenticação pelas opções disponíveis para essa origem.\n\nO perfil do portal não concede acesso adicional ao BI: cada pessoa continua usando sua própria conexão e suas permissões.\n\nSe outra conta entrar no mesmo navegador, uma aba antiga solicitará uma nova entrada ou atualização antes de enviar pedidos. Isso mantém o contexto do atendimento separado. Não compartilhe a sessão da conta entre pessoas.\n\nPara pedir ajuda sobre uma falha de login, informe a mensagem exibida e o horário aproximado. Senhas e links de autorização não devem ser enviados no chat nem incluídos no diagnóstico compartilhado.",
       "pages": [
         "account"
       ],

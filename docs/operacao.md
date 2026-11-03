@@ -165,3 +165,16 @@ A fonte sintética de permissões no tenant de teste foi publicada com autoriza�
 No HTTP local, usar **`npm run build:local`**, como nos scripts de preparação e no CI. `npm run build` lê a configuração de produção; neste ambiente ela aponta para o ensaio HTTPS em outro endereço e subdiretório. Um build direcionado ao endereço errado deixou módulos de páginas indisponíveis e a tela em branco; a compilação local foi restaurada e a página de login voltou a renderizar sem erros de JavaScript na conferência do navegador. Isso não constitui implantação nem homologação do domínio público. A configuração final de produção precisa corresponder ao endereço que será efetivamente publicado.
 
 Publicações novas de aplicações passam a conferir também o conteúdo revisado e os vínculos dos dashboards, com recibo explícito. Uma divergência permanece pendente e deve ser investigada por leitura; não reenviar automaticamente. O Lumo instalado não oferece `--dry-run` para `app publish`; a preparação usa plano, validação, comparação remota e checkpoint, mantendo a decisão de publicação separada.
+
+
+## Logs HTTP no piloto
+
+O Nginx interno registra JSON com horário, método, caminho original sem query string, status, duração, status/tempo do upstream e bytes. Não inclui cabeçalhos, corpo, cookies, referer ou parâmetros de retorno de autenticação. A configuração usa `escape=json`, conforme a [referência do Nginx](https://nginx.org/en/docs/http/ngx_http_log_module.html#log_format). O exemplo de proxy externo desativa o access log somente no subdiretório do produto, delegando a observação HTTP ao web interno. Adapte também outros proxies ou balanceadores existentes: a configuração deste projeto não controla seus logs.
+
+O error log do Nginx nesses contextos usa nível `crit`, para não repetir a URI completa nas mensagens comuns de erro do upstream. A contrapartida é menor detalhe nesses erros: acompanhe status, duração e upstream no JSON e os logs da aplicação. Falhas críticas de processo e ferramentas externas exigem análise própria antes de compartilhar diagnósticos. A configuração não apaga registros antigos.
+
+No Compose de produção, cada serviço usa rotação Docker `json-file`, com até três arquivos de 10 MB por contêiner. O log Laravel permanece diário, com 14 dias no exemplo de produção. O limite Docker é por volume de log, não por dias; retenção de anexos, backups e auditoria do banco continua sendo uma política separada. Essas opções entram em vigor ao criar/recriar os contêineres.
+
+Após compilar a imagem, `python3 scripts/test-web-privacy.py --image horus-ia-web:production` testa GET/POST, parâmetros, cabeçalhos, corpo e falha de upstream usando somente marcadores fictícios. Ele cria contêineres efêmeros sem rede, portas públicas, aplicação ou banco e os remove ao terminar. O CI executa essa mesma conferência.
+
+O ensaio HTTPS também envia um retorno de autenticação com código/estado fictícios, confere o redirecionamento no subdiretório e procura seus marcadores e a senha sintética nos logs de TLS, web e PHP-FPM. A preparação do certificado registra o UID/GID do operador para o contêiner TLS poder ler sua chave privada; não altera as chaves existentes. Esse ambiente e os testes de filas passam a ser executados no CI, separados da instalação principal.

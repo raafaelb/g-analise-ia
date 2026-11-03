@@ -5,7 +5,7 @@ import urllib.request,urllib.parse,urllib.error,http.cookiejar,ssl,re,json,subpr
 root=Path(__file__).resolve().parent.parent
 compose=['docker','compose','--project-directory',str(root),'--env-file','.env.homologacao','-f','compose.homologacao.yaml']
 password=secrets.token_urlsafe(32)
-seed='''require "vendor/autoload.php";$app=require "bootstrap/app.php";$app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();if(config("database.connections.pgsql.database")!=="ganalise_ensaio_descartavel"||config("app.url")!=="https://localhost:8443/ia-ganalise"){exit(3);}$p=json_decode(stream_get_contents(STDIN),true);App\\Models\\User::updateOrCreate(["email"=>"homologacao@example.invalid"],["name"=>"Homologação efêmera","role"=>"owner","password"=>Illuminate\\Support\\Facades\\Hash::make($p["password"])]);echo "seed_ok";'''
+seed='''require "vendor/autoload.php";$app=require "bootstrap/app.php";$app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();if(config("database.connections.pgsql.database")!=="ganalise_ensaio_descartavel"||config("app.url")!=="https://localhost:8443/ia-ganalise"||config("horus.openai.enabled")||config("horus.lumo.login_enabled")){exit(3);}$p=json_decode(stream_get_contents(STDIN),true);App\\Models\\User::updateOrCreate(["email"=>"homologacao@example.invalid"],["name"=>"Homologação efêmera","role"=>"owner","password"=>Illuminate\\Support\\Facades\\Hash::make($p["password"])]);echo "seed_ok";'''
 r=subprocess.run(compose+['exec','-T','app','php','-r',seed],input=json.dumps({'password':password}),text=True,capture_output=True,check=True)
 assert r.stdout=='seed_ok'
 base='https://localhost:8443/ia-ganalise'
@@ -71,4 +71,16 @@ while True:
     time.sleep(0.25)
 assert ws['event']=='pusher:connection_established',ws
 rejected=handshake('https://untrusted.invalid');assert rejected['event']=='pusher:error' and rejected['error_code']==4009,rejected
-print(json.dumps({'ok':True,'websocket':ws,'foreign_origin_rejected':True,'tls_certificate_verified':True,'assets_checked':len(assets),'inertia_prefix':page['url'],'login_redirect':final,'authenticated_bootstrap':True,'secure_cookie_scoped':True,'isolated_database':True}))
+auth_marker='synthetic-auth-return-'+secrets.token_urlsafe(24)
+request=urllib.request.Request(base+'/auth/openai/callback?'+urllib.parse.urlencode({'code':auth_marker,'state':auth_marker+'-state'}),headers={'Authorization':'Bearer '+auth_marker,'Referer':'https://example.invalid/?code='+auth_marker})
+with opener.open(request,timeout=10) as response:
+    assert response.geturl()==base+'/app/connections','O retorno de autenticação saiu do subdiretório.'
+deadline=time.monotonic()+3
+while True:
+    captured=subprocess.run(compose+['logs','--no-color','app','web','tls-test'],capture_output=True,text=True,check=True)
+    container_logs=captured.stdout+captured.stderr
+    assert auth_marker not in container_logs and password not in container_logs,'Dados fictícios de autenticação apareceram nos logs do contêiner.'
+    if '"path":"/auth/openai/callback"' in container_logs:break
+    assert time.monotonic()<deadline,'O acesso ao callback não apareceu no log HTTP esperado.'
+    time.sleep(0.1)
+print(json.dumps({'ok':True,'websocket':ws,'foreign_origin_rejected':True,'tls_certificate_verified':True,'assets_checked':len(assets),'inertia_prefix':page['url'],'login_redirect':final,'authenticated_bootstrap':True,'secure_cookie_scoped':True,'isolated_database':True,'auth_return_prefix':True,'synthetic_auth_data_absent_from_logs':True}))

@@ -40,5 +40,22 @@ jobs:
           python3 scripts/prepare-production.py --url https://ci.example.invalid/ia-ganalise
           docker compose --env-file .env.production -f compose.production.yaml build app web
           docker compose --env-file .env.production -f compose.production.yaml run --rm --no-deps app php artisan ganalise:preflight
+      - name: Conferir privacidade dos logs HTTP sem rede externa
+        run: python3 scripts/test-web-privacy.py --image horus-ia-web:production
+      - name: Ensaiar HTTPS e filas em ambiente descartavel
+        run: |
+          python3 scripts/prepare-https-test.py
+          docker compose --env-file .env.homologacao -f compose.homologacao.yaml build app web
+          docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d --wait postgres redis
+          docker compose --env-file .env.homologacao -f compose.homologacao.yaml run --rm --no-deps app php artisan migrate --force
+          docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d
+          python3 scripts/test-https.py
+          docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php scripts/test-queues.php --disposable
+      - name: Encerrar somente o ensaio descartavel
+        if: always()
+        run: |
+          if [ -f .env.homologacao ]; then
+            docker compose --env-file .env.homologacao -f compose.homologacao.yaml down --volumes
+          fi
       - name: Conferir pacote de codigo versionado
         run: python3 scripts/package-release.py --output "${RUNNER_TEMP}/g-analise-ia-source.tar.gz"
