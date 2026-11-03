@@ -148,12 +148,14 @@ python3 scripts/prepare-https-test.py
 docker compose --env-file .env.homologacao -f compose.homologacao.yaml build app web
 docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d --wait postgres redis
 docker compose --env-file .env.homologacao -f compose.homologacao.yaml run --rm app php artisan migrate --force
-docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d
+docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d --scale worker=2 --scale actions=2
 python3 scripts/test-https.py
-python3 scripts/test-team-pilot.py --disposable
-docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php scripts/test-queues.php --disposable
+python3 scripts/test-team-pilot.py --disposable --realtime
+docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php scripts/test-queues.php --disposable --parallel
 docker compose --env-file .env.homologacao -f compose.homologacao.yaml down --volumes
 ```
+
+A preparação normaliza para desligadas as integrações ChatGPT, uso do plano, Lumo, visualizador, Suíte e MCP, inclusive ao reutilizar `.env.homologacao`; preserva as chaves existentes, corrige a permissão para 0600 e recusa um arquivo de configuração que seja link simbólico. Esse comportamento pertence somente ao ensaio descartável.
 
 O teste cria uma conta sintética somente após conferir o nome exclusivo do banco efêmero. Verifica certificado, assets, prefixo Inertia, CSRF/login, redirecionamento e sessão autenticada. A senha aleatória não é exibida. Não contorna avisos de certificado do navegador nem instala certificados no sistema. O ensaio concorrente adicional usa dez contas fictícias, alternando autoria e consulta: valida login com CSRF, cookies HTTPS, propriedade de projetos/conversas, recusa entre identidades e os controles de criação de cada perfil. Mede latência somente das rotas locais do portal; não mede APIs BI, inferência ou capacidade de outro servidor. Remove suas próprias contas e arquivos fictícios ao terminar. Opcionalmente, `--pdf-fixture /CAMINHO/documento-digitalizado-ficticio.pdf` verifica upload multipart com CSRF, processamento de três páginas pelo worker, integridade do original e recusa de download por outra identidade, sem envio a modelos. O teste separado de filas executa uma espera sintética de oito segundos em `agents` e verifica se ações, documentos e ajuda concluem durante essa espera, incluindo a leitura de um arquivo privado pelo worker de documentos, sem chamadas externas. Só aceita o banco efêmero e integrações desligadas, usa chaves próprias com expiração e não limpa outras filas. Encerrar o Compose descarta o banco/cache de ensaio.
 
@@ -187,3 +189,8 @@ O armazenamento em memória do ensaio usa `volume.nocopy`: os processos preparam
 A imagem PHP usa `upload_max_filesize=10M` e `post_max_size=11M`, alinhados ao limite de 10 MB por arquivo no portal e à margem multipart do Nginx. A memória PHP não foi ampliada. Recompile a imagem e recrie o serviço web para aplicar a configuração; uma troca apenas dos arquivos PHP não muda as diretivas já carregadas pelo processo. O frontend informa o excesso antes do envio e o backend mantém sua própria validação.
 
 O CI envia um texto inteiramente fictício com exatamente 10 MiB pelo HTTPS local, usando `scripts/test-team-pilot.py --disposable --text-fixture CAMINHO`. A preparação deve concluir com aviso de conteúdo limitado; o download do original precisa preservar o hash e ser recusado para outra identidade. O parâmetro alternativo `--pdf-fixture` continua disponível para conferir até três páginas visuais de um PDF digitalizado fictício. Esses ensaios não enviam anexos à IA.
+
+
+O parâmetro **`--realtime`** acrescenta dez assinaturas reais de canais privados pelo HTTPS/Reverb. Cada conta autoriza seu canal e recebe 403 para o canal de outra; o servidor WebSocket também precisa recusar uma assinatura reaproveitada em outro canal ou socket. Eventos `WorkspaceChanged` inteiramente fictícios são emitidos pelo aplicativo do ensaio e conferidos por identidade. As autorizações não podem aparecer nos logs de TLS/web/PHP/Reverb. O resultado não equivale a consultas BI ou inferências concorrentes.
+
+O parâmetro **`--parallel`** do teste de filas exige pelo menos duas réplicas de `worker` e de `actions`. Tarefas fictícias precisam se sobrepor em processos distintos, enquanto documentos e ajuda continuam disponíveis. As réplicas são aumentadas somente no Compose descartável acima; o padrão de produção continua conservador e pode ser ajustado pelo operador conforme memória, filas e homologação do ambiente. Esses números de réplica não limitam o cadastro ou o número de usuários do produto.

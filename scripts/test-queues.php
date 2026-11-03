@@ -11,18 +11,20 @@ use Illuminate\Support\Facades\Storage;
 
 $app = require dirname(__DIR__).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
-if (! in_array('--disposable', $argv, true) || config('database.default') !== 'pgsql' || config('database.connections.pgsql.database') !== 'ganalise_ensaio_descartavel' || config('queue.default') !== 'redis' || config('cache.default') !== 'redis' || config('horus.openai.enabled') || config('horus.lumo.login_enabled')) {
+if (! in_array('--disposable', $argv, true) || config('database.default') !== 'pgsql' || config('database.connections.pgsql.database') !== 'ganalise_ensaio_descartavel' || config('queue.default') !== 'redis' || config('cache.default') !== 'redis' || config('horus.openai.enabled') || config('horus.openai.plan_enabled') || config('horus.lumo.login_enabled') || config('suite.enabled') || config('horus.mcp.enabled') || config('horus.viewer.enabled')) {
     fwrite(STDERR, "Este teste exige o banco efêmero ganalise_ensaio_descartavel, Redis e integrações externas desabilitadas.\n");
     exit(2);
 }
 $prefix = 'operations:queue-rehearsal:'.bin2hex(random_bytes(12));
 $file = 'operations/queue-rehearsal-'.bin2hex(random_bytes(12)).'.txt';
-$keys = ['agents_started', 'agents_finished', 'actions', 'documents', 'help'];
+$parallel = in_array('--parallel', $argv, true);
+$keys = ['agents_started', 'agents_finished', 'agents_worker', 'actions', 'documents', 'help'];
 $report = ['ok' => false, 'isolated_database' => true, 'external_calls' => false];
 try {
     Storage::disk('local')->put($file, $prefix);
     Bus::dispatch(CallQueuedClosure::create(static function () use ($prefix): void {
         Cache::put($prefix.':agents_started', microtime(true), 45);
+        Cache::put($prefix.':agents_worker', gethostname().':'.getmypid(), 45);
         usleep(8_000_000);
         Cache::put($prefix.':agents_finished', microtime(true), 45);
     })->onQueue('agents'));
@@ -40,6 +42,16 @@ try {
             }
             Cache::put($prefix.':'.$channel, microtime(true), 45);
         })->onQueue($channel));
+    }
+    if ($parallel) {
+        foreach (['parallel_agents' => 'agents', 'parallel_actions_1' => 'actions', 'parallel_actions_2' => 'actions'] as $key => $channel) {
+            $keys[] = $key;
+            Bus::dispatch(CallQueuedClosure::create(static function () use ($prefix, $key): void {
+                $started = microtime(true);
+                usleep(2_000_000);
+                Cache::put($prefix.':'.$key, ['started' => $started, 'finished' => microtime(true), 'worker' => gethostname().':'.getmypid()], 45);
+            })->onQueue($channel));
+        }
     }
     do {
         $values = [];
@@ -62,6 +74,16 @@ try {
     $report['private_storage_shared_with_documents'] = $independent['documents'];
     $report['agent_duration_seconds'] = round($values['agents_finished'] - $values['agents_started'], 3);
     $report['ok'] = ! in_array(false, $independent, true);
+    if ($parallel) {
+        $pairs = ['agents' => [['started' => $values['agents_started'], 'finished' => $values['agents_finished'], 'worker' => $values['agents_worker']], $values['parallel_agents']], 'actions' => [$values['parallel_actions_1'], $values['parallel_actions_2']]];
+        foreach ($pairs as $channel => [$first, $second]) {
+            $overlap = min($first['finished'], $second['finished']) - max($first['started'], $second['started']);
+            $workers = count(array_unique([$first['worker'], $second['worker']]));
+            $confirmed = $overlap > 0 && $workers === 2;
+            $report['parallel_workers'][$channel] = ['confirmed' => $confirmed, 'distinct_processes' => $workers, 'overlap_seconds' => round(max(0, $overlap), 3)];
+            $report['ok'] = $report['ok'] && $confirmed;
+        }
+    }
 } catch (Throwable $error) {
     $report['error'] = $error->getMessage();
 } finally {

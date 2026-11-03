@@ -48,11 +48,11 @@ jobs:
           docker compose --env-file .env.homologacao -f compose.homologacao.yaml build app web
           docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d --wait postgres redis
           docker compose --env-file .env.homologacao -f compose.homologacao.yaml run --rm --no-deps app php artisan migrate --force
-          docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d
+          docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d --scale worker=2 --scale actions=2
           python3 scripts/test-https.py
-          docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php scripts/test-queues.php --disposable
+          docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php scripts/test-queues.php --disposable --parallel
           python3 -c 'from pathlib import Path; import os; size=10*1024*1024; line=b"DADOS INTEIRAMENTE SINTETICOS PARA TESTE DE LIMITE.\n"; Path(os.environ["RUNNER_TEMP"], "ganalise-upload-10MiB.txt").write_bytes((line*((size//len(line))+1))[:size])'
-          python3 scripts/test-team-pilot.py --disposable --text-fixture "${RUNNER_TEMP}/ganalise-upload-10MiB.txt"
+          python3 scripts/test-team-pilot.py --disposable --realtime --text-fixture "${RUNNER_TEMP}/ganalise-upload-10MiB.txt"
       - name: Encerrar somente o ensaio descartavel
         if: always()
         run: |
