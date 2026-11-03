@@ -1,23 +1,45 @@
 # Entrega local e pendências de homologação
 
-Instalação de desenvolvimento: http://127.0.0.1:8088. Estado consolidado em 01/11/2026. O código está preparado para execução Docker; esta entrega não declara a implantação central concluída.
+Instalação de desenvolvimento: http://127.0.0.1:8088. Estado consolidado em 03/11/2026. O código está preparado para execução Docker; esta entrega não declara a implantação central concluída. A tabela abaixo apresenta o estado atual; as seções datadas seguintes preservam o alcance e as pendências da respectiva rodada histórica.
 
 | Entrega | Implementado e verificado | Etapa restante |
 |---|---|---|
-| Catálogo por tenant | Oito tenants da conta principal e um na conta restrita; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados confirmados pelo arquivo sincronizado e variáveis sem valores | Homologar autoria dos módulos indisponíveis e restrições entre mesas; segunda identidade com tenant restrito e revogação/restauração de Criar mesas já conferidas |
-| ChatGPT | Login oficial OSS local, plano individual, modelos autorizados, inferência remota, Codex e ferramentas reais | Enquadramento/configuração oficial para hospedagem central; repetir no domínio público |
-| Criação completa | Clone, manutenção, consultas, criação nova, prévia PNG/interativa, histórico de prévias no projeto, revisão assíncrona, ações manuais de duplicação/exclusão e carga de teste | Ampliar a homologação real da substituição de versões; publicação como nova já autorizada e confirmada no BI |
-| Anexos | Extração privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; seleção ordenada por pedido, preservada nas retomadas e conferida sem inferência; interpretação real anterior de CSV, PDF, XLSX e imagens; preparo visual de PDF sem texto conferido sem nova inferência | Homologar interpretação real do PDF digitalizado com autorização; OCR não implementado; validar amostras do piloto |
-| Agendamento | Fontes compartilhadas, frequência preservada, duplicação recusada, agenda ativa e execução nova concluída; fonte geográfica publicada após autorização e carga concluída | Novas fontes privadas continuam exigindo autorização específica; não reutilizar a autorização geográfica em outro recurso |
+| Catálogo por tenant | Oito tenants da conta principal e um na conta restrita; 13 tipos Lumo, dashboards, Minha Mesa, mesas, etiquetas, fontes, agendas, metadados confirmados pelo arquivo sincronizado e variáveis sem valores; MCP individual com mesa, tabela, filtro de linha e coluna oculta conferidos em dados sintéticos | Ampliar a homologação das escritas com conta restrita, exportações e módulos indisponíveis. `app query` do CLI permanece suspenso após não respeitar restrições no ensaio; a alternativa MCP foi homologada separadamente, sem liberar essa rota |
+| ChatGPT | Login oficial OSS local, plano individual, catálogo de modelos, inferência remota, Codex e ferramentas reais; leitura visual concluída com `gpt-6.1-sol` | Enquadramento/configuração oficial para hospedagem central; repetir OAuth e inferência no domínio público. Um modelo constar no catálogo não prova autorização para todas as solicitações |
+| Criação completa | Clone, manutenção, aplicação nova e assistente de dashboard com consulta pelo MCP individual, prévia PNG/interativa, histórico de prévias, revisão no chat, operações manuais, publicação como nova com conteúdo conferido e carga de teste | Ampliar a homologação real da substituição de aplicações e ETLs, com alvo, dependências, dados e decisão próprios; ampliar falhas/recuperação em duas identidades. Histórico completo/restauração e cópia entre tenants são evoluções adicionais ainda sem interface |
+| Anexos | Extração privada de texto/CSV/JSON/YAML/MD/PDF/XLSX/imagens; seleção ordenada por pedido e preservada nas retomadas; interpretação real de CSV, PDF, XLSX e imagens; PDF digitalizado de quatro páginas teve as três páginas fornecidas interpretadas, cálculos/identificador corretos e limite informado em 03/11 | Ampliar amostras do piloto, incluindo PDFs mistos e documentos maiores. O seletor de arquivos da extensão Chrome recusou este envio; o anexo foi preparado pelo serviço interno do aplicativo e a tarefa real enviada pela conversa. OCR pesquisável não implementado |
+| Agendamento | Fontes compartilhadas, frequência preservada, duplicação recusada, agendas ativas e execuções concluídas; fonte geográfica e base sintética publicadas após autorizações próprias, com carga diária às 03h de Brasília | Ampliar os ensaios de gatilhos e de substituição de ETLs. Novas fontes privadas continuam exigindo decisão específica de publicação; enfileiramento não confirma carga concluída |
 | Operação | HTTPS/subpasta/WebSocket em ensaio isolado, backup criptografado/restauração independente, retenção e saúde; testes de propriedade e concorrência; empacotamento do auxiliar oficial de sandbox corrigido | Isolamento completo do processo por usuário ainda não comprovado; este Docker bloqueia namespaces nativos; domínio/certificado, backup externo, alertas e piloto com contas independentes |
 
 ## Evidências e uso
 
-A regressão usada como base desta auditoria, commit `9686d8b`, passou com **1.215 testes / 9.015 asserções em SQLite**, mais três casos próprios do PostgreSQL ignorados nesse banco; **1.218 testes / 9.063 asserções em PostgreSQL isolado**; **188 testes de frontend**, TypeScript/build, Pint, testes operacionais Python e smoke do protocolo Codex. [CI aprovado dessa revisão](https://github.com/raafaelb/g-analise-ia/actions/runs/41275015775). As contagens nas seções históricas descrevem as respectivas revisões, não a cobertura atual. O teste do binário Codex com provedor sintético conferiu o catálogo real de ferramentas e a recusa de escrita nativa, sem usar a conta OpenAI. As evidências reais e seus limites estão em [homologação](homologacao.md). Os testes automatizados não usam as contas reais.
+A regressão atual de código, commit `8b797c43970ef92e38ca1826ffc03705a6ed90b0`, passou com **1.549 testes / 12.011 asserções em SQLite**, mais três casos próprios de PostgreSQL ignorados nesse banco; **1.552 testes / 12.059 asserções em PostgreSQL isolado**; **297 testes de frontend**, TypeScript/build, Pint, testes operacionais Python e smoke do protocolo Codex. [CI aprovado dessa revisão](https://github.com/raafaelb/g-analise-ia/actions/runs/41526491859). As contagens nas seções históricas descrevem as respectivas revisões. Os testes automatizados não usam contas reais; o ensaio separado de PDF digitalizado usou uma única inferência real com documento sintético. As evidências e limites recentes estão na [matriz de gestão](gestao-completa.md).
 
 As duas conexões foram conferidas no portal. Renovação BI preserva a sessão criptografada. Desconectar cancela revisões pendentes e tarefas pausadas; ações já iniciadas remotamente não são desfeitas. Consultas sem permissão são diferenciadas de listas vazias.
 
 A publicação como nova foi autorizada pelo próprio portal e confirmada na mesa de teste da Inovadora. Uma segunda consulta independente confirmou recurso, nome, quantidade de dashboards e destino. A versão compartilhada permanece vinculada ao projeto. Substituição de uma versão existente passou pelos testes isolados; o ciclo real de substituição ainda precisa de uma revisão e decisão próprias. Uma revisão expirada ou alterada exige nova validação antes da execução.
+
+## Pendências e estimativa de esforço — 03/11/2026
+
+Estimativa solicitada pelo titular, em horas efetivas de engenharia e testes, não horas corridas. Considera as funcionalidades e os comprovantes atuais. Não inclui tempo de resposta de fornecedores, disponibilidade de infraestrutura ou aprovação de publicação de recursos concretos. A implantação em servidor continua fora da autorização atual.
+
+| Fechamento das seis entregas originais | Trabalho restante | Horas |
+|---|---|---:|
+| Homologação BI | Substituição de versões, contas restritas, interrupções e recuperação, com dados fictícios e decisões específicas quando houver publicação | 8–16 |
+| Isolamento | Separação dos processos, arquivos e credenciais por usuário e validação de concorrência no ambiente escolhido | 16–32 |
+| ChatGPT central | Configuração e homologação do fluxo hospedado depois de obter o enquadramento e a configuração oficiais | 4–8 |
+| Operação | Backup externo/restauração, alertas, HTTPS e capacidade no ambiente acordado | 6–12 |
+| Revisão final | Correções dos ensaios, usabilidade, ajuda/tours, regressões e preparação do piloto | 6–10 |
+
+Faixa consolidada: **aproximadamente 40–80 horas**. O PDF digitalizado já teve uma inferência real concluída; não deve continuar listado como interpretação inteiramente pendente. A falta de configuração do seletor da extensão é uma pendência do ensaio de navegador e não substitui a necessidade de testar o upload normal no piloto.
+
+| Evoluções adicionais discutidas | Horas |
+|---|---:|
+| Histórico, comparação e restauração revisada de dashboards | 16–24 |
+| Cópia guiada entre tenants, seleção de recursos, conexões e compatibilidade | 24–40 |
+| Gestão avançada restante: editores, permissões de mesas, cadastros, apresentações e administração disponível pelos contratos/API | 80–160 |
+
+Com a fila ampliada, a ordem de grandeza é **160–300 horas**, sujeita ao levantamento e aos limites efetivos das APIs. Não é uma promessa de substituir todos os módulos do BI sem confirmar seus contratos. A [visão geral oficial da OpenAI](https://developers.openai.com/siwc/token-sharing-open-source) continua encaminhando aplicações hospedadas remotamente para solicitação de acesso, mesmo com código aberto. A configuração local e a gratuidade do projeto não comprovam essa elegibilidade. A [solicitação preparada](solicitacao-openai.md) permanece disponível; não foi enviada automaticamente.
 
 ## Auditoria das seis entregas — 01/11/2026
 
@@ -99,7 +121,7 @@ Consultas indisponíveis, incompletas ou com estado de publicação desconhecido
 
 ## Atualização segura e correção de metadados
 
-**Atualizar do BI** recebe a versão atual do recurso vinculado ao projeto, sem iniciar IA ou enviar alterações ao servidor do BI. O broker oferece a mesma operação como `refresh_resource`. Edições locais pendentes, revisões em andamento, sessão alterada e dados de diff desconhecidos impedem a substituição. Não há descarte forçado no workspace de autoria.
+**Atualizar do BI** recebe a versão atual do recurso vinculado ao projeto, sem iniciar IA ou enviar alterações ao servidor do BI. O broker oferece a mesma operação como `refresh_resource`. A revisão de 02/11 preserva um checkpoint dos mesmos bytes confirmados sem edições antes de receber somente esse recurso. Ela trata a mudança da base nativa de comparação que pode ocorrer antes de uma recusa de `pull`. Uma tentativa interrompida só reutiliza comprovante assinado ainda aberto, com os mesmos arquivos e acesso; o comprovante é encerrado depois de utilizado. Edições reais, divergências antigas sem comprovante, revisões em andamento, sessão alterada e diff desconhecido continuam preservados. O [ensaio recente e seus limites](gestao-completa.md) registra a reprodução e a correção.
 
 A homologação real em projeto local separado confirmou o recebimento da versão publicada, o reconhecimento de uma versão já atual e a preservação de uma edição temporária. A mensagem de conflito foi observada no navegador, o hash permaneceu intacto e o arquivo foi restaurado ao conteúdo exato anterior. Não houve tarefas de IA, aprovações ou recursos remotos criados. O projeto descartável foi arquivado, preservando o histórico.
 
