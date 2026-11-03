@@ -10,6 +10,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(web: __DIR__.'/../routes/web.php', commands: __DIR__.'/../routes/console.php', channels: __DIR__.'/../routes/channels.php', health: '/up')
@@ -24,4 +26,21 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(fn (Request $request) => $request->is('api/*') || $request->expectsJson());
+        $exceptions->respond(function (Response $response, Throwable $exception, Request $request): Response {
+            $status = $response->getStatusCode();
+            if ($request->is('api/*') || $request->expectsJson() || ! in_array($status, [403, 404, 419, 429, 500, 503], true)) {
+                return $response;
+            }
+            if (config('app.debug') && $status >= 500) {
+                return $response;
+            }
+
+            $page = Inertia::render('Error', ['status' => $status])->toResponse($request)->setStatusCode($status);
+            $page->headers->set('Cache-Control', 'no-store, private');
+            if ($response->headers->has('Retry-After')) {
+                $page->headers->set('Retry-After', $response->headers->get('Retry-After'));
+            }
+
+            return $page;
+        });
     })->create();

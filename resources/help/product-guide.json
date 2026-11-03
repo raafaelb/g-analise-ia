@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-03.8",
+  "version": "2026-11-03.9",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -63,7 +63,7 @@
         {
           "id": "home-help",
           "title": "A ajuda fica sempre aqui",
-          "description": "Abra a ajuda para pesquisar orientações, fazer perguntas e refazer o tour desta página. Na conversa, role o histórico para ler respostas anteriores e use o campo abaixo para uma nova pergunta.",
+          "description": "Abra a ajuda para pesquisar orientações, entender mensagens de acesso ou sessão, fazer perguntas e refazer o tour desta página. Na conversa, role o histórico para ler respostas anteriores e use o campo abaixo para uma nova pergunta.",
           "anchor": "workspace-help",
           "audience": "all"
         },
@@ -1260,6 +1260,30 @@
         }
       ],
       "audience": "authors"
+    },
+    {
+      "id": "portal-recovery",
+      "title": "Como retomo o acesso quando uma página não abre?",
+      "summary": "Entenda os avisos de acesso, sessão expirada e indisponibilidade.",
+      "body": "Se um endereço não existir ou não estiver disponível para sua conta, a página oferece **Voltar ao início**. Use esse caminho para localizar seus projetos e dashboards. Um aviso de acesso negado precisa da conta correta ou da conferência do responsável pelo sistema.\n\nQuando a **sessão expirar**, use **Abrir o sistema novamente**. A recuperação não repete a solicitação anterior. Confira a conversa ou **Atividade** antes de enviar uma alteração outra vez, principalmente uma publicação ou exclusão. Em uma janela já aberta, o aviso pode pedir para atualizar a página.\n\nO aviso de muitas tentativas pede uma pausa antes de tentar de novo. Uma falha de carregamento ou indisponibilidade temporária também pode exigir aguardar alguns instantes. Se persistir, informe ao responsável o código da página e o horário aproximado.",
+      "pages": [
+        "home",
+        "account",
+        "projects",
+        "project",
+        "activity"
+      ],
+      "actions": [
+        {
+          "page": "home",
+          "label": "Voltar ao início"
+        },
+        {
+          "page": "activity",
+          "label": "Conferir Atividade"
+        }
+      ],
+      "audience": "all"
     }
   ]
 }
