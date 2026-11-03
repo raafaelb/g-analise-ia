@@ -1311,3 +1311,14 @@ A instalação principal foi recriada somente após confirmar zero tarefas de IA
 A leitura da agenda nativa `schedule:4325`, no tenant de testes, confirmou também uma execução automática em 03/11/2026: início **03:04:21**, término **03:04:24**, com sucesso, em Brasília. A agenda permanece ativa, diária às 03:00, vinculada à fonte sintética já autorizada. A consulta não disparou uma carga manual e não alterou o BI.
 
 A regressão final desta revisão passou com **1.598 testes SQLite / 12.324 asserções** (três casos de PostgreSQL omitidos), **312 testes de frontend** e **13 testes operacionais Python**. A suíte PostgreSQL será reconferida pelo CI do commit. O ensaio de PDF de 10 MiB teve mediana de 0,169 s e p95 de 1,335 s nas 80 operações iniciais; o de texto, 0,124 s e 0,808 s. Essas medições locais não incluem o upload nem serviços externos e não indicam capacidade de outro servidor.
+
+
+## Leitura das amostras de tabelas e cadastros — 03/11/2026
+
+As amostras do catálogo passam a usar nomes e tipos das colunas confirmados na mesma leitura autorizada, sem outra chamada nativa. A apresentação numérica não transforma strings decimais em ponto flutuante nem usa o arredondamento padrão do navegador para três casas. Zeros finais podem ser retirados da leitura; todos os dígitos significativos recebidos são mantidos. Inteiros PHP fora da faixa exata de JavaScript são entregues como texto. Códigos em colunas textuais e valores de tipo não confirmado permanecem como recebidos.
+
+Campos Date sem horário ou à meia-noite reconhecida são apresentados por dia/mês/ano sem deslocamento de fuso; horários diferentes e formatos não reconhecidos permanecem originais. **Exibir valores originais** / **Ver valores formatados** alternam a apresentação da mesma amostra, sem nova consulta, gravação, cálculo ou alteração dos formatos cadastrados. Os limites anteriores de até 20 linhas e de proteção de campos continuam vigentes. A área de dados recebe foco de teclado para sua rolagem.
+
+O Chrome conferiu os seis registros fictícios da tabela de homologação no tenant teste_, incluindo nomes, datas, valores formatados e originais. Em 390 × 844, os controles permaneceram dentro da janela, e a tabela manteve a própria rolagem horizontal; a seta do teclado moveu a área com foco. O viewport original foi restaurado e a página recuperou a rolagem ao fechar a janela. Não houve edição nativa, carga, publicação ou inferência. A ajuda e o passo estável do catálogo foram revistos na versão `2026-11-03.5`, sem reiniciar tours já vistos.
+
+A regressão PHP local passou com **1.600 testes / 12.343 asserções**, com três casos próprios de PostgreSQL omitidos em SQLite. A regressão de frontend passou com **321 testes**; a bateria focada foi repetida para o formato real de data e o foco da tabela. Pint, TypeScript e build local passaram. O CI da revisão correspondente deve ser conferido antes do upload.

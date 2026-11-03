@@ -13,7 +13,7 @@ async function componentUrl(name,bindings={}){
  return 'data:text/javascript;base64,'+Buffer.from(code).toString('base64');
 }
 const messageUrl=await componentUrl('BiExecutionMessage',{'../lib/execution-message':new URL('../../resources/js/lib/execution-message.ts',import.meta.url).href});
-const Inspector=(await import(await componentUrl('ResourceInspector',{'./BiExecutionMessage.vue':messageUrl}))).default;
+const Inspector=(await import(await componentUrl('ResourceInspector',{'./BiExecutionMessage.vue':messageUrl,'../lib/sample-values':new URL('../../resources/js/lib/sample-values.ts',import.meta.url).href}))).default;
 function node(kind,text=''){return {kind,text,props:{},children:[],parent:null};}
 const renderer=createRenderer({
  createElement:kind=>node(kind),createText:text=>node('text',text),createComment:text=>node('comment',text),
@@ -70,4 +70,29 @@ test('technical load failures show a readable summary and collapsed details whil
 test('agent occurrences use the same readable message and remain scoped to the authorized resource endpoint',async()=>{
  const requests=[];const view=mount(async(...args)=>{requests.push(args);return {events:[{name:'Ocorrência sintética',state:'ERROR',expected_at:null,started_at:null,recovered_at:null,message:'Traceback (most recent call last):\n    synthetic reader failed'}]};},'agent');
  try{await view.events();await nextTick();assert.equal(requests.length,1);assert.equal(requests[0][0],'/catalog/923/resources/agent/90/inspect/events');assert.match(text(view.root),/O BI informou uma falha nesta execução/);const details=find(view.root,item=>item.kind==='details');assert.ok(details);assert.equal(details.props.open,undefined);assert.match(text(details),/synthetic reader failed/);}finally{view.close();}
+});
+
+
+test('the readable sample preserves decimal precision and can switch to original values without another request',async()=>{
+ let calls=0;const view=mount(async()=>{calls++;return {table:{columns:['VALOR','DATA','CODIGO'],column_labels:{VALOR:'Valor'},column_types:{VALOR:'Number',DATA:'Date',CODIGO:'String'},rows:[{VALOR:'1234.123456789',DATA:'2026-11-03T00:00:00.000Z',CODIGO:'001234'}]}};});
+ try{
+  await view.inspect();await nextTick();
+  assert.match(text(view.root),/1\.234,123456789/);assert.match(text(view.root),/03\/11\/2026/);assert.match(text(view.root),/001234/);
+  const sample=find(view.root,item=>item.props.role==='region'&&item.props['aria-label']==='Dados da amostra');assert.equal(sample.props.tabindex,'0');
+  const value=find(view.root,item=>item.kind==='td'&&item.props.title==='1234.123456789');assert.ok(value);
+  const toggle=find(view.root,item=>item.kind==='button'&&text(item)==='Exibir valores originais');assert.equal(toggle.props['aria-pressed'],false);
+  toggle.props.onClick();await nextTick();
+  assert.match(text(view.root),/1234\.123456789/);assert.match(text(view.root),/2026-11-03T00:00:00\.000Z/);assert.equal(toggle.props['aria-pressed'],true);
+  toggle.props.onClick();await nextTick();assert.match(text(view.root),/1\.234,123456789/);assert.equal(calls,1);
+ }finally{view.close();}
+});
+
+test('unknown metadata leaves numeric-looking strings untouched and does not offer a misleading format toggle',async()=>{
+ const view=mount(async()=>({table:{columns:['CODIGO','VALOR'],rows:[{CODIGO:'001234',VALOR:'1234.000000000'}]}}));
+ try{await view.inspect();await nextTick();assert.match(text(view.root),/1234\.000000000/);assert.match(text(view.root),/001234/);assert.equal(find(view.root,item=>item.kind==='button'&&text(item)==='Exibir valores originais'),undefined);}finally{view.close();}
+});
+
+test('a sample column named like an inherited object property is rendered as data',async()=>{
+ const view=mount(async()=>({table:{columns:['constructor'],column_labels:{},column_types:{},rows:[{constructor:'1234.000000000'}]}}));
+ try{await view.inspect();await nextTick();assert.match(text(view.root),/constructor/);assert.match(text(view.root),/1234\.000000000/);assert.doesNotMatch(text(view.root),/function Object/);}finally{view.close();}
 });

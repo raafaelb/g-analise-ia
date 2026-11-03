@@ -52,9 +52,9 @@ class BiInspectorTest extends TestCase
             }
             if ($args[0] === 'pull') {
                 if ($metadata !== []) {
-                    $folder = app(WorkspaceFiles::class)->path($project).'/writebacks';
+                    $folder = app(WorkspaceFiles::class)->path($project).'/'.($kind === 'table' ? 'tables' : 'writebacks');
                     File::ensureDirectoryExists($folder, 0700, true);
-                    File::put($folder.'/cadastro--10.yaml', Yaml::dump(['kind' => 'writeback', 'id' => 10, 'tenantId' => $responseTenant, 'lumo' => 'v2'])."---\n".Yaml::dump($metadata, 15));
+                    File::put($folder.'/cadastro--10.yaml', Yaml::dump(['kind' => $kind, 'id' => 10, 'tenantId' => $responseTenant, 'lumo' => 'v2'])."---\n".Yaml::dump($metadata, 15));
                 }
 
                 return ['data' => []];
@@ -76,6 +76,31 @@ class BiInspectorTest extends TestCase
         $response = $this->actingAs($user)->getJson('/api/catalog/321/resources/table/10/inspect/data')->assertOk()->assertJsonCount(20, 'table.rows')->assertJsonPath('table.limit', 20)->assertJsonPath('table.rows.0.VALOR', 50)->assertJsonPath('table.rows.0.password', '[protegido]')->assertJsonMissingPath('sql');
         $this->assertStringNotContainsString('private-secret', $response->getContent());
         $this->assertStringNotContainsString('private-sql', $response->getContent());
+    }
+
+    public function test_table_sample_matches_current_column_metadata_and_preserves_large_integer_precision(): void
+    {
+        $user = $this->connect(['rows' => [['ID' => 9007199254740993, 'VALOR' => '1234567890.123456789', 'DATA' => '2026-11-03T00:00:00.000Z', 'CODIGO' => '001234']]], 'table', 'preview', 321, ['columns' => ['ID (Number)' => ['label' => 'Identificador'], 'VALOR (Number)' => ['label' => 'Valor da operação'], 'DATA (Date)' => ['label' => 'Competência'], 'CODIGO (String)' => ['label' => 'Código'], 'OUTRO (Number)' => ['label' => 'Não consta na amostra']]]);
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/table/10/inspect/data')->assertOk()
+            ->assertJsonPath('table.rows.0.ID', '9007199254740993')
+            ->assertJsonPath('table.rows.0.VALOR', '1234567890.123456789')
+            ->assertJsonPath('table.rows.0.DATA', '2026-11-03T00:00:00.000Z')
+            ->assertJsonPath('table.rows.0.CODIGO', '001234')
+            ->assertJsonPath('table.column_labels.VALOR', 'Valor da operação')
+            ->assertJsonPath('table.column_types', ['ID' => 'Number', 'VALOR' => 'Number', 'DATA' => 'Date', 'CODIGO' => 'String'])
+            ->assertJsonMissingPath('table.column_labels.OUTRO');
+    }
+
+    public function test_table_sample_does_not_guess_types_or_labels_without_confirmed_metadata(): void
+    {
+        $user = $this->connect(['rows' => [['CODIGO' => '001234', 'DATA' => '2026-11-03']]], 'table', 'preview');
+
+        $this->actingAs($user)->getJson('/api/catalog/321/resources/table/10/inspect/data')->assertOk()
+            ->assertJsonPath('table.column_types', [])
+            ->assertJsonPath('table.column_labels', [])
+            ->assertJsonPath('table.rows.0.CODIGO', '001234')
+            ->assertJsonPath('table.rows.0.DATA', '2026-11-03');
     }
 
     public function test_flow_status_requires_finished_execution_to_confirm_success(): void

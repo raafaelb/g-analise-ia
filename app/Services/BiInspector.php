@@ -32,7 +32,7 @@ class BiInspector
         $report = ['resource' => $detail['resource']['ref'], 'action' => $action, 'checked_at' => now()->toIso8601String()];
 
         return [...$report, ...match ($kind.':'.$action) {
-            'table:data' => $this->table($result),
+            'table:data' => $this->table($result, $detail),
             'writeback:data' => $this->writeback($result, $detail),
             'writeback:history' => $this->imports($result),
             'flow:status' => ['history' => [$this->execution($result)]],
@@ -43,7 +43,7 @@ class BiInspector
         }];
     }
 
-    private function table(array $data): array
+    private function table(array $data, array $detail): array
     {
         abort_unless(is_array($data['rows'] ?? null) && array_is_list($data['rows']), 422, 'A amostra de dados não retornou linhas em formato reconhecido.');
         $rows = [];
@@ -56,28 +56,39 @@ class BiInspector
             foreach (array_slice($this->catalog->redact($row), 0, 50, true) as $key => $value) {
                 $name = mb_substr((string) $key, 0, 150);
                 $columns[$name] = true;
+                if (is_int($value) && ($value > 9007199254740991 || $value < -9007199254740991)) {
+                    $value = (string) $value;
+                }
                 $safe[$name] = is_scalar($value) || $value === null ? (is_string($value) ? mb_substr($value, 0, 2000) : $value) : '[valor composto]';
             }
             $rows[] = $safe;
         }
 
-        return ['table' => ['columns' => array_keys($columns), 'rows' => $rows, 'limit' => 20], 'message' => 'Amostra de até 20 linhas; não representa a contagem total da tabela.'];
+        $labels = [];
+        $types = [];
+        if (($detail['metadata_complete'] ?? false) === true) {
+            $fields = $detail['overview']['columns'] ?? [];
+            foreach (is_array($fields) ? $fields : [] as $field) {
+                $name = is_array($field) ? ($field['name'] ?? null) : null;
+                if (! is_string($name) || ! isset($columns[$name])) {
+                    continue;
+                }
+                if (is_string($field['label'] ?? null) && trim($field['label']) !== '') {
+                    $labels[$name] = mb_substr($field['label'], 0, 150);
+                }
+                if (is_string($field['type'] ?? null)) {
+                    $types[$name] = mb_substr($field['type'], 0, 100);
+                }
+            }
+        }
+
+        return ['table' => ['columns' => array_keys($columns), 'column_labels' => $labels, 'column_types' => $types, 'rows' => $rows, 'limit' => 20], 'message' => 'Amostra de até 20 linhas; não representa a contagem total da tabela.'];
     }
 
     private function writeback(array $data, array $detail): array
     {
         abort_if(($data['success'] ?? null) === false || ! empty($data['error']) || ! empty($data['errors']), 422, 'O BI informou uma falha ao consultar os registros do cadastro. A amostra não foi confirmada.');
-        $report = $this->table($data);
-        $labels = [];
-        if (($detail['metadata_complete'] ?? false) === true) {
-            $fields = $detail['details']['fields'] ?? [];
-            foreach (is_array($fields) ? $fields : [] as $field) {
-                if (is_array($field) && is_string($field['alias'] ?? null) && is_string($field['label'] ?? null)) {
-                    $labels[mb_substr($field['alias'], 0, 150)] = mb_substr($field['label'], 0, 150);
-                }
-            }
-        }
-        $report['table']['column_labels'] = $labels;
+        $report = $this->table($data, $detail);
         $report['message'] = 'Amostra de até 20 registros do BI. Alterações recentes no cadastro podem aguardar sincronização; a amostra não representa a contagem total.';
 
         return $report;

@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-03.4",
+  "version": "2026-11-03.5",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -228,7 +228,7 @@
         {
           "id": "catalog-search",
           "title": "Localize e confira",
-          "description": "Use a busca e os filtros e abra um recurso para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso ou um módulo estiver indisponível no ambiente. São condições diferentes. Mensagens extensas ficam em Ver detalhes técnicos, sem mudar o resultado informado pelo BI. Detalhes sem confirmação ficam desconhecidos, mesmo que já tenham sido consultados antes. Em Conferir dados, os valores seguem os filtros e o acesso às tabelas. Ver a aplicação não garante acesso às suas tabelas; zeros ou informações incompletas exigem conferir esses acessos.",
+          "description": "Use a busca e os filtros e abra um recurso para conferir vínculos e ações. Em Fontes / ETL, consulte Última execução ou Histórico de cargas: informações das etapas podem vir da origem de uma cópia. Contadores de processamento não comprovam o total da tabela. Confira o motivo quando faltar acesso ou um módulo estiver indisponível no ambiente. São condições diferentes. Mensagens extensas ficam em Ver detalhes técnicos, sem mudar o resultado informado pelo BI. Detalhes sem confirmação ficam desconhecidos, mesmo que já tenham sido consultados antes. Em Conferir dados, os valores seguem os filtros e o acesso às tabelas. Ver a aplicação não garante acesso às suas tabelas; zeros ou informações incompletas exigem conferir esses acessos. Em Tabelas, Amostra dos dados mostra os nomes disponíveis e facilita a leitura de números e datas. Exibir valores originais permite conferir o formato da amostra sem repetir a consulta.",
           "anchor": "catalog-search",
           "audience": "all"
         },
@@ -743,7 +743,7 @@
       "id": "table-presentation",
       "title": "Como altero os nomes e formatos de uma tabela?",
       "summary": "Organize a apresentação sem alterar a estrutura física ou os dados.",
-      "body": "No **Catálogo BI**, escolha **Tabelas**, abra o recurso e use **Organizar nomes e formatos**. Edite os nomes, descrições e os formatos numéricos disponíveis. A busca, a paginação e o filtro de campos alterados ajudam em tabelas maiores.\n\nUse **Conferir alterações**, compare Atual e Proposto e autorize ou recuse. O portal lê o resultado de volta antes de confirmar. Se outra alteração ocorrer durante a revisão, reabra a configuração atual.\n\nEsses campos definem padrões de apresentação da tabela; cada dashboard pode ter suas próprias escolhas. Este formulário não altera nomes físicos, tipos de coluna, linhas, chaves ou o ETL. Alguns formatos da origem são preservados e não possuem edição aqui.",
+      "body": "No **Catálogo BI**, escolha **Tabelas**, abra o recurso e use **Organizar nomes e formatos**. Edite os nomes, descrições e os formatos numéricos disponíveis. A busca, a paginação e o filtro de campos alterados ajudam em tabelas maiores.\n\nUse **Conferir alterações**, compare Atual e Proposto e autorize ou recuse. O portal lê o resultado de volta antes de confirmar. Se outra alteração ocorrer durante a revisão, reabra a configuração atual.\n\nEsses campos definem padrões de apresentação da tabela; cada dashboard pode ter suas próprias escolhas. Este formulário não altera nomes físicos, tipos de coluna, linhas, chaves ou o ETL. Alguns formatos da origem são preservados e não possuem edição aqui.\n\nPara apenas conferir as linhas, use **Amostra dos dados**. A alternância entre valores formatados e originais nessa amostra facilita a leitura e não modifica os padrões de apresentação cadastrados.",
       "pages": [
         "catalog"
       ],
@@ -1029,7 +1029,7 @@
       "id": "writeback-data",
       "title": "Como consulto registros de Cadastros e exporto a planilha?",
       "summary": "Confira uma amostra, consulte importações e solicite o XLSX com as permissões da sua conta BI.",
-      "body": "Abra **Catálogo BI → Cadastros** e selecione o cadastro. Cadastros são tabelas de informações preenchidas manualmente no BI, como metas, classificações ou observações. O cadastro das pessoas que entram no G-Analise IA fica em **Usuários e acessos**.\n\nEm **Registros e importações**, **Amostra dos registros** consulta até 20 registros. O BI pode precisar sincronizar alterações recentes antes de mostrá-las nessa consulta. Uma amostra vazia não confirma uma importação; confira o histórico e as mensagens retornadas.\n\n**Histórico de importações** mostra até 100 lotes retornados pelo BI. Na fila e Em execução ainda não são conclusão. Mesmo quando o lote aparece como Concluída no BI, confira as quantidades e a amostra; esse estado registra o término informado pelo provedor. Concluída com ocorrências exige conferência. Desfeita indica um lote revertido. Sem confirmação significa que o formato recebido não comprova o estado. Essa janela consulta o histórico; não importa arquivos nem desfaz lotes.\n\n**Exportar XLSX** solicita uma planilha com **todos os registros e colunas permitidos pela sua conta**, além das 20 linhas da amostra. A instalação limita o tamanho do arquivo; um resultado acima desse limite é recusado, sem truncar a planilha. Mantenha a janela aberta enquanto a planilha é preparada. Fechar ou trocar o recurso antes da entrega descarta o download tardio.\n\nUma negativa de download do BI é exibida na mesma janela. Confira as permissões do cadastro e do serviço de arquivos com o administrador do BI. A capacidade de registros de Cadastros pertence à configuração do BI; se uma importação informar falta de espaço, confira esse limite antes de tentar novamente. Consultar e exportar por esses botões não inicia uma tarefa de IA. A criação, importação e edição cotidiana de linhas ainda não têm formulário próprio nesta área.",
+      "body": "Abra **Catálogo BI → Cadastros** e selecione o cadastro. Cadastros são tabelas de informações preenchidas manualmente no BI, como metas, classificações ou observações. O cadastro das pessoas que entram no G-Analise IA fica em **Usuários e acessos**.\n\nEm **Registros e importações**, **Amostra dos registros** consulta até 20 registros. O BI pode precisar sincronizar alterações recentes antes de mostrá-las nessa consulta. Uma amostra vazia não confirma uma importação; confira o histórico e as mensagens retornadas.\n\n**Histórico de importações** mostra até 100 lotes retornados pelo BI. Na fila e Em execução ainda não são conclusão. Mesmo quando o lote aparece como Concluída no BI, confira as quantidades e a amostra; esse estado registra o término informado pelo provedor. Concluída com ocorrências exige conferência. Desfeita indica um lote revertido. Sem confirmação significa que o formato recebido não comprova o estado. Essa janela consulta o histórico; não importa arquivos nem desfaz lotes.\n\n**Exportar XLSX** solicita uma planilha com **todos os registros e colunas permitidos pela sua conta**, além das 20 linhas da amostra. A instalação limita o tamanho do arquivo; um resultado acima desse limite é recusado, sem truncar a planilha. Mantenha a janela aberta enquanto a planilha é preparada. Fechar ou trocar o recurso antes da entrega descarta o download tardio.\n\nUma negativa de download do BI é exibida na mesma janela. Confira as permissões do cadastro e do serviço de arquivos com o administrador do BI. A capacidade de registros de Cadastros pertence à configuração do BI; se uma importação informar falta de espaço, confira esse limite antes de tentar novamente. Consultar e exportar por esses botões não inicia uma tarefa de IA. A criação, importação e edição cotidiana de linhas ainda não têm formulário próprio nesta área.\n\nA amostra também facilita a leitura de números e datas quando os tipos dos campos estão confirmados. **Exibir valores originais** permite conferir a representação recebida sem repetir a consulta. A alternância não altera os registros nem o conteúdo exportado na planilha.",
       "pages": [
         "catalog"
       ],
@@ -1227,6 +1227,22 @@
         }
       ],
       "audience": "authors"
+    },
+    {
+      "id": "table-sample",
+      "title": "Como confiro os dados de uma tabela?",
+      "summary": "Consulte uma amostra, leia números e datas com clareza e confira os valores originais.",
+      "body": "No **Catálogo BI → Tabelas**, abra a tabela e selecione **Amostra dos dados**. A consulta traz até 20 linhas e os campos permitidos à sua conta. Ela não representa a contagem total da tabela. Uma amostra vazia também não confirma que uma carga concluiu.\n\nQuando os metadados atuais estão disponíveis, a amostra usa os nomes amigáveis das colunas e facilita a leitura dos números e das datas. Números decimais mantêm todos os dígitos significativos recebidos; zeros finais podem ser ocultados na apresentação. Códigos em texto conservam seus zeros iniciais. Campos do tipo Data, sem horário ou à meia-noite reconhecida, são mostrados com dia, mês e ano, sem deslocar o dia pelo fuso do navegador. Horários e formatos não reconhecidos conservam a representação recebida.\n\nUse **Exibir valores originais** para conferir o formato retornado na amostra e **Ver valores formatados** para voltar à leitura. Essa alternância não faz outra consulta ao BI nem altera dados, cálculos ou formatos cadastrados na tabela. Os formatos próprios de cada dashboard continuam independentes. O traço indica um valor ausente.\n\nSe os tipos das colunas não estiverem confirmados, textos que parecem números ou datas permanecem como vieram. Use **Atualizar consulta do recurso** para consultar novamente; isso não executa a carga da fonte.",
+      "pages": [
+        "catalog"
+      ],
+      "actions": [
+        {
+          "page": "catalog",
+          "label": "Abrir Catálogo BI"
+        }
+      ],
+      "audience": "all"
     }
   ]
 }
