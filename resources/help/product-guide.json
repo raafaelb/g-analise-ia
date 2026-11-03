@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-02.10",
+  "version": "2026-11-03.1",
   "welcome": {
     "title": "Bem-vindo ao G-Analise IA",
     "description": "Seu espaço para transformar perguntas em dashboards e manter seus dados em dia.",
@@ -315,7 +315,7 @@
         {
           "id": "connections-chatgpt",
           "title": "Conecte sua inteligência",
-          "description": "Autorize sua própria conta ChatGPT na página oficial. A inferência acontece nos servidores da OpenAI e compartilha os limites do seu plano.",
+          "description": "Quando habilitado para esta instalação, autorize sua própria conta ChatGPT na página oficial. A inferência ocorre na OpenAI e usa os limites do seu plano. Se a conexão estiver indisponível, confira a pendência indicada no cartão.",
           "anchor": "connections-chatgpt",
           "audience": "all"
         },
@@ -589,7 +589,7 @@
       "id": "portal-connections",
       "title": "Como conecto minhas contas?",
       "summary": "O login no portal, o ChatGPT e o acesso ao BI são conexões diferentes.",
-      "body": "Em **Conexões**, autorize sua conta ChatGPT na página oficial e conecte o usuário do G-Analise BI. Se a conta BI tiver autenticação adicional, informe o código no formulário do navegador. Não envie senhas pelo chat.\n\nO login pela **Suíte** ou por senha local permite entrar no portal. Ele não substitui a conexão ChatGPT nem cria permissões extras no BI. A conta BI precisa ter autorização de uso do Lumo CLI. Se essa permissão faltar, procure o responsável pelo ambiente.\n\nA configuração de ChatGPT depende do modo habilitado pelo administrador. O fluxo local foi homologado; hospedagem central depende da configuração oficial adequada. Se a opção estiver indisponível, a mensagem da página explica a pendência.",
+      "body": "Em **Conexões**, conecte seu usuário do G-Analise BI e, quando habilitado nesta instalação, autorize sua conta ChatGPT na página oficial. Se a conta BI tiver autenticação adicional, informe o código no formulário do navegador. Não envie senhas pelo chat.\n\nO login pela **Suíte** ou por senha local permite entrar no portal. Ele não substitui a conexão ChatGPT nem cria permissões extras no BI. A conta BI precisa ter autorização de uso do Lumo CLI. Se essa permissão faltar, procure o responsável pelo ambiente.\n\nA configuração de ChatGPT depende do modo habilitado pelo administrador. O fluxo local foi homologado; hospedagem central depende da configuração oficial adequada. Se a opção estiver indisponível, a mensagem da página explica a pendência.\n\nCada pessoa deve usar seu próprio acesso ao portal e conectar suas próprias contas. A implantação em outro servidor não copia automaticamente as conexões feitas no ambiente local. Quando o ChatGPT estiver indisponível, você ainda pode explorar o catálogo e usar as ações de BI oferecidas para seu perfil; operações dependentes de IA ou MCP precisam das respectivas conexões habilitadas.",
       "pages": [
         "connections",
         "home"
@@ -640,7 +640,7 @@
       "id": "reviews",
       "title": "Por que a IA está aguardando autorização?",
       "summary": "Algumas ações só continuam depois de você conferir a proposta na conversa.",
-      "body": "Uma solicitação de autorização indica que a IA preparou uma ação que precisa da sua decisão. No chat, procure o aviso destacado e use **Revisar agora**. Confira recurso, ambiente, valores e destino e escolha autorizar ou recusar na própria conversa.\n\nA autorização vale somente para a revisão apresentada. Se o recurso mudar, a revisão vencer ou o acesso for alterado, pode ser necessária outra conferência. Autorizar não significa que a execução terminou: aguarde a confirmação.\n\nSe o resultado for incerto, confira o estado atual antes de repetir. O histórico em **Atividade** ajuda nessa análise. Perguntar algo na ajuda não autoriza alterações no BI.",
+      "body": "Uma solicitação de autorização indica que a IA preparou uma ação que precisa da sua decisão. No chat, procure o aviso destacado e use **Revisar agora**. Confira recurso, ambiente, valores e destino e escolha autorizar ou recusar na própria conversa.\n\nA autorização vale somente para a revisão apresentada. Se o recurso mudar, a revisão vencer ou o acesso for alterado, pode ser necessária outra conferência. Autorizar não significa que a execução terminou: aguarde a confirmação.\n\nSe o resultado for incerto, confira o estado atual antes de repetir. O histórico em **Atividade** ajuda nessa análise. Perguntar algo na ajuda não autoriza alterações no BI.\n\nUma tarefa pode aguardar processamento depois da autorização. Acompanhe a conversa ou Atividade até a confirmação e evite reenviar o pedido para acelerar a execução. Se houver interrupção ou resultado incerto, confira o estado atual antes de decidir outra ação.",
       "pages": [
         "project",
         "activity"

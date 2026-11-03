@@ -26,7 +26,7 @@ class CheckOperations extends Command
             $key = 'operations:probe:'.bin2hex(random_bytes(8));
             Cache::put($key, 'ok', 10);
             $checks['cache'] = Cache::pull($key) === 'ok';
-            foreach (['scheduler' => 180, 'worker:agents' => 1200, 'worker:documents' => 180, 'worker:help' => 300] as $name => $seconds) {
+            foreach (['scheduler' => 180, 'worker:actions' => 1200, 'worker:agents' => 1200, 'worker:documents' => 180, 'worker:help' => 300] as $name => $seconds) {
                 $last = Cache::get('operations:'.$name);
                 $checks[$name] = is_numeric($last) && $last <= now()->timestamp && $last >= now()->timestamp - $seconds;
             }

@@ -1,5 +1,18 @@
 # Ensaio local descartável. PostgreSQL e Redis somente em memória; sem contas externas.
 name: g-analise-ia-https-test
+x-app: &app
+  image: g-analise-ia-app:homologacao
+  env_file: .env.homologacao
+  environment:
+    DB_HOST: postgres
+    DB_DATABASE: ganalise_ensaio_descartavel
+    DB_USERNAME: ensaio
+    DB_PASSWORD: ""
+    REDIS_HOST: redis
+  volumes: ["ephemeral-storage:/var/www/html/storage"]
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
 services:
   postgres:
     image: postgres:17-alpine
@@ -16,7 +29,12 @@ services:
     image: redis:7-alpine
     command: [redis-server, --save, "", --appendonly, "no"]
     tmpfs: [/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      retries: 20
   app:
+    <<: *app
     build: &build
       context: .
       target: production
@@ -27,19 +45,27 @@ services:
         VITE_REVERB_PORT: 8443
         VITE_REVERB_SCHEME: https
         VITE_REVERB_PATH: /ia-ganalise/ws
-    image: g-analise-ia-app:homologacao
-    env_file: .env.homologacao
-    environment:
-      DB_HOST: postgres
-      DB_DATABASE: ganalise_ensaio_descartavel
-      DB_USERNAME: ensaio
-      DB_PASSWORD: ""
-      REDIS_HOST: redis
-    depends_on:
-      postgres: {condition: service_healthy}
+  worker:
+    <<: *app
+    command: [php, artisan, 'queue:work', '--queue=agents', '--sleep=1', '--tries=1', '--timeout=960']
+    stop_grace_period: 990s
+  actions:
+    <<: *app
+    command: [php, artisan, 'queue:work', '--queue=actions,default', '--sleep=1', '--tries=1', '--timeout=960']
+    stop_grace_period: 990s
+  documents:
+    <<: *app
+    command: [php, artisan, 'queue:work', '--queue=documents', '--sleep=1', '--tries=1', '--timeout=90']
+    stop_grace_period: 100s
+  help:
+    <<: *app
+    command: [php, artisan, 'queue:work', '--queue=help', '--sleep=1', '--tries=1', '--timeout=180']
+    stop_grace_period: 190s
+  scheduler:
+    <<: *app
+    command: [php, artisan, 'schedule:work']
   reverb:
-    image: g-analise-ia-app:homologacao
-    env_file: .env.homologacao
+    <<: *app
     command: [php, artisan, reverb:start, --host=0.0.0.0, --port=8080]
   web:
     build:
@@ -56,3 +82,11 @@ services:
       - ./backups/homologacao-local/localhost.crt:/certs/localhost.crt:ro
       - ./backups/homologacao-local/localhost.key:/certs/localhost.key:ro
     depends_on: [web]
+
+volumes:
+  ephemeral-storage:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=512m,uid=1000,gid=1000,mode=0750

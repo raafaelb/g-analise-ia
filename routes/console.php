@@ -87,6 +87,7 @@ Schedule::call(function () {
 
 Schedule::call(function () {
     Cache::put('operations:scheduler', now()->timestamp, 300);
+    OperationsHeartbeat::dispatch('actions');
     OperationsHeartbeat::dispatch('agents');
     OperationsHeartbeat::dispatch('documents');
     OperationsHeartbeat::dispatch('help');

@@ -16,15 +16,24 @@ valid=cert.exists() and key.exists() and subprocess.run(['openssl','x509','-in',
 if not valid:
     subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(key),'-out',str(cert),'-days','7','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost,IP:127.0.0.1'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     key.chmod(0o600)
-(target/'tls-nginx.conf').write_text("""server {
+(target/'tls-nginx.conf').write_text("""resolver 127.0.0.11 valid=5s ipv6=off;
+resolver_timeout 2s;
+upstream ganalise_test_web {
+zone ganalise_test_web 64k;
+server web:8080 resolve;
+}
+server {
 listen 8443 ssl;
 server_name localhost;
 ssl_certificate /certs/localhost.crt;
 ssl_certificate_key /certs/localhost.key;
 location = /ia-ganalise { return 308 /ia-ganalise/; }
 location /ia-ganalise/ {
-proxy_pass http://web:8080/;
+proxy_pass http://ganalise_test_web/;
 proxy_set_header Host $http_host;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Port $server_port;
 proxy_http_version 1.1;
 proxy_set_header Upgrade $http_upgrade;
 proxy_set_header Connection \"upgrade\";

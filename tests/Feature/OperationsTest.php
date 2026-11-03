@@ -26,7 +26,12 @@ class OperationsTest extends TestCase
         (new OperationsHeartbeat('documents'))->handle();
         $this->artisan('ganalise:health')->assertFailed();
         (new OperationsHeartbeat('help'))->handle();
+        $this->artisan('ganalise:health')->assertFailed();
+        (new OperationsHeartbeat('actions'))->handle();
         $this->artisan('ganalise:health')->assertSuccessful();
+        Cache::put('operations:worker:actions', now()->subMinutes(21)->timestamp, 300);
+        $this->artisan('ganalise:health')->assertFailed();
+        (new OperationsHeartbeat('actions'))->handle();
         Cache::put('operations:worker:help', now()->subMinutes(6)->timestamp, 300);
         $this->artisan('ganalise:health')->assertFailed();
         (new OperationsHeartbeat('help'))->handle();

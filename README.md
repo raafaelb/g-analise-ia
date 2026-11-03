@@ -19,19 +19,25 @@ Produto gratuito e aberto da Inovadora, complementar ao G-Analise BI. PHP 8.5/La
 - Painel de plano/limites informa somente o que o provedor disponibiliza; o fluxo OSS testado não retornou saldo. A interface oferece acesso ao uso no ChatGPT.
 - Revisão humana dentro da conversa, com cartão destacado, aviso fixo, proposta e botões Autorizar/Recusar. No fluxo assíncrono, o worker é liberado enquanto aguarda decisão; a ação aprovada executa uma vez e a IA retoma com o resultado confirmado. Publicação depende da revisão concreta e das fontes verificadas.
 - Boas-vindas e tours guiados por usuário/página, com repetição manual, guias pesquisáveis e atendimento sobre o próprio produto usando o plano ChatGPT. Histórico pessoal e fila própria, sem executar ações BI na ajuda.
-- Anexos privados: texto/CSV/JSON/YAML/Markdown, XLSX, PDF com texto e PNG/JPEG. Limites explícitos; PDFs digitalizados ainda exigem OCR ou envio de imagem.
+- Anexos privados: texto/CSV/JSON/YAML/Markdown, XLSX, PDF com texto e PNG/JPEG. Limites explícitos; PDFs digitalizados podem ter até três páginas convertidas em imagens localmente, com limite e confirmação antes do envio visual; uma resposta real conferiu valores e um código presentes apenas nessas páginas fictícias.
 - Editor de agendas no catálogo: fontes por nome, agente, ordem, seis tipos de gatilho, avisos, revisão e confirmação de gravação. Criação e edição inativas homologadas; salvar não solicita carga de teste.
 - Cobertura das fontes, preservação de agendas mais frequentes e identificação de carga concluída. A ativação de uma segunda agenda para uma fonte já agendada é bloqueada no servidor. A solicitação/enfileiramento não é sucesso. Nova publicação de aplicação gerenciada é bloqueada enquanto faltar a verificação das cargas.
 - Imagens imutáveis PHP-FPM/Nginx, caminho `/ia-ganalise`, HTTPS/WebSocket testados localmente, backup criptografado com restauração isolada, retenção e monitoramento por heartbeat.
 
 **O servidor central ainda depende da configuração/elegibilidade oficial da OpenAI para aplicações hospedadas remotamente.** O modo OSS local não é habilitado no servidor central. Não foi feita implantação pública. Consulte [entregas e pendências](docs/entrega-local.md), [autenticação](docs/autenticacao-chatgpt.md), [homologação](docs/homologacao.md), [arquitetura](docs/arquitetura.md) e [operação](docs/operacao.md).
 
+## Piloto interno — 03/11/2026
+
+A preparação prioriza instalação, autenticação, gestão BI, revisões e uso por aproximadamente dez pessoas, sem teto fixo de usuários. Ações BI, IA, documentos e ajuda têm workers separados. A imagem prepara seus diretórios privados ao iniciar; configuração nova, conferência de chaves/URLs/cookies e pacote de código versionado possuem comandos próprios em [operação](docs/operacao.md). Não transfira a pasta de execução do desenvolvedor para o servidor.
+
+O ensaio HTTPS descartável verificou dez sessões simultâneas com perfis de autoria/consulta e isolamento de projetos/conversas. Isso não homologa APIs BI ou inferência simultânea, nem a capacidade do servidor escolhido. O candidato central mantém integrações que exigem configuração/homologação desabilitadas; a IA local não habilita automaticamente uso remoto.
+
 ## Instalação local
 
 Requisitos: Docker Engine/Compose v2, Linux x86_64 e acesso às dependências oficiais. Não precisa de PHP ou Node no host. Ajuste `LOCAL_UID/LOCAL_GID` antes de instalar, se necessário.
 
 ```sh
-git clone https://github.com/raafaelb/g-analise-ia.git
+git clone --branch feature/gestao-completa --single-branch https://github.com/raafaelb/g-analise-ia.git
 cd g-analise-ia
 ./scripts/setup.sh
 docker compose exec app php artisan horus:user seu@email.com --name="Seu nome" --role=owner
@@ -43,7 +49,7 @@ O modo de demonstração `LOCAL_PREVIEW=true` abre uma conta de exemplo somente 
 
 ```sh
 docker compose ps
-docker compose up -d app worker help documents scheduler reverb postgres redis
+docker compose up -d app worker actions help documents scheduler reverb postgres redis
 docker compose stop
 ```
 
@@ -74,7 +80,7 @@ docker compose exec app php scripts/codex-smoke.php
 docker compose exec app php artisan ganalise:health
 ```
 
-A rodada local de 31/10/2026 passou com 775 testes PHP (4.056 asserções), tanto em SQLite em memória quanto em PostgreSQL 17 descartável, e 76 testes de frontend. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
+A rodada local de 03/11/2026 passou com 1.593 testes PHP / 12.291 asserções em SQLite em memória (mais três casos exclusivos de PostgreSQL omitidos), 1.596 testes / 12.339 asserções em PostgreSQL 17 descartável, 297 testes de frontend e 12 testes operacionais Python. As suítes usam fakes HTTP e dados sintéticos, sem alterar o banco da instalação nem chamar contas reais. O smoke verifica o protocolo instalado sem inferência. `build:local` evita que `.env.production` altere os caminhos do frontend de desenvolvimento. A imagem de produção usa `npm run build`, com configuração de assets no build.
 
 Codex está fixado em 0.165.0 e Lumo em 3.44.0. O build confere o checksum publicado pelo fornecedor, um SHA-256 fixado no código e a versão do Lumo; se o canal oficial mudar a versão, atualize a pinagem após homologar, em vez de aceitar uma versão diferente silenciosamente.
 

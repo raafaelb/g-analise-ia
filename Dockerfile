@@ -48,15 +48,18 @@ ARG VITE_REVERB_PATH=/ws
 RUN npm run build
 
 FROM runtime AS production
+COPY --chmod=0755 docker/start.sh /usr/local/bin/ganalise-start
 COPY --chown=1000:1000 . .
 COPY --from=dependencies --chown=1000:1000 /var/www/html/vendor ./vendor
 COPY --from=assets --chown=1000:1000 /src/public/build ./public/build
 RUN mkdir -p storage/app/private storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache && chown -R 1000:1000 storage bootstrap/cache && rm -f public/hot bootstrap/cache/*.php && php artisan package:discover --ansi
 USER 1000:1000
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/ganalise-start"]
 CMD ["php-fpm","-F"]
 
 FROM nginxinc/nginx-unprivileged:stable-alpine AS web
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=production /var/www/html/public /var/www/html/public
+RUN nginx -t
 
 FROM runtime AS development

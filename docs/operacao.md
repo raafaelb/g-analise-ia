@@ -1,21 +1,67 @@
 # Operação
 
+## Preparação do piloto interno — 03/11/2026
+
+O piloto foi priorizado para cerca de dez pessoas, sem limite fixo de usuários cadastrados. A capacidade simultânea depende do host e das operações. O pacote central inicia com ChatGPT, MCP e visualizador interativo desabilitados até as respectivas configurações e homologações; a integração ChatGPT local não deve ser transferida para um servidor compartilhado. Login local/Suíte e gestão BI não exigem habilitar inferência. Isso é um candidato a piloto interno, não uma declaração de disponibilidade de todas as entregas.
+
+Para preparar uma entrega, primeiro conclua os testes e o commit; então gere somente o código versionado:
+
+```sh
+python3 scripts/package-release.py --output /tmp/g-analise-ia-piloto.tar.gz
+```
+
+O script exige árvore Git limpa, recusa caminhos privados versionados, links e submódulos e cria `.sha256` e `.json` com o commit e o hash. Arquivos ignorados da instalação não são lidos nem copiados. O pacote não contém `.git`, dependências instaladas, conexões, banco ou credenciais de execução. A revisão de segredos do código continua necessária: a verificação de caminhos não é uma análise de todo o conteúdo dos arquivos. Transfira também o checksum, confira-o no destino e extraia a entrega em um diretório próprio. Não envie a pasta de trabalho inteira da máquina local.
+
+Na **primeira instalação**, com o código extraído e Python 3 disponível:
+
+```sh
+python3 scripts/prepare-production.py --url https://suite.inovadora.com.br/ia-ganalise --port 8089
+```
+
+Escolha uma porta livre e ajuste o proxy para a mesma porta. O gerador cria `.env.production` com permissão 0600 e segredos aleatórios distintos. Recusa substituir qualquer arquivo existente; uma atualização deve preservar a APP_KEY e os dados do ambiente. Ele não inicia serviços, migra bancos, faz login ou habilita a OpenAI. Guarde o arquivo em backup criptografado, fora do repositório.
+
+Depois do build e antes de iniciar a instalação, confira a configuração:
+
+```sh
+docker compose --env-file .env.production -f compose.production.yaml run --rm --no-deps app php artisan ganalise:preflight
+```
+
+`ganalise:preflight` retorna JSON e código 1 se houver inconsistências: produção/debug/demo, chave de criptografia, URL/asset/subdiretório, cookies, drivers compartilhados, reserva da fila, origens WebSocket, proxy e configurações de integrações habilitadas. Avisos distinguem funcionalidades desligadas de falhas da instalação. Nenhum segredo é exibido, e a conferência de configuração não chama IA, Suíte ou API BI. Resultado positivo não comprova certificado público, autorização do provedor, isolamento do processo, capacidade do host ou backup externo.
+
+Após migrar e iniciar todos os serviços, aguarde a próxima virada de minuto e confira também o runtime:
+
+```sh
+docker compose --env-file .env.production -f compose.production.yaml exec -T app php artisan ganalise:preflight --runtime
+```
+
+Essa opção confere migrações pendentes, leitura das conexões criptografadas com a APP_KEY atual, assets, permissões de diretórios, executáveis e a saúde dos serviços; não aplica migrações nem regrava credenciais. Se a chave não conseguir ler os registros existentes, recupere a configuração original ou o backup antes de liberar o acesso; não gere outra APP_KEY para tentar corrigir. Verifique os avisos e o endpoint HTTPS final antes de liberar os acessos.
+
+Colaboradores podem entrar pela Suíte, com perfil administrativo conforme o contrato de autenticação. Para criar o primeiro responsável local, se necessário, use o comando interativo abaixo; a senha é solicitada no terminal sem aparecer em argumentos e deve ser trocada no primeiro acesso:
+
+```sh
+docker compose --env-file .env.production -f compose.production.yaml exec app php artisan horus:user SEU_EMAIL --name="Responsável pelo piloto" --role=owner
+```
+
+Depois, cadastre os demais acessos pela página **Usuários**, sem compartilhar uma conta BI entre pessoas. A primeira instalação utiliza banco vazio: o pacote de código não migra as contas e conexões pessoais usadas na homologação local. Para transferência de dados existente, use o procedimento de backup/restauração e preserve a APP_KEY.
+
 ## Instalação central
 
 Use `.env.production.example` como modelo de `.env.production`. Defina APP_KEY, senha PostgreSQL, segredo e chave Reverb; preserve APP_KEY em cofre. Confira APP_URL/ASSET_URL, PUBLIC_HOST, PUBLIC_PATH e SESSION_PATH. Para o domínio previsto: HTTPS, `/ia-ganalise`, cookie seguro e `LOCAL_PREVIEW=false`.
 
-O endpoint interno padrão 8089 já é utilizado por outro projeto nesta máquina. Escolha uma porta disponível no servidor e ajuste `APP_PORT` e `docker/proxy-location.example.conf` juntos. O exemplo de proxy remove o prefixo antes de encaminhar ao Nginx da aplicação. Não habilite confiança genérica em todos os proxies.
+O endpoint interno padrão 8089 já é utilizado por outro projeto nesta máquina. Escolha uma porta disponível no servidor e ajuste `APP_PORT` e `docker/proxy-location.example.conf` juntos. O exemplo de proxy remove o prefixo antes de encaminhar ao Nginx da aplicação. Configure `TRUSTED_PROXIES` somente com os IPs/CIDRs que realmente encaminham ao Nginx interno. Um proxy no host Docker normalmente chega pelo gateway da rede desse projeto; confira o endereço no servidor escolhido. Vazio não confia em cabeçalhos encaminhados. Curingas, `REMOTE_ADDR` e redes `/0` são recusados pelo middleware. O proxy substitui os cabeçalhos de IP/protocolo/porta e o portal não confia em host ou prefixo encaminhado. Não habilite confiança genérica em todos os proxies.
+
+O entrypoint da imagem prepara os diretórios de armazenamento, views e logs com o próprio usuário do serviço e recusa um volume sem escrita. Ele não altera arquivos existentes, gera chaves, aplica migrações ou ajusta permissões com privilégios elevados. A verificação também funciona em um volume vazio após recriar os contêineres.
 
 Antes de migrar, confira o projeto Compose, os nomes físicos dos volumes e o banco de destino. O pacote de produção possui volumes persistentes. Uma atualização preserva os volumes e a APP_KEY.
 
 ```sh
 docker compose --env-file .env.production -f compose.production.yaml build
-docker compose --env-file .env.production -f compose.production.yaml up -d postgres redis
+docker compose --env-file .env.production -f compose.production.yaml up -d --wait postgres redis
 docker compose --env-file .env.production -f compose.production.yaml run --rm app php artisan migrate --force
 docker compose --env-file .env.production -f compose.production.yaml up -d
 ```
 
-Configure certificado válido no proxy HTTPS e o bloco de `docker/proxy-location.example.conf` dentro do server correspondente. A configuração da OpenAI para o servidor central permanece pendente; não habilite modo OSS local em produção.
+Configure certificado válido no proxy HTTPS e o bloco de `docker/proxy-location.example.conf` dentro do server correspondente. O Nginx interno renova os endereços de aplicação e Reverb pelo DNS do Docker, com resolução dinâmica e configuração conferida no build. A descoberta evita manter um IP antigo depois da recriação de um contêiner; não garante atualização sem interrupção. O recurso usa a versão suportada na imagem (Nginx 1.30.6 no ensaio), conforme a [documentação oficial de upstream](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#server). A configuração da OpenAI para o servidor central permanece pendente; não habilite modo OSS local em produção.
 
 ## Saúde e filas
 
@@ -24,15 +70,15 @@ docker compose exec -T app php artisan ganalise:health
 docker compose exec -T app php artisan ganalise:backup-state
 ```
 
-`ganalise:health` retorna JSON/exit code: banco, cache, scheduler, workers e disco. O primeiro heartbeat chega após a próxima virada de minuto. Scheduler/documentos: tolerância 3 minutos; worker de ajuda: 5 minutos, incluindo resposta de até 3 minutos; worker IA: 20 minutos, incluindo turno autorizado de até 15 minutos. A saída inclui tamanho das filas sem conteúdo das tarefas. Monitore exit code e crescimento das filas; `/up` verifica apenas o processo web.
+`ganalise:health` retorna JSON/exit code: banco, cache, scheduler, workers e disco. O primeiro heartbeat chega após a próxima virada de minuto. Scheduler/documentos: tolerância 3 minutos; worker de ajuda: 5 minutos, incluindo resposta de até 3 minutos; workers de IA e ações BI: 20 minutos, incluindo execução autorizada de até 15 minutos. A saída inclui tamanho das filas sem conteúdo das tarefas. Monitore exit code e crescimento das filas; `/up` verifica apenas o processo web.
 
 A migração `add_preview_revision_to_projects_table` acrescenta a revisão confirmada e sua data ao projeto. Aplique as migrações antes de iniciar os workers com o código atualizado. Registros anteriores continuam válidos com esses campos vazios; não é necessário exportar imagens ou recriar projetos.
 
-As migrações `create_user_guide_progress_table` e `create_help_questions_table` acrescentam o progresso individual e o histórico do atendimento. Aplique-as antes de iniciar a versão com ajuda. O serviço **help** consome somente a fila `help`, com timeout de 180 segundos e uma tentativa; deve iniciar junto de `worker`, `documents` e `scheduler`. A manutenção expira atendimentos interrompidos, sem reenviar perguntas à OpenAI. `ganalise:backup-state` inclui `active_help`; o backup aguarda não haver resposta ativa. A restauração isolada invalida perguntas pendentes.
+As migrações `create_user_guide_progress_table` e `create_help_questions_table` acrescentam o progresso individual e o histórico do atendimento. Aplique-as antes de iniciar a versão com ajuda. O serviço **actions** consome `actions,default`, **worker** consome `agents` e **documents** consome `documents`. Uma tarefa longa de IA não ocupa o processo de execução das ações manuais. O serviço **help** consome somente a fila `help`, com timeout de 180 segundos e uma tentativa; deve iniciar junto de `worker`, `actions`, `documents` e `scheduler`. A manutenção expira atendimentos interrompidos, sem reenviar perguntas à OpenAI. `ganalise:backup-state` inclui `active_help`; o backup aguarda não haver resposta ativa. A restauração isolada invalida perguntas pendentes.
 
 A migração `2026_11_01_191249_add_attachment_ids_to_agent_runs_table` acrescenta a seleção de arquivos por tarefa. Aplique-a antes de carregar o código atualizado no web e nas filas. Novos pedidos gravam a seleção no envio, incluindo uma lista vazia; retomadas preservam essa lista. Registros antigos com `null` capturam uma única vez os primeiros 12 anexos disponíveis quando forem utilizados, sem reconstruir uma seleção histórica. A atualização não apaga anexos nem elimina conteúdo já enviado ao contexto de uma conversa. Depois de migrar, recarregue os workers de forma graciosa e confira `ganalise:health`.
 
-Os workers têm `restart: unless-stopped`. Alterações no código exigem reiniciar os workers; a fila é preservada. Em produção, use a nova imagem em todos os serviços. Timeout da fila é maior que o turno; ações remotas não têm repetição automática após resultado incerto. Não monte Docker socket no worker.
+Os workers têm `restart: unless-stopped`. Os processos de IA e ações recebem até 990 segundos para encerrar de forma graciosa, acima do timeout de 960 segundos; não reduza esse prazo para matar uma execução durante atualização. O Compose não fixa nomes ou portas para esses workers e permite aumentar suas réplicas com `--scale worker=N --scale actions=N`, conforme capacidade e monitoramento das filas; o padrão inicial é uma réplica por serviço. Alterações no código exigem reiniciar os workers; a fila é preservada. Em produção, use a nova imagem em todos os serviços. Timeout da fila é maior que o turno; ações remotas não têm repetição automática após resultado incerto. Não monte Docker socket no worker.
 
 A leitura completa do catálogo confere o `status --filter clean` da versão homologada do Lumo, com tenant e caminhos relativos dos documentos sincronizados. Formato desconhecido ou identidade divergente impede confirmar detalhes; não substitua a resposta por arquivos antigos nem remova essa conferência para reduzir latência. Arquivos fora de escopo continuam preservados. Cobertura diária e dependências de exclusão usam a mesma leitura confirmada. Essa revisão não exige migração de banco; recarregue os workers após atualizar o código e confira a saúde.
 
@@ -95,18 +141,21 @@ Confirmar enquadramento OpenAI remoto, certificado público, proxy/cookies/WebSo
 
 ## Reproduzir o ensaio HTTPS local
 
-Requer Python 3 e OpenSSL no host. O Compose de homologação tem nome próprio, banco/cache em memória e integrações externas desabilitadas. A porta 8443 precisa estar disponível. Não compartilha volumes com o portal normal.
+Requer Python 3 e OpenSSL no host. O Compose de homologação tem nome próprio, banco/cache e armazenamento compartilhado entre serviços em memória e integrações externas desabilitadas. A porta 8443 precisa estar disponível. Não compartilha volumes com o portal normal.
 
 ```sh
 python3 scripts/prepare-https-test.py
 docker compose --env-file .env.homologacao -f compose.homologacao.yaml build app web
+docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d --wait postgres redis
+docker compose --env-file .env.homologacao -f compose.homologacao.yaml run --rm app php artisan migrate --force
 docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d
-docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php artisan migrate --force
 python3 scripts/test-https.py
-docker compose --env-file .env.homologacao -f compose.homologacao.yaml down
+python3 scripts/test-team-pilot.py --disposable
+docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php scripts/test-queues.php --disposable
+docker compose --env-file .env.homologacao -f compose.homologacao.yaml down --volumes
 ```
 
-O teste cria uma conta sintética somente após conferir o nome exclusivo do banco efêmero. Verifica certificado, assets, prefixo Inertia, CSRF/login, redirecionamento e sessão autenticada. A senha aleatória não é exibida. Não contorna avisos de certificado do navegador nem instala certificados no sistema. Encerrar o Compose descarta o banco/cache de ensaio.
+O teste cria uma conta sintética somente após conferir o nome exclusivo do banco efêmero. Verifica certificado, assets, prefixo Inertia, CSRF/login, redirecionamento e sessão autenticada. A senha aleatória não é exibida. Não contorna avisos de certificado do navegador nem instala certificados no sistema. O ensaio concorrente adicional usa dez contas fictícias, alternando autoria e consulta: valida login com CSRF, cookies HTTPS, propriedade de projetos/conversas, recusa entre identidades e os controles de criação de cada perfil. Mede latência somente das rotas locais do portal; não mede APIs BI, inferência ou capacidade de outro servidor. Remove suas próprias contas e arquivos fictícios ao terminar. Opcionalmente, `--pdf-fixture /CAMINHO/documento-digitalizado-ficticio.pdf` verifica upload multipart com CSRF, processamento de três páginas pelo worker, integridade do original e recusa de download por outra identidade, sem envio a modelos. O teste separado de filas executa uma espera sintética de oito segundos em `agents` e verifica se ações, documentos e ajuda concluem durante essa espera, incluindo a leitura de um arquivo privado pelo worker de documentos, sem chamadas externas. Só aceita o banco efêmero e integrações desligadas, usa chaves próprias com expiração e não limpa outras filas. Encerrar o Compose descarta o banco/cache de ensaio.
 
 
 ## Homologação da fonte e compilação local — 02/11/2026
