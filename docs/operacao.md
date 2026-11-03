@@ -10,7 +10,7 @@ Para preparar uma entrega, primeiro conclua os testes e o commit; então gere so
 python3 scripts/package-release.py --output /tmp/g-analise-ia-piloto.tar.gz
 ```
 
-O script exige árvore Git limpa, recusa caminhos privados versionados, links e submódulos e cria `.sha256` e `.json` com o commit e o hash. Arquivos ignorados da instalação não são lidos nem copiados. O pacote não contém `.git`, dependências instaladas, conexões, banco ou credenciais de execução. A revisão de segredos do código continua necessária: a verificação de caminhos não é uma análise de todo o conteúdo dos arquivos. Transfira também o checksum, confira-o no destino e extraia a entrega em um diretório próprio. Não envie a pasta de trabalho inteira da máquina local.
+O script exige árvore Git limpa, recusa caminhos privados versionados, dependências de runtime do Composer, links e submódulos; preserva os assets públicos licenciados usados pela interface e cria `.sha256` e `.json` com o commit e o hash. Arquivos ignorados da instalação não são lidos nem copiados. O pacote não contém `.git`, dependências instaladas, conexões, banco ou credenciais de execução. A revisão de segredos do código continua necessária: a verificação de caminhos não é uma análise de todo o conteúdo dos arquivos. Transfira também o checksum, confira-o no destino e extraia a entrega em um diretório próprio. Não envie a pasta de trabalho inteira da máquina local.
 
 Na **primeira instalação**, com o código extraído e Python 3 disponível:
 

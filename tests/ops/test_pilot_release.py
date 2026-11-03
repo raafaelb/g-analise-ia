@@ -107,6 +107,20 @@ class ReleasePackageTest(unittest.TestCase):
                 module("package-release").package(root, output)
             self.assertEqual(original, output.read_bytes())
 
+    def test_committed_public_vendor_assets_are_source_and_not_composer_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            root.mkdir()
+            git = self.repository(root)
+            (root / "public/vendor").mkdir(parents=True)
+            (root / "public/vendor/driverjs-LICENSE.txt").write_text("synthetic license")
+            git("add", "public/vendor/driverjs-LICENSE.txt")
+            git("commit", "--quiet", "-m", "public static source")
+            output = Path(directory) / "release.tar.gz"
+            module("package-release").package(root, output)
+            with tarfile.open(output) as archive:
+                self.assertEqual(b"synthetic license", archive.extractfile("g-analise-ia/public/vendor/driverjs-LICENSE.txt").read())
+
     def test_dirty_source_is_not_packaged(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "source"
@@ -119,7 +133,7 @@ class ReleasePackageTest(unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_tracked_private_files_and_links_are_rejected(self):
-        for filename in (".env.production", "storage/app/private/auth.json", ".runtime/github/token.json", "backups/dump.sql", "reports-private/check.json", "database/database.sqlite", "docker/tls.key"):
+        for filename in (".env.production", "storage/app/private/auth.json", ".runtime/github/token.json", "backups/dump.sql", "reports-private/check.json", "database/database.sqlite", "docker/tls.key", "vendor/composer/installed.php"):
             with self.subTest(filename=filename), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory) / "source"
                 root.mkdir()

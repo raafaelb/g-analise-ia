@@ -8,7 +8,7 @@ from pathlib import Path, PurePosixPath
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
-PRIVATE_FOLDERS = {".runtime", ".lumo", ".codex", "backups", "reports-private", "node_modules", "vendor"}
+PRIVATE_FOLDERS = {".runtime", ".lumo", ".codex", "backups", "reports-private", "node_modules"}
 ENV_EXAMPLES = {".env.example", ".env.production.example"}
 
 
@@ -37,7 +37,7 @@ def package(root, output):
         if mode not in (b"100644", b"100755") or kind != b"blob":
             raise ValueError("Link ou submódulo não permitido no pacote: " + path)
         if (
-            not parts or any(part in PRIVATE_FOLDERS for part in parts)
+            not parts or parts[0] == "vendor" or any(part in PRIVATE_FOLDERS for part in parts)
             or (any(part.startswith(".env") for part in parts) and path not in ENV_EXAMPLES)
             or (parts[0] == "storage" and parts[-1] != ".gitignore")
             or PurePosixPath(path).suffix.lower() in {".sqlite", ".sqlite3", ".db", ".pem", ".key", ".p12", ".pfx"}
