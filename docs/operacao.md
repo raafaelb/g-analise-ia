@@ -180,3 +180,10 @@ Após compilar a imagem, `python3 scripts/test-web-privacy.py --image horus-ia-w
 O ensaio HTTPS também envia um retorno de autenticação com código/estado fictícios, confere o redirecionamento no subdiretório e procura seus marcadores e a senha sintética nos logs de TLS, web e PHP-FPM. A preparação do certificado registra o UID/GID do operador para o contêiner TLS poder ler sua chave privada; não altera as chaves existentes. Esse ambiente e os testes de filas passam a ser executados no CI, separados da instalação principal.
 
 O armazenamento em memória do ensaio usa `volume.nocopy`: os processos preparam os diretórios pelo entrypoint, com o UID já configurado no tmpfs. Isso evita a cópia simultânea da mesma árvore de `storage` pelo Docker ao criar vários contêineres. A instalação de produção continua usando volume persistente e a inicialização por migração documentada antes de subir os consumidores.
+
+
+## Limites de upload
+
+A imagem PHP usa `upload_max_filesize=10M` e `post_max_size=11M`, alinhados ao limite de 10 MB por arquivo no portal e à margem multipart do Nginx. A memória PHP não foi ampliada. Recompile a imagem e recrie o serviço web para aplicar a configuração; uma troca apenas dos arquivos PHP não muda as diretivas já carregadas pelo processo. O frontend informa o excesso antes do envio e o backend mantém sua própria validação.
+
+O CI envia um texto inteiramente fictício com exatamente 10 MiB pelo HTTPS local, usando `scripts/test-team-pilot.py --disposable --text-fixture CAMINHO`. A preparação deve concluir com aviso de conteúdo limitado; o download do original precisa preservar o hash e ser recusado para outra identidade. O parâmetro alternativo `--pdf-fixture` continua disponível para conferir até três páginas visuais de um PDF digitalizado fictício. Esses ensaios não enviam anexos à IA.

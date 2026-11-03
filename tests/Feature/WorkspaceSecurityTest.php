@@ -15,9 +15,11 @@ use App\Services\Agent\CodexRuntime;
 use App\Services\BiBusy;
 use App\Services\RefreshCoverage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class WorkspaceSecurityTest extends TestCase
@@ -373,5 +375,22 @@ class WorkspaceSecurityTest extends TestCase
         $job->assertNotReleased();
         $this->assertSame('cancelled', $run->fresh()->status);
         $this->assertDatabaseCount('messages', 0);
+    }
+
+    public function test_an_oversized_attachment_has_a_clear_message_without_storage_or_processing(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        $user = User::factory()->create();
+        $project = $this->project($user);
+        $file = UploadedFile::fake()->create('relatorio.pdf', 10241, 'application/pdf');
+
+        $this->actingAs($user)->postJson('/api/projects/'.$project->id.'/files', ['file' => $file])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.file.0', 'O arquivo deve ter no máximo 10 MB.');
+
+        $this->assertDatabaseCount('artifacts', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+        Queue::assertNothingPushed();
     }
 }

@@ -88,12 +88,15 @@ def exercise(user, foreign, password, context):
 
 
 
-def attachment_rehearsal(results, users, fixture):
+def attachment_rehearsal(results, users, fixture, *, text=False):
     data = fixture.read_bytes()
-    if not data.startswith(b"%PDF-") or len(data) > 10 * 1024 * 1024:
-        raise ValueError("Use um PDF digitalizado fictício de até 10 MB para o ensaio.")
+    if not data or len(data) > 10 * 1024 * 1024 or (not text and not data.startswith(b"%PDF-")):
+        raise ValueError("Use somente um arquivo fictício válido de até 10 MB para o ensaio.")
+    if text:
+        data.decode("utf-8")
+    filename, mime = ("homologacao-limite.txt", "text/plain") if text else ("homologacao-digitalizado.pdf", "application/pdf")
     boundary = "ganalise-rehearsal-" + secrets.token_hex(16)
-    multipart = ("--" + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="homologacao-digitalizado.pdf"\r\nContent-Type: application/pdf\r\n\r\n').encode() + data + ("\r\n--" + boundary + "--\r\n").encode()
+    multipart = ("--" + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="' + filename + '"\r\nContent-Type: ' + mime + "\r\n\r\n").encode() + data + ("\r\n--" + boundary + "--\r\n").encode()
     editor, viewer = results[0], results[1]
     artifact = editor["request"]("/api/projects/" + users[0]["project_id"] + "/files", method="POST", token=editor["csrf"], multipart=(multipart, "multipart/form-data; boundary=" + boundary), expected=201)
     deadline = time.perf_counter() + 40
@@ -105,19 +108,27 @@ def attachment_rehearsal(results, users, fixture):
         if state.get("status") in ("ready", "failed", "empty"):
             break
         time.sleep(0.25)
-    assert current is not None and state.get("status") == "ready", "O worker não preparou o PDF digitalizado."
-    assert state.get("visual_pdf") is True
-    assert [page["page"] for page in state["visual_pages"]] == [1, 2, 3]
+    assert current is not None and state.get("status") == "ready", "O worker não preparou o anexo fictício."
+    if text:
+        assert state.get("characters", 0) > 0
+        if len(data) > 180000:
+            assert state.get("truncated") is True
+    else:
+        assert state.get("visual_pdf") is True
+        assert [page["page"] for page in state["visual_pages"]] == [1, 2, 3]
+    assert current.get("metadata", {}).get("size") == len(data)
     original = editor["request"]("/api/artifacts/" + artifact["id"] + "/download", raw=True)
     assert hashlib.sha256(original).digest() == hashlib.sha256(data).digest()
     viewer["request"]("/api/artifacts/" + artifact["id"] + "/download", expected=404)
-    return {"multipart_upload_with_csrf": True, "documents_worker_preparation": True, "visual_pages": [1, 2, 3], "original_sha256_preserved": True, "foreign_download_returns_404": True, "sent_to_model": False}
+    return {"multipart_upload_with_csrf": True, "documents_worker_preparation": True, "fixture_bytes": len(data), "kind": "text" if text else "visual_pdf", "visual_pages": [] if text else [1, 2, 3], "truncated": state.get("truncated"), "original_sha256_preserved": True, "foreign_download_returns_404": True, "sent_to_model": False}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--disposable", action="store_true", required=True)
-    parser.add_argument("--pdf-fixture", type=Path, help="PDF digitalizado fictício com pelo menos três páginas, enviado somente ao ensaio HTTPS local")
+    fixtures = parser.add_mutually_exclusive_group()
+    fixtures.add_argument("--pdf-fixture", type=Path, help="PDF digitalizado fictício com pelo menos três páginas, enviado somente ao ensaio HTTPS local")
+    fixtures.add_argument("--text-fixture", type=Path, help="Texto UTF-8 inteiramente fictício de até 10 MB, enviado somente ao ensaio HTTPS local")
     args = parser.parse_args()
     context = ssl.create_default_context(cafile=str(ROOT / "backups/homologacao-local/localhost.crt"))
     nonce = secrets.token_hex(8)
@@ -131,6 +142,8 @@ def main():
         report = {"ok": True, "concurrent_users": 10, "editors": 5, "viewers": 5, "http_operations": len(samples), "own_projects_verified": True, "foreign_conversations_return_404": True, "viewer_creation_return_403": True, "editor_project_creation_verified": True, "secure_scoped_sessions": True, "operation_latency_seconds": {"median": round(statistics.median(samples), 3), "p95": round(samples[int((len(samples)-1)*0.95)], 3), "max": round(samples[-1], 3)}, "scope": "local HTTPS and application ownership; no native BI calls or model inference"}
         if args.pdf_fixture is not None:
             report["attachment"] = attachment_rehearsal(results, users, args.pdf_fixture)
+        elif args.text_fixture is not None:
+            report["attachment"] = attachment_rehearsal(results, users, args.text_fixture, text=True)
     finally:
         cleanup = php(CLEANUP, {"nonce": nonce, "ids": [user["id"] for user in users]})
         if cleanup["removed"] != len(users):

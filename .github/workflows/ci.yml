@@ -51,6 +51,8 @@ jobs:
           docker compose --env-file .env.homologacao -f compose.homologacao.yaml up -d
           python3 scripts/test-https.py
           docker compose --env-file .env.homologacao -f compose.homologacao.yaml exec -T app php scripts/test-queues.php --disposable
+          python3 -c 'from pathlib import Path; import os; size=10*1024*1024; line=b"DADOS INTEIRAMENTE SINTETICOS PARA TESTE DE LIMITE.\n"; Path(os.environ["RUNNER_TEMP"], "ganalise-upload-10MiB.txt").write_bytes((line*((size//len(line))+1))[:size])'
+          python3 scripts/test-team-pilot.py --disposable --text-fixture "${RUNNER_TEMP}/ganalise-upload-10MiB.txt"
       - name: Encerrar somente o ensaio descartavel
         if: always()
         run: |

@@ -19,6 +19,7 @@ RUN apk add --no-cache curl tar && cd /tmp && curl -fsSLo LumoCLI-linux-amd64.ta
 
 FROM php:8.5-fpm-alpine AS runtime
 RUN apk add --no-cache libpq git curl libstdc++ libgcc tini poppler-utils libzip && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS postgresql-dev linux-headers libzip-dev && docker-php-ext-install pdo_pgsql pcntl zip && apk del .build-deps
+COPY docker/php.ini /usr/local/etc/php/conf.d/zz-ganalise.ini
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY --from=codex-tools /codex /usr/local/bin/codex
 COPY --from=codex-tools /codex-code-mode-host /usr/local/bin/codex-code-mode-host

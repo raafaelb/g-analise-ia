@@ -265,7 +265,7 @@ class WorkspaceController extends Controller
         $this->author($request);
         $project = $this->project($request, $id);
         abort_if($project->status === 'archived', 409, 'Este projeto está arquivado. Reabra-o antes de anexar arquivos.');
-        $request->validate(['file' => ['required', 'file', 'max:10240', 'mimes:csv,txt,pdf,xlsx,json,yaml,yml,md,png,jpg,jpeg']]);
+        $request->validate(['file' => ['required', 'file', 'max:10240', 'mimes:csv,txt,pdf,xlsx,json,yaml,yml,md,png,jpg,jpeg']], ['file.required' => 'Escolha um arquivo para anexar.', 'file.file' => 'Envie um arquivo válido.', 'file.max' => 'O arquivo deve ter no máximo 10 MB.', 'file.mimes' => 'Este formato não é aceito. Envie PDF, planilha XLSX, imagem ou um dos formatos de texto indicados.', 'file.uploaded' => 'O arquivo não pôde ser enviado. Verifique se ele tem até 10 MB e tente novamente.']);
         abort_if(Artifact::where('project_id', $project->id)->where('user_id', $request->user()->id)->where('kind', 'attachment')->count() >= 20, 422, 'Cada projeto aceita até 20 anexos.');
         $file = $request->file('file');
         $path = $file->store('uploads/'.$request->user()->id.'/'.$project->id, 'local');
