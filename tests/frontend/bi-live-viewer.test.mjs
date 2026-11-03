@@ -141,3 +141,52 @@ test('a transient zero-sized or hidden panel retains its frame and resumes witho
     assert.equal(frame.props.src,session.url);
     assert.equal(requests.length,1);
 });
+
+
+test('an expired preview waits for reconnection and preserves the selected device', async t => {
+    const startedAt = Date.parse('2026-11-03T12:00:00Z');
+    t.mock.timers.enable({apis: ['Date', 'setInterval', 'setTimeout'], now: startedAt});
+    const requests = [];
+    const view = await mountResponsiveViewer(t, async (...args) => {
+        requests.push(args);
+        return {...session, url: `https://bi.example.test/preview/${requests.length}`, session_expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString()};
+    });
+    await view.measure(833,714);
+    view.device.value = 'phone';
+    await nextTick();
+    const firstFrame = view.frame();
+    assert.ok(firstFrame);
+    firstFrame.props.onLoad();
+
+    t.mock.timers.tick(30 * 60 * 1000 - 1000);
+    await nextTick();
+    assert.equal(view.frame(), firstFrame);
+    t.mock.timers.tick(1000);
+    await nextTick();
+    assert.equal(view.frame(), undefined);
+    assert.equal(requests.length, 1);
+
+    view.device.value = 'tablet';
+    await nextTick();
+    await view.measure(640,680);
+    view.active.value = false;
+    await nextTick();
+    view.active.value = true;
+    await nextTick();
+    assert.equal(requests.length, 1);
+    assert.equal(view.frame(), undefined);
+    const textOf = item => item.text + item.children.map(textOf).join('');
+    const reconnect = findElement(view.root, item => item.kind === 'button' && textOf(item).trim() === 'Reconectar');
+    assert.ok(reconnect);
+    assert.equal(reconnect.props.disabled, false);
+
+    await reconnect.props.onClick();
+    await nextTick();
+    assert.equal(requests.length, 2);
+    assert.deepEqual(requests[1], requests[0]);
+    assert.ok(view.frame());
+    assert.notEqual(view.frame(), firstFrame);
+    assert.equal(view.frame().props.src, 'https://bi.example.test/preview/2');
+    assert.equal(view.frame().props.style.width, '768px');
+    assert.equal(view.frame().props.style.height, '1024px');
+});
