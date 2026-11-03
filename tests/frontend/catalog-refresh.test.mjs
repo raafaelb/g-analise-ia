@@ -60,7 +60,7 @@ const renderer=createRenderer({
  remove:item=>{if(item.parent){const index=item.parent.children.indexOf(item);if(index>=0)item.parent.children.splice(index,1);}item.parent=null;},parentNode:item=>item.parent,nextSibling:item=>item.parent?.children[item.parent.children.indexOf(item)+1]??null,
  insertStaticContent:(text,parent,anchor)=>{const item=node('static',text);const index=parent.children.indexOf(anchor);if(index<0)parent.children.push(item);else parent.children.splice(index,0,item);item.parent=parent;return[item,item];},
 });
-function mount({onRequest=null,role='admin',readOnly=false,realManual=false}={}){
+function mount({onRequest=null,beforeRequest=null,role='admin',readOnly=false,realManual=false}={}){
  const previous=Object.fromEntries(['window','document','localStorage','Document','ShadowRoot','HTMLElement'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  Object.defineProperty(globalThis,'window',{configurable:true,writable:true,value:{addEventListener(){},removeEventListener(){},matchMedia(){return{matches:true};}}});
  Object.defineProperty(globalThis,'document',{configurable:true,writable:true,value:{activeElement:null}});
@@ -71,14 +71,24 @@ function mount({onRequest=null,role='admin',readOnly=false,realManual=false}={})
  activeFixture=fixture;
  const requests=[],errors=[],root=node('root'),connected=ref(true);
  const request=async(...args)=>{
-  requests.push(args);const path=args[0];
+  requests.push(args);const path=args[0];if(beforeRequest)await beforeRequest(...args);
   if(realManual){
-   const approval={id:'00000000-0000-4000-8000-000000000001',status:'pending',expires_at:'2099-01-01T00:00:00Z',fingerprint:'synthetic-clone-version'};
+   const id='00000000-0000-4000-8000-000000000001';
    const project={id:'00000000-0000-4000-8000-000000000002'};
-   const cloning=/^\/catalog\/923\/(apps|flows)\/1\/actions$/.exec(path);
-   if(cloning){fixture.cloning=cloning[1]==='apps'?'app':'flow';return{approval,project};}
-   if(path==='/approvals/'+approval.id+'/decide')return{...approval,status:'approved'};
-   if(path==='/bi-actions/'+approval.id){const row=fixture.save(fixture.cloning,42);return{project,approval:{...approval,status:'completed',payload:{execution:{result:{managed_resource:row.ref,confirmed_name:row.name}}}}};}
+   const respond=result=>{const response=structuredClone(result);return onRequest?onRequest(path,response):response;};
+   const preparing=/^\/catalog\/923\/(apps|flows)\/1\/actions$/.exec(path);
+   if(preparing){fixture.cloning=preparing[1]==='apps'?'app':'flow';fixture.review={id,status:'pending',expires_at:'2099-01-01T00:00:00Z',fingerprint:'a'.repeat(64),payload:{action:{...args[2],resource:fixture.cloning+':1'}}};return respond({approval:fixture.review,project});}
+   if(path==='/approvals/'+id+'/decide'){if(fixture.review.status!=='pending')throw new Error('Esta solicitação já foi respondida.');fixture.review={...fixture.review,status:args[2].decision};return respond(fixture.review);}
+   if(path==='/bi-actions/'+id){
+    if(fixture.review.status==='approved'){
+     const action=fixture.review.payload.action.action;let result;
+     if(action==='delete_draft'){fixture.remove(fixture.cloning,1);result={deletion:{verified:true,resource:fixture.cloning+':1'}};}
+     else if(action==='publish_app'||action==='publish_flow'){const row=fixture.save(fixture.cloning,44);result={publication:{verified:true,resource:row.ref,name:row.name,destination:{name:'Mesa fictícia'}}};}
+     else{const row=fixture.save(fixture.cloning,42);result={managed_resource:row.ref,confirmed_name:row.name};}
+     fixture.review={...fixture.review,status:'completed',payload:{...fixture.review.payload,execution:{result}}};
+    }
+    return respond({project,approval:fixture.review});
+   }
   }
   const tenant=path.split('/')[2].split('?')[0];const type=/\/sections\/([a-z-]+)/.exec(path)?.[1];const match=/\/resources\/([a-z-]+)\/([0-9]+)/.exec(path);
   let result;
@@ -193,5 +203,90 @@ test('a post-clone catalog failure keeps the successful receipt and retries only
   assert.equal(view.requests.filter(args=>args[1]==='POST'&&args[0].endsWith('/actions')).length,1);
   assert.equal(view.requests.filter(args=>args[0].includes('/decide')).length,1);
   assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+
+
+async function prepareManualAction(view,action,kind='app'){
+ await choose(view,kind==='app'?'Aplicações':'Fontes / ETL');view.openFirst();await settled();
+ await view.button(action==='clone'?(kind==='app'?'Duplicar aplicação':'Duplicar ETL'):action==='publish'?'Publicar aplicação':'Excluir rascunho criado aqui').props.onClick();await settled();
+ if(action==='publish')find(view.root,item=>item.props['aria-label']==='Mesa de publicação').props['onUpdate:modelValue']('1');
+ await find(view.root,item=>item.kind==='form').props.onSubmit({preventDefault(){}});await settled();
+}
+function lostDecisionResponse(path,response){
+ if(path.endsWith('/decide'))throw new Error('A resposta da decisão se perdeu.');
+ if(path.includes('/resources/'))return{...response,management:{can_publish:true,can_delete_draft:true}};
+ return response;
+}
+for(const kind of ['app','flow'])test(`a lost ${kind} clone decision is recovered by reading its existing review without repeating the write`,async()=>{
+ const view=mount({realManual:true,onRequest:lostDecisionResponse});
+ try{
+  await settled();await prepareManualAction(view,'clone',kind);await view.button('Autorizar duplicação').props.onClick();await settled();
+  assert.match(text(modal(view)),/A resposta da decisão se perdeu/);assert.equal(text(document.activeElement),'Sua decisão precisa de conferência');assert.equal(Boolean(view.button('Autorizar duplicação')),false);assert.equal(Boolean(view.button('Recusar')),false);
+  await view.button('Conferir decisão').props.onClick();await settled();await settled();
+  assert.match(text(modal(view)),/Cópia criada na sua mesa/);assert.deepEqual(freshRequests(view),['/catalog/923/sections/'+kind+'?refresh=1']);
+  assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.equal(view.requests.filter(args=>args[1]==='POST'&&args[0].endsWith('/actions')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+for(const action of ['publish','delete'])test(`a lost ${action} decision is recovered without repeating the remote operation`,async()=>{
+ const view=mount({realManual:true,onRequest:lostDecisionResponse});
+ try{
+  await settled();await prepareManualAction(view,action);await view.button(action==='publish'?'Autorizar publicação':'Autorizar exclusão').props.onClick();await settled();
+  await view.button('Conferir decisão').props.onClick();await settled();await settled();
+  if(action==='publish')assert.match(text(modal(view)),/app atualizado 44/);else{assert.equal(modal(view),undefined);assert.equal(find(view.root,item=>item.kind==='button'&&item.props.class==='catalog-resource'),undefined);}
+  assert.deepEqual(freshRequests(view),['/catalog/923/sections/app?refresh=1']);assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.equal(view.requests.filter(args=>args[1]==='POST'&&args[0].endsWith('/actions')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+test('a lost rejection is confirmed as rejected and never starts another action',async()=>{
+ const view=mount({realManual:true,onRequest:lostDecisionResponse});
+ try{
+  await settled();await prepareManualAction(view,'clone');await view.button('Recusar').props.onClick();await settled();await view.button('Conferir decisão').props.onClick();await settled();
+  assert.match(text(modal(view)),/Operação recusada/);assert.doesNotMatch(text(modal(view)),/Cópia criada/);assert.equal(Boolean(view.button('Autorizar duplicação')),false);assert.deepEqual(freshRequests(view),[]);assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+for(const mismatch of [
+ {name:'identity',change:review=>({...review,id:'00000000-0000-4000-8000-000000000099'})},
+ {name:'fingerprint',change:review=>({...review,fingerprint:'b'.repeat(64)})},
+ {name:'action',change:review=>({...review,payload:{...review.payload,action:{...review.payload.action,action:'delete_draft'}}})},
+ {name:'resource',change:review=>({...review,payload:{...review.payload,action:{...review.payload.action,resource:'app:99'}}})},
+ {name:'unrecognized status',change:review=>({...review,status:'unknown'})},
+])test(`a recovery response with a mismatched ${mismatch.name} cannot release the uncertain decision`,async()=>{
+ let reads=0;const view=mount({realManual:true,onRequest:(path,response)=>{if(path.startsWith('/bi-actions/')&&++reads===1)return{...response,approval:mismatch.change(response.approval)};return lostDecisionResponse(path,response);}});
+ try{
+  await settled();await prepareManualAction(view,'clone');await view.button('Autorizar duplicação').props.onClick();await settled();await view.button('Conferir decisão').props.onClick();await settled();
+  assert.match(text(modal(view)),/não corresponde/);assert.equal(Boolean(view.button('Autorizar duplicação')),false);assert.deepEqual(freshRequests(view),[]);
+  await view.button('Conferir decisão').props.onClick();await settled();await settled();assert.match(text(modal(view)),/Cópia criada na sua mesa/);assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+test('a decision that never reached the server requires a fresh user choice after a confirmed pending read',async()=>{
+ let lost=true;const view=mount({realManual:true,beforeRequest:path=>{if(path.endsWith('/decide')&&lost){lost=false;throw new Error('A decisão não chegou ao servidor.');}}});
+ try{
+  await settled();await prepareManualAction(view,'clone');await view.button('Autorizar duplicação').props.onClick();await settled();await view.button('Conferir decisão').props.onClick();await settled();
+  assert.ok(view.button('Autorizar duplicação'));assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.doesNotMatch(text(modal(view)),/Cópia criada/);assert.deepEqual(freshRequests(view),[]);
+  await view.button('Autorizar duplicação').props.onClick();await settled();await settled();assert.match(text(modal(view)),/Cópia criada na sua mesa/);assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,2);assert.equal(view.requests.filter(args=>args[1]==='POST'&&args[0].endsWith('/actions')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+test('a failed status read keeps the decision locked until the existing review can be checked',async()=>{
+ let reads=0;const view=mount({realManual:true,onRequest:(path,response)=>{if(path.startsWith('/bi-actions/')&&++reads===1)throw new Error('A consulta do estado está indisponível.');return lostDecisionResponse(path,response);}});
+ try{
+  await settled();await prepareManualAction(view,'clone');await view.button('Autorizar duplicação').props.onClick();await settled();await view.button('Conferir decisão').props.onClick();await settled();
+  assert.match(text(modal(view)),/consulta do estado está indisponível/);assert.equal(Boolean(view.button('Autorizar duplicação')),false);assert.deepEqual(freshRequests(view),[]);
+  await view.button('Conferir decisão').props.onClick();await settled();await settled();assert.match(text(modal(view)),/Cópia criada na sua mesa/);assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{view.close();}
+});
+test('a delayed recovery from a closed modal cannot change the newer resource view',async()=>{
+ let release;const view=mount({realManual:true,onRequest:(path,response)=>path.startsWith('/bi-actions/')?new Promise(resolve=>release=()=>resolve(response)):lostDecisionResponse(path,response)});
+ try{
+  await settled();await prepareManualAction(view,'clone');await view.button('Autorizar duplicação').props.onClick();await settled();const checking=view.button('Conferir decisão').props.onClick();await settled();
+  find(view.root,item=>item.kind==='button'&&item.props['aria-label']==='Fechar recurso').props.onClick();await settled();view.openFirst();await settled();release();await checking;await settled();
+  assert.doesNotMatch(text(modal(view)),/Cópia criada|Conferir decisão/);assert.deepEqual(freshRequests(view),[]);assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.deepEqual(view.errors,[]);
+ }finally{release?.();view.close();}
+});
+test('the visible manual review automatically checks an uncertain decision without another POST',async t=>{
+ let poll;t.mock.method(globalThis,'setInterval',callback=>{poll=callback;return 0;});
+ const view=mount({realManual:true,onRequest:lostDecisionResponse});
+ try{
+  await settled();await prepareManualAction(view,'clone');await view.button('Autorizar duplicação').props.onClick();await settled();document.hidden=true;poll();await settled();assert.equal(view.requests.filter(args=>args[0].startsWith('/bi-actions/')).length,0);document.hidden=false;poll();await settled();await settled();
+  assert.match(text(modal(view)),/Cópia criada na sua mesa/);assert.equal(view.requests.filter(args=>args[0].startsWith('/bi-actions/')).length,1);assert.equal(view.requests.filter(args=>args[0].endsWith('/decide')).length,1);assert.deepEqual(view.errors,[]);
  }finally{view.close();}
 });
