@@ -163,7 +163,7 @@ class BiScheduleRuns
                     }
                 } finally {
                     if (in_array($execution->fresh()->status, self::OBSERVING, true)) {
-                        ObserveBiLoadExecution::dispatch($execution->id)->onQueue('agents')->delay(now()->addSeconds(5));
+                        ObserveBiLoadExecution::dispatch($execution->id)->delay(now()->addSeconds(5));
                     }
                     Audit::record($user->id, 'bi.load.requested', 'Tentativa de carga registrada; resultado final tem conferência própria.', $project?->id, ['execution_id' => $execution->id, 'approval_id' => $approval->id, 'tenant_id' => $context->tenant_id, 'schedule_id' => $id]);
                 }
@@ -199,7 +199,7 @@ class BiScheduleRuns
 
         $result = $this->observeRecord($execution);
         if (in_array($result['status'], self::OBSERVING, true)) {
-            ObserveBiLoadExecution::dispatch($execution->id)->onQueue('agents')->delay(now()->addSeconds(15));
+            ObserveBiLoadExecution::dispatch($execution->id)->delay(now()->addSeconds(15));
         }
 
         return $result;

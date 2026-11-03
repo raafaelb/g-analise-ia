@@ -76,7 +76,7 @@ Artisan::command('horus:user {email} {--name=} {--role=editor}', function () {
 Schedule::call(function () {
     Artisan::call('ganalise:expire-reviews');
     if (Schema::hasTable('bi_load_executions')) {
-        BiLoadExecution::whereIn('status', BiScheduleRuns::OBSERVING)->where('updated_at', '<', now()->subMinutes(5))->limit(50)->get()->each(fn (BiLoadExecution $execution) => ObserveBiLoadExecution::dispatch($execution->id)->onQueue('agents'));
+        BiLoadExecution::whereIn('status', BiScheduleRuns::OBSERVING)->where('updated_at', '<', now()->subMinutes(5))->limit(50)->get()->each(fn (BiLoadExecution $execution) => ObserveBiLoadExecution::dispatch($execution->id));
     }
     HelpQuestion::interrupted()->update(['status' => 'failed', 'error_message' => 'O atendimento foi interrompido. Envie uma nova pergunta para continuar.', 'finished_at' => now()]);
     AgentRun::whereIn('status', ['running'])->where('heartbeat_at', '<', now()->subMinutes(5))->each(function ($run) {

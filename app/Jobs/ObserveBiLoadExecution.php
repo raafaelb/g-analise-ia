@@ -18,7 +18,10 @@ class ObserveBiLoadExecution implements ShouldBeUniqueUntilProcessing, ShouldQue
 
     public int $timeout = 170;
 
-    public function __construct(public string $executionId) {}
+    public function __construct(public string $executionId)
+    {
+        $this->onQueue('actions');
+    }
 
     public function uniqueId(): string
     {
@@ -33,7 +36,7 @@ class ObserveBiLoadExecution implements ShouldBeUniqueUntilProcessing, ShouldQue
         }
         $result = $runs->observeRecord($execution);
         if (in_array($result['status'], BiScheduleRuns::OBSERVING, true)) {
-            self::dispatch($execution->id)->onQueue('agents')->delay(now()->addSeconds(15));
+            self::dispatch($execution->id)->delay(now()->addSeconds(15));
         }
     }
 }

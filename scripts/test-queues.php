@@ -3,6 +3,7 @@
 /** Proves worker independence only inside the disposable HTTPS rehearsal. */
 require dirname(__DIR__).'/vendor/autoload.php';
 
+use App\Jobs\ObserveBiLoadExecution;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Queue\CallQueuedClosure;
 use Illuminate\Support\Facades\Bus;
@@ -18,9 +19,14 @@ if (! in_array('--disposable', $argv, true) || config('database.default') !== 'p
 $prefix = 'operations:queue-rehearsal:'.bin2hex(random_bytes(12));
 $file = 'operations/queue-rehearsal-'.bin2hex(random_bytes(12)).'.txt';
 $parallel = in_array('--parallel', $argv, true);
-$keys = ['agents_started', 'agents_finished', 'agents_worker', 'actions', 'documents', 'help'];
+$keys = ['agents_started', 'agents_finished', 'agents_worker', 'actions', 'documents', 'help', 'bi_observation'];
 $report = ['ok' => false, 'isolated_database' => true, 'external_calls' => false];
 try {
+    $observationQueue = (new ObserveBiLoadExecution('00000000-0000-4000-8000-000000000001'))->queue;
+    if ($observationQueue !== 'actions') {
+        throw new RuntimeException('A conferência de cargas precisa usar a fila de ações BI, separada da IA.');
+    }
+    $report['bi_observation_queue'] = $observationQueue;
     Storage::disk('local')->put($file, $prefix);
     Bus::dispatch(CallQueuedClosure::create(static function () use ($prefix): void {
         Cache::put($prefix.':agents_started', microtime(true), 45);
@@ -35,12 +41,12 @@ try {
     if (! Cache::has($prefix.':agents_started')) {
         throw new RuntimeException('O worker de IA não iniciou a tarefa sintética.');
     }
-    foreach (['actions', 'documents', 'help'] as $channel) {
-        Bus::dispatch(CallQueuedClosure::create(static function () use ($prefix, $channel, $file): void {
+    foreach (['actions' => 'actions', 'documents' => 'documents', 'help' => 'help', 'bi_observation' => $observationQueue] as $key => $channel) {
+        Bus::dispatch(CallQueuedClosure::create(static function () use ($prefix, $key, $channel, $file): void {
             if ($channel === 'documents' && Storage::disk('local')->get($file) !== $prefix) {
                 throw new RuntimeException('O worker de documentos não recebeu o arquivo privado do portal.');
             }
-            Cache::put($prefix.':'.$channel, microtime(true), 45);
+            Cache::put($prefix.':'.$key, microtime(true), 45);
         })->onQueue($channel));
     }
     if ($parallel) {
@@ -67,7 +73,7 @@ try {
         throw new RuntimeException('Um dos workers não concluiu a tarefa sintética no prazo.');
     }
     $independent = [];
-    foreach (['actions', 'documents', 'help'] as $channel) {
+    foreach (['actions', 'documents', 'help', 'bi_observation'] as $channel) {
         $independent[$channel] = $values[$channel] >= $values['agents_started'] && $values[$channel] < $values['agents_finished'];
     }
     $report['independent_while_agent_busy'] = $independent;

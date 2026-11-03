@@ -20,6 +20,8 @@ use App\Services\BiScheduleRuns;
 use App\Services\LumoClient;
 use App\Services\UserAccessRevocation;
 use App\Services\WorkspaceFiles;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
@@ -191,7 +193,7 @@ class BiScheduleRunsTest extends TestCase
         $this->assertFalse($review->payload['execution']['result']['execution_request']['verified']);
         $this->assertSame(1, $this->sends());
         $this->assertSame($before, $this->bodies);
-        Queue::assertPushed(ObserveBiLoadExecution::class, fn ($job) => $job->executionId === BiLoadExecution::sole()->id);
+        Queue::assertPushedOn('actions', ObserveBiLoadExecution::class, fn ($job) => $job->executionId === BiLoadExecution::sole()->id);
     }
 
     public function test_a_published_source_without_execution_history_can_receive_its_first_load(): void
@@ -207,7 +209,7 @@ class BiScheduleRunsTest extends TestCase
         $this->assertSame('accepted', BiLoadExecution::sole()->status);
         $this->assertFalse($review->payload['execution']['result']['execution_request']['verified']);
         $this->assertSame(1, $this->sends());
-        Queue::assertPushed(ObserveBiLoadExecution::class, fn ($job) => $job->executionId === BiLoadExecution::sole()->id);
+        Queue::assertPushedOn('actions', ObserveBiLoadExecution::class, fn ($job) => $job->executionId === BiLoadExecution::sole()->id);
     }
 
     #[TestWith([6])]
@@ -463,7 +465,7 @@ class BiScheduleRunsTest extends TestCase
 
         $this->assertSame('accepted', $load->fresh()->status);
         $this->assertSame(0, $this->sends());
-        Queue::assertPushed(ObserveBiLoadExecution::class, fn ($job) => $job->executionId === $load->id && $job->queue === 'agents');
+        Queue::assertPushed(ObserveBiLoadExecution::class, fn ($job) => $job->executionId === $load->id && $job->queue === 'actions');
     }
 
     public function test_observation_stops_after_four_hours_without_claiming_failure_of_the_native_job(): void
@@ -559,10 +561,40 @@ class BiScheduleRunsTest extends TestCase
         [$user] = $this->context();
         $load = BiLoadExecution::factory()->create(['user_id' => $user->id]);
 
-        ObserveBiLoadExecution::dispatch($load->id)->onQueue('agents')->delay(now()->addSeconds(15));
-        ObserveBiLoadExecution::dispatch($load->id)->onQueue('agents')->delay(now()->addSeconds(15));
+        ObserveBiLoadExecution::dispatch($load->id)->delay(now()->addSeconds(15));
+        ObserveBiLoadExecution::dispatch($load->id)->delay(now()->addSeconds(15));
 
         Queue::assertPushed(ObserveBiLoadExecution::class, 1);
         $this->assertSame(0, $this->sends());
+    }
+
+    public function test_manual_observation_keeps_pending_followups_outside_the_ai_queue(): void
+    {
+        Queue::fake([ObserveBiLoadExecution::class]);
+        [$user, $connection] = $this->context();
+        $load = BiLoadExecution::factory()->create(['user_id' => $user->id, 'connection_id' => $connection->id]);
+        $load->update(['metadata' => [...$load->metadata, 'connection_generation' => $connection->metadata['session_generation'], 'access_version' => $user->access_version]]);
+
+        $this->actingAs($user)->postJson('/api/bi-loads/'.$load->id.'/observe')->assertOk()->assertJsonPath('status', 'accepted');
+
+        Queue::assertPushedOn('actions', ObserveBiLoadExecution::class, fn ($job) => $job->executionId === $load->id);
+        $this->assertSame(0, $this->sends());
+        $this->assertSame('accepted', $load->fresh()->status);
+    }
+
+    public function test_maintenance_queues_stale_load_observations_outside_the_ai_queue(): void
+    {
+        Queue::fake([ObserveBiLoadExecution::class]);
+        [$user, $connection] = $this->context();
+        $load = BiLoadExecution::factory()->create(['user_id' => $user->id, 'connection_id' => $connection->id, 'updated_at' => now()->subMinutes(6)]);
+        $this->app->make(ConsoleKernel::class)->bootstrap();
+        $maintenance = collect($this->app->make(Schedule::class)->events())->first(fn ($event) => $event->description === 'workspace-maintenance');
+        $this->assertNotNull($maintenance);
+
+        $maintenance->run($this->app);
+
+        Queue::assertPushedOn('actions', ObserveBiLoadExecution::class, fn ($job) => $job->executionId === $load->id);
+        $this->assertSame(0, $this->sends());
+        $this->assertSame('accepted', $load->fresh()->status);
     }
 }
