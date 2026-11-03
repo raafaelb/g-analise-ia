@@ -9,7 +9,11 @@ x-app: &app
     DB_USERNAME: ensaio
     DB_PASSWORD: ""
     REDIS_HOST: redis
-  volumes: ["ephemeral-storage:/var/www/html/storage"]
+  volumes:
+    - type: volume
+      source: ephemeral-storage
+      target: /var/www/html/storage
+      volume: {nocopy: true}
   depends_on:
     postgres: {condition: service_healthy}
     redis: {condition: service_healthy}
